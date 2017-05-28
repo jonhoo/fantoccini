@@ -955,3 +955,97 @@ impl<'a> Form<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tester<F>(f: F)
+        where F: FnOnce(Client) -> Result<(), error::CmdError>
+    {
+        match Client::new("http://localhost:4444") {
+            Ok(c) => {
+                match f(c) {
+                    Ok(_) => {}
+                    Err(e) => {
+                        println!("{}", e);
+                        assert!(false);
+                    }
+                }
+            }
+            Err(e) => {
+                println!("{}", e);
+                assert!(false);
+            }
+        }
+    }
+
+    fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
+        // go to the Wikipedia page for Foobar
+        c.goto("https://en.wikipedia.org/wiki/Foobar")?;
+        assert_eq!(c.current_url()?.as_ref(),
+                   "https://en.wikipedia.org/wiki/Foobar");
+        // click "Foo (disambiguation)"
+        c.click(".mw-disambig")?;
+        // click "Foo Lake"
+        c.click_by_text("Foo Lake")?;
+        assert_eq!(c.current_url()?.as_ref(),
+                   "https://en.wikipedia.org/wiki/Foo_Lake");
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn it_works() {
+        tester(works_inner)
+    }
+
+    fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
+        // go to the Wikipedia frontpage this time
+        c.goto("https://www.wikipedia.org/")?;
+        // find, fill out, and submit the search form
+        {
+            let mut f = c.form("#search-form")?;
+            f.set_by_name("search", "foobar")?;
+            f.submit()?;
+        }
+        // we should now have ended up in the rigth place
+        assert_eq!(c.current_url()?.as_ref(),
+                   "https://en.wikipedia.org/wiki/Foobar");
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn it_clicks() {
+        tester(clicks_inner)
+    }
+
+    fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
+        // go back to the frontpage
+        c.goto("https://www.wikipedia.org/")?;
+        // find the source for the Wikipedia globe
+        let img = c.lookup_attr("img.central-featured-logo", "src")
+            .expect("image should be on page")
+            .expect("image should have a src");
+        // now build a raw HTTP client request (which also has all current cookies)
+        let raw = c.raw_client_for(Method::Get, &img)?;
+        // this is a RequestBuilder from hyper, so we could also add POST data here
+        // but for this we just send the request
+        let mut res = raw.send()?;
+        // we then read out the image bytes
+        use std::io::prelude::*;
+        let mut pixels = Vec::new();
+        res.read_to_end(&mut pixels)?;
+        // and voilla, we now have the bytes for the Wikipedia logo!
+        assert!(pixels.len() > 0);
+        println!("Wikipedia logo is {}b", pixels.len());
+        Ok(())
+    }
+
+    #[test]
+    #[ignore]
+    fn it_can_be_raw() {
+        tester(raw_inner)
+    }
+}
