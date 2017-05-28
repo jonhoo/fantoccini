@@ -16,10 +16,12 @@
 //! # Examples
 //!
 //! These examples all assume that you have a [WebDriver compatible] process running on port 4444.
-//! A quick way to get one is to run [`geckodriver`] at the command line. The examples will also be
-//! using `unwrap` generously --- you should probably not do that in your code, and instead deal
-//! with errors when they occur. This is particularly true for methods that you *expect* might
-//! fail, such as lookups by CSS selector.
+//! A quick way to get one is to run [`geckodriver`] at the command line. The code also has
+//! partial support for the legacy WebDriver protocol used by `chromedriver` and `ghostdriver`.
+//!
+//! The examples will be using `unwrap` generously --- you should probably not do that in your
+//! code, and instead deal with errors when they occur. This is particularly true for methods that
+//! you *expect* might fail, such as lookups by CSS selector.
 //!
 //! Let's start out clicking around on Wikipedia:
 //!
@@ -112,6 +114,7 @@ pub struct Client {
     c: hyper::Client,
     wdb: hyper::Url,
     session: Option<String>,
+    legacy: bool,
 }
 
 /// An HTML form on the current page.
@@ -121,6 +124,46 @@ pub struct Form<'a> {
 }
 
 impl Client {
+    fn init(&mut self,
+            params: webdriver::command::NewSessionParameters)
+            -> Result<(), error::NewSessionError> {
+
+        if let webdriver::command::NewSessionParameters::Legacy(..) = params {
+            self.legacy = true;
+        }
+
+        // Create a new session for this client
+        // https://www.w3.org/TR/webdriver/#dfn-new-session
+        match self.issue_wd_cmd(WebDriverCommand::NewSession(params)) {
+            Ok(Json::Object(mut v)) => {
+                // TODO: not all impls are w3c compatible
+                // See https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L189
+                // and https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L200
+                if let Some(session_id) = v.remove("sessionId") {
+                    if let Some(session_id) = session_id.as_string() {
+                        self.session = Some(session_id.to_string());
+                        return Ok(());
+                    }
+                    v.insert("sessionId".to_string(), session_id);
+                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
+                } else {
+                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
+                }
+            }
+            Ok(v) => Err(error::NewSessionError::NotW3C(v)),
+            Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
+            Err(error::CmdError::NotJson(v)) => {
+                Err(error::NewSessionError::NotW3C(Json::String(v)))
+            }
+            Err(error::CmdError::Standard(e @ WebDriverError {
+                                              error: ErrorStatus::SessionNotCreated, ..
+                                          })) => Err(error::NewSessionError::SessionNotCreated(e)),
+            Err(e) => {
+                panic!("unexpected webdriver error; {}", e);
+            }
+        }
+    }
+
     /// Create a new `Client` associated with a new WebDriver session on the server at the given
     /// URL.
     pub fn new<U: hyper::client::IntoUrl>(webdriver: U) -> Result<Self, error::NewSessionError> {
@@ -139,6 +182,7 @@ impl Client {
             c: client,
             wdb,
             session: None,
+            legacy: false,
         };
 
         // Required capabilities
@@ -149,36 +193,48 @@ impl Client {
                    Json::String("normal".to_string()));
 
         let session_config = webdriver::capabilities::SpecNewSessionParameters {
-            alwaysMatch: cap,
+            alwaysMatch: cap.clone(),
             firstMatch: vec![],
         };
         let spec = webdriver::command::NewSessionParameters::Spec(session_config);
 
-        // Create a new session for this client
-        // https://www.w3.org/TR/webdriver/#dfn-new-session
-        match c.issue_wd_cmd(WebDriverCommand::NewSession(spec)) {
-            Ok(Json::Object(mut v)) => {
-                // TODO: not all impls are w3c compatible
-                // See https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L189
-                // and https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L200
-                if let Some(session_id) = v.remove("sessionId") {
-                    if let Some(session_id) = session_id.as_string() {
-                        c.session = Some(session_id.to_string());
-                        return Ok(c);
+        match c.init(spec) {
+            Ok(_) => Ok(c),
+            Err(error::NewSessionError::NotW3C(json)) => {
+                let mut legacy = false;
+                match json {
+                    Json::String(ref err) if err.starts_with("Missing Command Parameter") => {
+                        // ghostdriver
+                        legacy = true;
                     }
-                    v.insert("sessionId".to_string(), session_id);
-                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
+                    Json::Object(ref err) => {
+                        if err.contains_key("message") &&
+                           err["message"]
+                               .as_string()
+                               .map(|s| s.contains("cannot find dict 'desiredCapabilities'"))
+                               .unwrap_or(false) {
+                            // chromedriver
+                            legacy = true;
+                        }
+                    }
+                    _ => {}
+                }
+
+                if legacy {
+                    // we're dealing with an implementation that only supports the legacy WebDriver
+                    // protocol: https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
+                    let session_config = webdriver::capabilities::LegacyNewSessionParameters {
+                        required: cap,
+                        desired: webdriver::capabilities::Capabilities::new(),
+                    };
+                    let spec = webdriver::command::NewSessionParameters::Legacy(session_config);
+                    c.init(spec)?;
+                    Ok(c)
                 } else {
-                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
+                    Err(error::NewSessionError::NotW3C(json))
                 }
             }
-            Ok(v) => Err(error::NewSessionError::NotW3C(v)),
-            Err(error::CmdError::Standard(e @ WebDriverError {
-                                              error: ErrorStatus::SessionNotCreated, ..
-                                          })) => Err(error::NewSessionError::SessionNotCreated(e)),
-            Err(e) => {
-                panic!("unexpected webdriver error; {}", e);
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -204,6 +260,7 @@ impl Client {
             WebDriverCommand::GetPageSource => base.join("source"),
             WebDriverCommand::FindElement(..) => base.join("element"),
             WebDriverCommand::GetCookies => base.join("cookie"),
+            WebDriverCommand::ExecuteScript(..) if self.legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
                 base.join(&format!("element/{}/property/{}", we.id, prop))
@@ -252,6 +309,10 @@ impl Client {
                 body = Some(format!("{}", conf.to_json()));
                 method = Method::Post;
             }
+            WebDriverCommand::NewSession(command::NewSessionParameters::Legacy(ref conf)) => {
+                body = Some(format!("{}", conf.to_json()));
+                method = Method::Post;
+            }
             WebDriverCommand::Get(ref params) => {
                 body = Some(format!("{}", params.to_json()));
                 method = Method::Post;
@@ -284,7 +345,10 @@ impl Client {
             let req = self.c.request(method, url);
             if let Some(ref body) = body {
                 let json = body.as_bytes();
-                req.body(hyper::client::Body::BufBody(json, json.len()))
+                let mut headers = hyper::header::Headers::new();
+                headers.set(hyper::header::ContentType::json());
+                req.headers(headers)
+                    .body(hyper::client::Body::BufBody(json, json.len()))
                     .send()
             } else {
                 req.send()
@@ -316,13 +380,23 @@ impl Client {
             }
         }
 
+        let is_new_session = if let WebDriverCommand::NewSession(..) = cmd {
+            true
+        } else {
+            false
+        };
 
         // https://www.w3.org/TR/webdriver/#dfn-send-a-response
         // NOTE: the standard specifies that even errors use the "Send a Reponse" steps
         let body = match Json::from_reader(&mut res)? {
             Json::Object(mut v) => {
-                v.remove("value")
-                    .ok_or_else(|| error::CmdError::NotW3C(Json::Object(v)))
+                if !self.legacy || !is_new_session {
+                    v.remove("value")
+                        .ok_or_else(|| error::CmdError::NotW3C(Json::Object(v)))
+                } else {
+                    // legacy implementations do not wrap sessionId inside "value"
+                    Ok(Json::Object(v))
+                }
             }
             v => Err(error::CmdError::NotW3C(v)),
         }?;
@@ -533,11 +607,18 @@ impl Client {
                                               } else {
                                                   unimplemented!();
                                               });
-            let expiry = val_of("expiry").map(|v| if let Some(secs) = v.as_u64() {
-                                                  webdriver::common::Date::new(secs)
-                                              } else {
-                                                  unimplemented!();
-                                              });
+            let expiry =
+                val_of("expiry").map(|v| match v {
+                                         Json::U64(secs) => webdriver::common::Date::new(secs),
+                                         Json::I64(secs) => {
+                                             webdriver::common::Date::new(secs as u64)
+                                         }
+                                         Json::F64(secs) => {
+                                             // this is only needed for chromedriver
+                                             webdriver::common::Date::new(secs as u64)
+                                         }
+                                         _ => unimplemented!(),
+                                     });
 
             // Object({"domain": String("www.wikipedia.org"), "expiry": Null, "httpOnly": Boolean(false), "name": String("CP"), "path": String("/"), "secure": Boolean(false), "value": String("H2")}
             // NOTE: too bad webdriver::response::Cookie doesn't implement FromJson
@@ -683,7 +764,8 @@ impl Client {
             using: webdriver::common::LocatorStrategy::LinkText,
             value: text.to_string(),
         };
-        let res = Self::parse_lookup(self.issue_wd_cmd(WebDriverCommand::FindElement(locator)));
+        let res = self.issue_wd_cmd(WebDriverCommand::FindElement(locator));
+        let res = self.parse_lookup(res);
         self.finish_click(res)
     }
 
@@ -772,7 +854,38 @@ impl Client {
     /// Look up an element on the page given a CSS selector.
     fn lookup(&self, selector: &str) -> Result<webdriver::common::WebElement, error::CmdError> {
         let locator = Self::mklocator(selector);
-        Self::parse_lookup(self.issue_wd_cmd(WebDriverCommand::FindElement(locator)))
+        let res = self.issue_wd_cmd(WebDriverCommand::FindElement(locator));
+        self.parse_lookup(res)
+    }
+
+    /// Extract the `WebElement` from a `FindElement` or `FindElementElement` command.
+    fn parse_lookup(&self,
+                    res: Result<Json, error::CmdError>)
+                    -> Result<webdriver::common::WebElement, error::CmdError> {
+        let res = res?;
+        if !res.is_object() {
+            return Err(error::CmdError::NotW3C(res));
+        }
+
+        // legacy protocol uses "ELEMENT" as identifier
+        let key = if self.legacy { "ELEMENT" } else { ELEMENT_KEY };
+
+        let mut res = res.into_object().unwrap();
+        if !res.contains_key(key) {
+            return Err(error::CmdError::NotW3C(Json::Object(res)));
+        }
+
+        match res.remove(key) {
+            Some(Json::String(wei)) => {
+                return Ok(webdriver::common::WebElement::new(wei));
+            }
+            Some(v) => {
+                res.insert(key.to_string(), v);
+            }
+            None => {}
+        }
+
+        Err(error::CmdError::NotW3C(Json::Object(res)))
     }
 
     /// Make a WebDriver locator for the given CSS selector.
@@ -783,32 +896,6 @@ impl Client {
             using: webdriver::common::LocatorStrategy::CSSSelector,
             value: selector.to_string(),
         }
-    }
-
-    /// Extract the `WebElement` from a `FindElement` or `FindElementElement` command.
-    fn parse_lookup(res: Result<Json, error::CmdError>)
-                    -> Result<webdriver::common::WebElement, error::CmdError> {
-        let res = res?;
-        if !res.is_object() {
-            return Err(error::CmdError::NotW3C(res));
-        }
-
-        let mut res = res.into_object().unwrap();
-        if !res.contains_key(ELEMENT_KEY) {
-            return Err(error::CmdError::NotW3C(Json::Object(res)));
-        }
-
-        match res.remove(ELEMENT_KEY) {
-            Some(Json::String(wei)) => {
-                return Ok(webdriver::common::WebElement::new(wei));
-            }
-            Some(v) => {
-                res.insert(ELEMENT_KEY.to_string(), v);
-            }
-            None => {}
-        }
-
-        Err(error::CmdError::NotW3C(Json::Object(res)))
     }
 }
 
@@ -829,10 +916,20 @@ impl<'a> Form<'a> {
         let locator = Client::mklocator(&format!("input[name='{}']", field));
         let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator);
         let res = self.c.issue_wd_cmd(locator);
-        let field = Client::parse_lookup(res)?;
+        let field = self.c.parse_lookup(res)?;
 
         use rustc_serialize::json::ToJson;
-        let args = vec![field.to_json(), Json::String(value.to_string())];
+        let mut args = vec![field.to_json(), Json::String(value.to_string())];
+        if self.c.legacy {
+            // the serialization of WebElement uses the W3C index,
+            // but legacy implementations need us to use the "ELEMENT" index
+            if let Json::Object(ref mut o) = *args.get_mut(0).unwrap() {
+                let wei = o.remove(ELEMENT_KEY).unwrap();
+                o.insert("ELEMENT".to_string(), wei);
+            } else {
+                unreachable!()
+            }
+        }
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "arguments[0].value = arguments[1]".to_string(),
             args: webdriver::common::Nullable::Value(args),
@@ -862,7 +959,7 @@ impl<'a> Form<'a> {
         let locator = WebDriverCommand::FindElementElement(self.f, locator);
         let res = self.c.issue_wd_cmd(locator);
 
-        let submit = Client::parse_lookup(res)?;
+        let submit = self.c.parse_lookup(res)?;
         let res = self.c.issue_wd_cmd(WebDriverCommand::ElementClick(submit))?;
 
         if res.is_null() {

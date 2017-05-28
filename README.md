@@ -22,10 +22,12 @@ source code, and `Client::raw_client_for` to build a raw HTTP request for a part
 ## Examples
 
 These examples all assume that you have a [WebDriver compatible] process running on port 4444.
-A quick way to get one is to run [`geckodriver`] at the command line. The examples will also be
-using `unwrap` generously --- you should probably not do that in your code, and instead deal
-with errors when they occur. This is particularly true for methods that you *expect* might
-fail, such as lookups by CSS selector.
+A quick way to get one is to run [`geckodriver`] at the command line. The code also has
+partial support for the legacy WebDriver protocol used by `chromedriver` and `ghostdriver`.
+
+The examples will be using `unwrap` generously --- you should probably not do that in your
+code, and instead deal with errors when they occur. This is particularly true for methods that
+you *expect* might fail, such as lookups by CSS selector.
 
 Let's start out clicking around on Wikipedia:
 

@@ -8,7 +8,7 @@ use rustc_serialize::json;
 /// An error occured while attempting to establish a session for a new `Client`.
 #[derive(Debug)]
 pub enum NewSessionError {
-    /// The given WebDriver URl is invalid.
+    /// The given WebDriver URL is invalid.
     BadWebdriverUrl(herror::ParseError),
     /// The server did not give a WebDriver-conforming response.
     NotW3C(json::Json),
