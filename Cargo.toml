@@ -7,3 +7,5 @@ authors = ["Jon Gjengset <jon@thesquareplanet.com>"]
 hyper = "0.10.10"
 webdriver = "0.25.2"
 rustc-serialize = "0.3"
+cookie = "0.6.2" # needs to be held back to match webdriver for Cookie.into()
+hyper-native-tls = "0.2.2"
