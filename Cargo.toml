@@ -1,0 +1,9 @@
+[package]
+name = "fantoccini"
+version = "0.1.0"
+authors = ["Jon Gjengset <jon@thesquareplanet.com>"]
+
+[dependencies]
+hyper = "0.10.10"
+webdriver = "0.25.2"
+rustc-serialize = "0.3"
