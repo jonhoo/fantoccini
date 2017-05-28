@@ -563,10 +563,6 @@ impl Client {
         }
 
         if all_ok {
-            println!("making {:?} request for {} with cookies: {:#?}",
-                     method,
-                     url,
-                     jar);
             let mut headers = hyper::header::Headers::new();
             headers.set(hyper::header::Cookie(jar));
             Ok(self.c.request(method, url).headers(headers))
