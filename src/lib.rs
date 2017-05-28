@@ -13,10 +13,78 @@
 //! For low-level access to the page, `Client::source` can be used to fetch the full page HTML
 //! source code, and `Client::raw_client_for` to build a raw HTTP request for a particular URL.
 //!
+//! # Examples
+//!
+//! These examples all assume that you have a [WebDriver compatible] process running on port 4444.
+//! A quick way to get one is to run [`geckodriver`] at the command line. The examples will also be
+//! using `unwrap` generously --- you should probably not do that in your code, and instead deal
+//! with errors when they occur. This is particularly true for methods that you *expect* might
+//! fail, such as lookups by CSS selector.
+//!
+//! Let's start out clicking around on Wikipedia:
+//!
+//! ```
+//! # use fantoccini::Client;
+//! let mut c = Client::new("http://localhost:4444").unwrap();
+//! // go to the Wikipedia page for Foobar
+//! c.goto("https://en.wikipedia.org/wiki/Foobar").unwrap();
+//! assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+//! // click "Foo (disambiguation)"
+//! c.click(".mw-disambig").unwrap();
+//! // click "Foo Lake"
+//! c.click_by_text("Foo Lake").unwrap();
+//! assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+//! ```
+//!
+//! How did we get to the Foobar page in the first place? We did a search!
+//! Let's make the program do that for us instead:
+//!
+//! ```
+//! # use fantoccini::Client;
+//! # let mut c = Client::new("http://localhost:4444").unwrap();
+//! // go to the Wikipedia frontpage this time
+//! c.goto("https://www.wikipedia.org/").unwrap();
+//! // find, fill out, and submit the search form
+//! {
+//!     let mut f = c.form("#search-form").unwrap();
+//!     f.set_by_name("search", "foobar").unwrap();
+//!     f.submit().unwrap();
+//! }
+//! // we should now have ended up in the rigth place
+//! assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+//! ```
+//!
+//! What if we want to download a raw file? Fantoccini has you covered:
+//!
+//! ```
+//! # use fantoccini::Client;
+//! # let mut c = Client::new("http://localhost:4444").unwrap();
+//! // go back to the frontpage
+//! c.goto("https://www.wikipedia.org/").unwrap();
+//! // find the source for the Wikipedia globe
+//! let img = c.lookup_attr("img.central-featured-logo", "src")
+//!     .expect("image should be on page")
+//!     .expect("image should have a src");
+//! // now build a raw HTTP client request (which also has all current cookies)
+//! let raw = c.raw_client_for(fantoccini::Method::Get, &img).unwrap();
+//! // this is a RequestBuilder from hyper, so we could also add POST data here
+//! // but for this we just send the request
+//! let mut res = raw.send().unwrap();
+//! // we then read out the image bytes
+//! use std::io::prelude::*;
+//! let mut pixels = Vec::new();
+//! res.read_to_end(&mut pixels).unwrap();
+//! // and voilla, we now have the bytes for the Wikipedia logo!
+//! assert!(pixels.len() > 0);
+//! println!("Wikipedia logo is {}b", pixels.len());
+//! ```
+//!
 //! [WebDriver protocol]: https://www.w3.org/TR/webdriver/
 //! [CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
 //! [powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
 //! [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
+//! [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
+//! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
 
 extern crate hyper_native_tls;
@@ -575,15 +643,10 @@ impl Client {
         self.lookup_prop(selector, prop)
     }
 
-    /// Simulate the user clicking on the element matching the given CSS selector.
-    ///
-    /// For convenience, `Ok(None)` is returned if the element was not found.
-    ///
-    /// Note that this *may* result in navigation.
-    pub fn click<'a>(&'a mut self,
-                     selector: &str)
-                     -> Result<Option<&'a mut Self>, error::CmdError> {
-        match self.lookup(selector) {
+    fn finish_click<'a>(&'a mut self,
+                        res: Result<webdriver::common::WebElement, error::CmdError>)
+                        -> Result<Option<&'a mut Self>, error::CmdError> {
+        match res {
             Err(error::CmdError::NoSuchElement(_)) => Ok(None),
             Err(e) => Err(e),
             Ok(e) => {
@@ -598,6 +661,34 @@ impl Client {
                 }
             }
         }
+    }
+
+    /// Simulate the user clicking on the element matching the given CSS selector.
+    ///
+    /// For convenience, `Ok(None)` is returned if the element was not found.
+    ///
+    /// Note that this *may* result in navigation.
+    pub fn click<'a>(&'a mut self,
+                     selector: &str)
+                     -> Result<Option<&'a mut Self>, error::CmdError> {
+        let res = self.lookup(selector);
+        self.finish_click(res)
+    }
+
+    /// Simulate the user clicking on a link with the given text.
+    ///
+    /// For convenience, `Ok(None)` is returned if the element was not found.
+    ///
+    /// The text matching is exact.
+    pub fn click_by_text<'a>(&'a mut self,
+                             text: &str)
+                             -> Result<Option<&'a mut Self>, error::CmdError> {
+        let locator = webdriver::command::LocatorParameters {
+            using: webdriver::common::LocatorStrategy::LinkText,
+            value: text.to_string(),
+        };
+        let res = Self::parse_lookup(self.issue_wd_cmd(WebDriverCommand::FindElement(locator)));
+        self.finish_click(res)
     }
 
     /// Follow the `href` target of the element matching the given selector *without* causing a
@@ -763,14 +854,14 @@ impl<'a> Form<'a> {
     /// Submit this form using the first available submit button.
     ///
     /// `false` is returned if no submit button was not found.
-    pub fn submit(self) -> Result<(), error::CmdError> {
-        self.submit_using("input[type=submit],button[type=submit]")
+    pub fn submit(self) -> Result<&'a mut Client, error::CmdError> {
+        self.submit_with("input[type=submit],button[type=submit]")
     }
 
     /// Submit this form using the button matched by the given CSS selector.
     ///
     /// `false` is returned if a matching button was not found.
-    pub fn submit_with(self, button: &str) -> Result<(), error::CmdError> {
+    pub fn submit_with(self, button: &str) -> Result<&'a mut Client, error::CmdError> {
         let locator = Client::mklocator(button);
         let locator = WebDriverCommand::FindElementElement(self.f, locator);
         let res = self.c.issue_wd_cmd(locator);
@@ -779,7 +870,10 @@ impl<'a> Form<'a> {
         let res = self.c.issue_wd_cmd(WebDriverCommand::ElementClick(submit))?;
 
         if res.is_null() {
-            Ok(())
+            Ok(self.c)
+        } else if res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+            // geckodriver returns {} :(
+            Ok(self.c)
         } else {
             Err(error::CmdError::NotW3C(res))
         }
@@ -788,7 +882,7 @@ impl<'a> Form<'a> {
     /// Submit this form using the form submit button with the given label (case-insensitive).
     ///
     /// `false` is returned if a matching button was not found.
-    pub fn submit_using(self, button_label: &str) -> Result<(), error::CmdError> {
+    pub fn submit_using(self, button_label: &str) -> Result<&'a mut Client, error::CmdError> {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
         self.submit_with(&format!("input[type=submit][value=\"{}\" i],\
                                   button[type=submit][value=\"{}\" i]",
@@ -804,7 +898,7 @@ impl<'a> Form<'a> {
     ///
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
-    pub fn submit_direct(self) -> Result<(), error::CmdError> {
+    pub fn submit_direct(self) -> Result<&'a mut Client, error::CmdError> {
         use rustc_serialize::json::ToJson;
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "arguments[0].submit()".to_string(),
@@ -819,7 +913,10 @@ impl<'a> Form<'a> {
         thread::sleep(Duration::from_millis(500));
 
         if res.is_null() {
-            Ok(())
+            Ok(self.c)
+        } else if res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+            // geckodriver returns {} :(
+            Ok(self.c)
         } else {
             Err(error::CmdError::NotW3C(res))
         }
@@ -831,7 +928,10 @@ impl<'a> Form<'a> {
     /// However, it will *also* inject a hidden input element on the page that carries the given
     /// `field=value` mapping. This allows you to emulate the form data as it would have been *if*
     /// the submit button was indeed clicked.
-    pub fn submit_sneaky(self, field: &str, value: &str) -> Result<(), error::CmdError> {
+    pub fn submit_sneaky(self,
+                         field: &str,
+                         value: &str)
+                         -> Result<&'a mut Client, error::CmdError> {
         use rustc_serialize::json::ToJson;
         let args = vec![self.f.clone().to_json(),
                         Json::String(field.to_string()),
@@ -848,10 +948,14 @@ impl<'a> Form<'a> {
         };
 
         let res = self.c.issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))?;
-        if !res.is_null() {
+
+        if res.is_null() {
+            self.submit_direct()
+        } else if res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+            // geckodriver returns {} :(
+            self.submit_direct()
+        } else {
             return Err(error::CmdError::NotW3C(res));
         }
-
-        self.submit_direct()
     }
 }
