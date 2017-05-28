@@ -1,4 +1,4 @@
-//! A high-level API for programmatically interacting with web pages.
+//! A high-level API for programmatically interacting with web pages through WebDriver.
 //!
 //! This crate uses the [WebDriver protocol] to drive a conforming (potentially headless) browser
 //! through relatively high-level operations such as "click this element", "submit this form", etc.

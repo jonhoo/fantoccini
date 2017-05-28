@@ -1,7 +1,23 @@
 [package]
 name = "fantoccini"
-version = "0.1.0"
+version = "0.2.0"
+
+description = "High-level API for programmatically interacting with web pages through WebDriver."
+readme = "README.md"
+
 authors = ["Jon Gjengset <jon@thesquareplanet.com>"]
+
+documentation = "https://docs.rs/fantoccini"
+homepage = "https://github.com/jonhoo/fantoccini"
+repository = "https://github.com/jonhoo/fantoccini.git"
+
+keywords = ["webdriver", "chromedriver", "geckodriver", "phantomjs", "automation"]
+categories = ["api-bindings", "development-tools::testing", "web-programming::http-client"]
+
+license = "MIT/Apache-2.0"
+
+[badges]
+travis-ci = { repository = "jonhoo/fantoccini" }
 
 [dependencies]
 hyper = "0.10.10"
