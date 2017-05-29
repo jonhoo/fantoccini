@@ -695,6 +695,15 @@ impl Client {
         self.by(locator)
     }
 
+    /// Find an element using an XPath expression.
+    pub fn by_xpath<'a>(&'a mut self, xpath: &str) -> Result<Element<'a>, error::CmdError> {
+        let locator = webdriver::command::LocatorParameters {
+            using: webdriver::common::LocatorStrategy::XPath,
+            value: xpath.to_string(),
+        };
+        self.by(locator)
+    }
+
     /// Wait for the given function to return `true` before proceeding.
     ///
     /// This can be useful to wait for something to appear on the page before interacting with it.
