@@ -373,17 +373,6 @@ impl Client {
             }
         }?;
 
-        match cmd {
-            WebDriverCommand::ElementClick(..) |
-            WebDriverCommand::Get(..) => {
-                // unfortunately implementations seem to sometimes return very eagerly
-                use std::thread;
-                use std::time::Duration;
-                thread::sleep(Duration::from_secs(1));
-            }
-            _ => {}
-        }
-
         // check that the server sent us json
         use hyper::mime::{Mime, TopLevel, SubLevel};
         let ctype = {
@@ -1035,11 +1024,6 @@ impl<'a> Form<'a> {
         };
 
         let res = self.c.issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))?;
-
-        // unfortunately implementations seem to sometimes return very eagerly
-        use std::thread;
-        use std::time::Duration;
-        thread::sleep(Duration::from_secs(1));
 
         if res.is_null() {
             Ok(self.c)
