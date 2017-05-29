@@ -32,9 +32,9 @@
 //! c.goto("https://en.wikipedia.org/wiki/Foobar").unwrap();
 //! assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 //! // click "Foo (disambiguation)"
-//! c.click(".mw-disambig").unwrap();
+//! c.by_selector(".mw-disambig").unwrap().click().unwrap();
 //! // click "Foo Lake"
-//! c.click_by_text("Foo Lake").unwrap();
+//! c.by_link_text("Foo Lake").unwrap().click().unwrap();
 //! assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
 //! ```
 //!
@@ -64,8 +64,10 @@
 //! // go back to the frontpage
 //! c.goto("https://www.wikipedia.org/").unwrap();
 //! // find the source for the Wikipedia globe
-//! let img = c.lookup_attr("img.central-featured-logo", "src")
+//! let img = c.by_selector("img.central-featured-logo")
 //!     .expect("image should be on page")
+//!     .attr("src")
+//!     .unwrap()
 //!     .expect("image should have a src");
 //! // now build a raw HTTP client request (which also has all current cookies)
 //! let raw = c.raw_client_for(fantoccini::Method::Get, &img).unwrap();
@@ -115,6 +117,13 @@ pub struct Client {
     wdb: hyper::Url,
     session: Option<String>,
     legacy: bool,
+    ua: Option<String>,
+}
+
+/// A single element on the current page.
+pub struct Element<'a> {
+    c: &'a mut Client,
+    e: webdriver::common::WebElement,
 }
 
 /// An HTML form on the current page.
@@ -183,6 +192,7 @@ impl Client {
             wdb,
             session: None,
             legacy: false,
+            ua: None,
         };
 
         // Required capabilities
@@ -236,6 +246,11 @@ impl Client {
             }
             Err(e) => Err(e),
         }
+    }
+
+    /// Set the User Agent string to use for all subsequent requests.
+    pub fn set_ua<S: Into<String>>(&mut self, ua: S) {
+        self.ua = Some(ua.into());
     }
 
     /// Helper for determining what URL endpoint to use for various requests.
@@ -342,7 +357,10 @@ impl Client {
 
         // issue the command to the webdriver server
         let mut res = {
-            let req = self.c.request(method, url);
+            let mut req = self.c.request(method, url);
+            if let Some(ref s) = self.ua {
+                req = req.header(hyper::header::UserAgent(s.to_owned()));
+            }
             if let Some(ref body) = body {
                 let json = body.as_bytes();
                 let mut headers = hyper::header::Headers::new();
@@ -410,7 +428,11 @@ impl Client {
         if !body.is_object() {
             return Err(error::CmdError::NotW3C(body));
         }
-        let body = body.into_object().unwrap();
+        let mut body = body.into_object().unwrap();
+
+        // phantomjs injects a *huge* field with the entire screen contents -- remove that
+        body.remove("screen");
+
         if !body.contains_key("error") || !body.contains_key("message") ||
            !body["error"].is_string() || !body["message"].is_string() {
             return Err(error::CmdError::NotW3C(Json::Object(body)));
@@ -526,7 +548,8 @@ impl Client {
     /// use fantoccini::Client;
     /// let mut c = Client::new("http://localhost:4444").unwrap();
     /// c.goto("https://www.wikipedia.org/").unwrap();
-    /// let img = c.lookup_attr("img.central-featured-logo", "src").unwrap().unwrap();
+    /// let img = c.by_selector("img.central-featured-logo").unwrap()
+    ///            .attr("src").unwrap().unwrap();
     /// let raw = c.raw_client_for(fantoccini::Method::Get, &img).unwrap();
     /// let mut res = raw.send().unwrap();
     ///
@@ -646,143 +669,30 @@ impl Client {
         if all_ok {
             let mut headers = hyper::header::Headers::new();
             headers.set(hyper::header::Cookie(jar));
+            if let Some(ref s) = self.ua {
+                headers.set(hyper::header::UserAgent(s.to_owned()));
+            }
             Ok(self.c.request(method, url).headers(headers))
         } else {
             Err(error::CmdError::NotW3C(Json::Array(cookies)))
         }
     }
 
-    /// Look up an [attribute] value by name for the element matching `selector`.
-    ///
-    /// `selector` should be a CSS selector. `Ok(None)` is returned if the element does not have
-    /// the given attribute. `Err(NoSuchElement)` is returned if the element could not be found.
-    ///
-    /// [attribute]: https://dom.spec.whatwg.org/#concept-attribute
-    pub fn lookup_attr(&self,
-                       selector: &str,
-                       attribute: &str)
-                       -> Result<Option<String>, error::CmdError> {
-        let e = self.lookup(selector)?;
-        let cmd = WebDriverCommand::GetElementAttribute(e, attribute.to_string());
-        match self.issue_wd_cmd(cmd)? {
-            Json::String(v) => Ok(Some(v)),
-            Json::Null => Ok(None),
-            v => Err(error::CmdError::NotW3C(v)),
-        }
+    /// Find an element by CSS selector.
+    pub fn by_selector<'a>(&'a mut self, selector: &str) -> Result<Element<'a>, error::CmdError> {
+        let locator = Self::mklocator(selector);
+        self.by(locator)
     }
 
-    /// Look up a DOM [property] for the element matching `selector`.
-    ///
-    /// `selector` should be a CSS selector. `Ok(None)` is returned if the element is not found, or
-    /// it does not have the given property.
-    ///
-    /// [property]: https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.1
-    pub fn lookup_prop(&self,
-                       selector: &str,
-                       prop: &str)
-                       -> Result<Option<String>, error::CmdError> {
-        let e = self.lookup(selector)?;
-        let cmd = WebDriverCommand::GetElementProperty(e, prop.to_string());
-        match self.issue_wd_cmd(cmd)? {
-            Json::String(v) => Ok(Some(v)),
-            Json::Null => Ok(None),
-            v => Err(error::CmdError::NotW3C(v)),
-        }
-    }
-
-    /// Look up the text contents of a node matching the given CSS selector.
-    ///
-    /// `Ok(None)` is returned if the element was not found.
-    pub fn lookup_text(&self, selector: &str) -> Result<Option<String>, error::CmdError> {
-        let e = self.lookup(selector)?;
-        match self.issue_wd_cmd(WebDriverCommand::GetElementText(e))? {
-            Json::String(v) => Ok(Some(v)),
-            v => Err(error::CmdError::NotW3C(v)),
-        }
-    }
-
-    /// Look up the HTML contents of a node matching the given CSS selector.
-    ///
-    /// `Ok(None)` is returned if the element was not found. `inner` dictates whether the wrapping
-    /// node's HTML is excluded or not. For example, take the HTML:
-    ///
-    /// ```html
-    /// <div id="foo"><hr /></div>
-    /// ```
-    ///
-    /// With `inner = true`, `<hr />` would be returned. With `inner = false`,
-    /// `<div id="foo"><hr /></div>` would be returned instead.
-    pub fn lookup_html(&self,
-                       selector: &str,
-                       inner: bool)
-                       -> Result<Option<String>, error::CmdError> {
-        let prop = if inner { "innerHTML" } else { "outerHTML" };
-        self.lookup_prop(selector, prop)
-    }
-
-    fn finish_click<'a>(&'a mut self,
-                        res: Result<webdriver::common::WebElement, error::CmdError>)
-                        -> Result<Option<&'a mut Self>, error::CmdError> {
-        match res {
-            Err(error::CmdError::NoSuchElement(_)) => Ok(None),
-            Err(e) => Err(e),
-            Ok(e) => {
-                let r = self.issue_wd_cmd(WebDriverCommand::ElementClick(e))?;
-                if r.is_null() {
-                    Ok(Some(self))
-                } else if r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
-                    // geckodriver returns {} :(
-                    Ok(Some(self))
-                } else {
-                    Err(error::CmdError::NotW3C(r))
-                }
-            }
-        }
-    }
-
-    /// Simulate the user clicking on the element matching the given CSS selector.
-    ///
-    /// For convenience, `Ok(None)` is returned if the element was not found.
-    ///
-    /// Note that this *may* result in navigation.
-    pub fn click<'a>(&'a mut self,
-                     selector: &str)
-                     -> Result<Option<&'a mut Self>, error::CmdError> {
-        let res = self.lookup(selector);
-        self.finish_click(res)
-    }
-
-    /// Simulate the user clicking on a link with the given text.
-    ///
-    /// For convenience, `Ok(None)` is returned if the element was not found.
+    /// Find an element by its link text.
     ///
     /// The text matching is exact.
-    pub fn click_by_text<'a>(&'a mut self,
-                             text: &str)
-                             -> Result<Option<&'a mut Self>, error::CmdError> {
+    pub fn by_link_text<'a>(&'a mut self, text: &str) -> Result<Element<'a>, error::CmdError> {
         let locator = webdriver::command::LocatorParameters {
             using: webdriver::common::LocatorStrategy::LinkText,
             value: text.to_string(),
         };
-        let res = self.issue_wd_cmd(WebDriverCommand::FindElement(locator));
-        let res = self.parse_lookup(res);
-        self.finish_click(res)
-    }
-
-    /// Follow the `href` target of the element matching the given selector *without* causing a
-    /// click interaction.
-    ///
-    /// For convenience, `Ok(None)` is returned if the element was not found, or if it does not
-    /// have an `href` attribute.
-    pub fn follow_link_nojs<'a>(&'a mut self,
-                                selector: &str)
-                                -> Result<Option<&'a mut Self>, error::CmdError> {
-        if let Some(url) = self.find_link(selector)? {
-            self.goto(&format!("{}", url))?;
-            Ok(Some(self))
-        } else {
-            Ok(None)
-        }
+        self.by(locator)
     }
 
     /// Wait for the given function to return `true` before proceeding.
@@ -832,30 +742,20 @@ impl Client {
     ///
     /// Through the returned `Form`, HTML forms can be filled out and submitted.
     pub fn form<'a>(&'a mut self, selector: &str) -> Result<Form<'a>, error::CmdError> {
-        let form = self.lookup(selector)?;
+        let locator = Self::mklocator(selector);
+        let res = self.issue_wd_cmd(WebDriverCommand::FindElement(locator));
+        let form = self.parse_lookup(res)?;
         Ok(Form { c: self, f: form })
     }
 
     // helpers
 
-    /// Find the URL pointed to by a link matching the given CSS selector.
-    fn find_link(&self, selector: &str) -> Result<Option<hyper::Url>, error::CmdError> {
-        match self.lookup_attr(selector, "href") {
-            Err(error::CmdError::NoSuchElement(_)) => Ok(None),
-            Ok(Some(href)) => {
-                let url = self.current_url()?;
-                Ok(Some(url.join(&href)?))
-            }
-            Ok(None) => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
-
-    /// Look up an element on the page given a CSS selector.
-    fn lookup(&self, selector: &str) -> Result<webdriver::common::WebElement, error::CmdError> {
-        let locator = Self::mklocator(selector);
+    fn by<'a>(&'a mut self,
+              locator: webdriver::command::LocatorParameters)
+              -> Result<Element<'a>, error::CmdError> {
         let res = self.issue_wd_cmd(WebDriverCommand::FindElement(locator));
-        self.parse_lookup(res)
+        let el = self.parse_lookup(res)?;
+        Ok(Element { c: self, e: el })
     }
 
     /// Extract the `WebElement` from a `FindElement` or `FindElementElement` command.
@@ -888,6 +788,20 @@ impl Client {
         Err(error::CmdError::NotW3C(Json::Object(res)))
     }
 
+    fn fixup_elements(&self, args: &mut [Json]) {
+        if self.legacy {
+            for arg in args {
+                // the serialization of WebElement uses the W3C index,
+                // but legacy implementations need us to use the "ELEMENT" index
+                if let Json::Object(ref mut o) = *arg {
+                    if let Some(wei) = o.remove(ELEMENT_KEY) {
+                        o.insert("ELEMENT".to_string(), wei);
+                    }
+                }
+            }
+        }
+    }
+
     /// Make a WebDriver locator for the given CSS selector.
     ///
     /// See https://www.w3.org/TR/webdriver/#element-retrieval.
@@ -907,6 +821,99 @@ impl Drop for Client {
     }
 }
 
+impl<'a> Element<'a> {
+    /// Look up an [attribute] value for this element by name.
+    ///
+    /// `Ok(None)` is returned if the element does not have the given attribute.
+    ///
+    /// [attribute]: https://dom.spec.whatwg.org/#concept-attribute
+    pub fn attr(&self, attribute: &str) -> Result<Option<String>, error::CmdError> {
+        let cmd = WebDriverCommand::GetElementAttribute(self.e.clone(), attribute.to_string());
+        match self.c.issue_wd_cmd(cmd)? {
+            Json::String(v) => Ok(Some(v)),
+            Json::Null => Ok(None),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Look up a DOM [property] for this element by name.
+    ///
+    /// `Ok(None)` is returned if the element does not have the given property.
+    ///
+    /// [property]: https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.1
+    pub fn prop(&self, prop: &str) -> Result<Option<String>, error::CmdError> {
+        let cmd = WebDriverCommand::GetElementProperty(self.e.clone(), prop.to_string());
+        match self.c.issue_wd_cmd(cmd)? {
+            Json::String(v) => Ok(Some(v)),
+            Json::Null => Ok(None),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Retrieve the text contents of this elment.
+    pub fn text(&self) -> Result<String, error::CmdError> {
+        let cmd = WebDriverCommand::GetElementText(self.e.clone());
+        match self.c.issue_wd_cmd(cmd)? {
+            Json::String(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Retrieve the HTML contents of this element.
+    ///
+    /// `inner` dictates whether the wrapping node's HTML is excluded or not. For example, take the
+    /// HTML:
+    ///
+    /// ```html
+    /// <div id="foo"><hr /></div>
+    /// ```
+    ///
+    /// With `inner = true`, `<hr />` would be returned. With `inner = false`,
+    /// `<div id="foo"><hr /></div>` would be returned instead.
+    pub fn html(&self, inner: bool) -> Result<String, error::CmdError> {
+        let prop = if inner { "innerHTML" } else { "outerHTML" };
+        self.prop(prop).map(|v| v.unwrap())
+    }
+
+    /// Simulate the user clicking on this element.
+    ///
+    /// Note that since this *may* result in navigation, we give up the handle to the element.
+    pub fn click(mut self) -> Result<&'a mut Client, error::CmdError> {
+        let cmd = WebDriverCommand::ElementClick(self.e);
+        let r = self.c.issue_wd_cmd(cmd)?;
+        if r.is_null() {
+            Ok(self.c)
+        } else if r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+            // geckodriver returns {} :(
+            Ok(self.c)
+        } else {
+            Err(error::CmdError::NotW3C(r))
+        }
+    }
+
+    /// Follow the `href` target of the element matching the given CSS selector *without* causing a
+    /// click interaction.
+    ///
+    /// Note that since this *may* result in navigation, we give up the handle to the element.
+    pub fn follow(mut self) -> Result<&'a mut Client, error::CmdError> {
+        let cmd = WebDriverCommand::GetElementAttribute(self.e, "href".to_string());
+        let href = match self.c.issue_wd_cmd(cmd)? {
+            Json::String(v) => Ok(v),
+            Json::Null => {
+                let e = WebDriverError::new(webdriver::error::ErrorStatus::InvalidArgument,
+                                            "cannot follow element without href attribute");
+                Err(error::CmdError::Standard(e))
+            }
+            v => Err(error::CmdError::NotW3C(v)),
+        }?;
+        let url = self.c.current_url()?;
+        let href = url.join(&href)?;
+
+        self.c.goto(&format!("{}", href))?;
+        Ok(self.c)
+    }
+}
+
 impl<'a> Form<'a> {
     /// Set the `value` of the given `field` in this form.
     pub fn set_by_name<'s>(&'s mut self,
@@ -920,16 +927,7 @@ impl<'a> Form<'a> {
 
         use rustc_serialize::json::ToJson;
         let mut args = vec![field.to_json(), Json::String(value.to_string())];
-        if self.c.legacy {
-            // the serialization of WebElement uses the W3C index,
-            // but legacy implementations need us to use the "ELEMENT" index
-            if let Json::Object(ref mut o) = *args.get_mut(0).unwrap() {
-                let wei = o.remove(ELEMENT_KEY).unwrap();
-                o.insert("ELEMENT".to_string(), wei);
-            } else {
-                unreachable!()
-            }
-        }
+        self.c.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "arguments[0].value = arguments[1]".to_string(),
             args: webdriver::common::Nullable::Value(args),
@@ -993,9 +991,12 @@ impl<'a> Form<'a> {
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
     pub fn submit_direct(self) -> Result<&'a mut Client, error::CmdError> {
         use rustc_serialize::json::ToJson;
+
+        let mut args = vec![self.f.clone().to_json()];
+        self.c.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "arguments[0].submit()".to_string(),
-            args: webdriver::common::Nullable::Value(vec![self.f.clone().to_json()]),
+            args: webdriver::common::Nullable::Value(args),
         };
 
         let res = self.c.issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))?;
@@ -1083,9 +1084,9 @@ mod tests {
         assert_eq!(c.current_url()?.as_ref(),
                    "https://en.wikipedia.org/wiki/Foobar");
         // click "Foo (disambiguation)"
-        c.click(".mw-disambig")?;
+        c.by_selector(".mw-disambig")?.click()?;
         // click "Foo Lake"
-        c.click_by_text("Foo Lake")?;
+        c.by_link_text("Foo Lake")?.click()?;
         assert_eq!(c.current_url()?.as_ref(),
                    "https://en.wikipedia.org/wiki/Foo_Lake");
         Ok(())
@@ -1122,8 +1123,8 @@ mod tests {
         // go back to the frontpage
         c.goto("https://www.wikipedia.org/")?;
         // find the source for the Wikipedia globe
-        let img = c.lookup_attr("img.central-featured-logo", "src")
-            .expect("image should be on page")
+        let img = c.by_selector("img.central-featured-logo")?
+            .attr("src")?
             .expect("image should have a src");
         // now build a raw HTTP client request (which also has all current cookies)
         let raw = c.raw_client_for(Method::Get, &img)?;
