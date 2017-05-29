@@ -1040,9 +1040,10 @@ impl<'a> Form<'a> {
                          value: &str)
                          -> Result<&'a mut Client, error::CmdError> {
         use rustc_serialize::json::ToJson;
-        let args = vec![self.f.clone().to_json(),
-                        Json::String(field.to_string()),
-                        Json::String(value.to_string())];
+        let mut args = vec![self.f.clone().to_json(),
+                            Json::String(field.to_string()),
+                            Json::String(value.to_string())];
+        self.c.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "\
                 var h = document.createElement('input');\
