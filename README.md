@@ -31,8 +31,7 @@ you *expect* might fail, such as lookups by CSS selector.
 
 Let's start out clicking around on Wikipedia:
 
-```rust,no_run
-# use fantoccini::Client;
+```rust
 let mut c = Client::new("http://localhost:4444").unwrap();
 // go to the Wikipedia page for Foobar
 c.goto("https://en.wikipedia.org/wiki/Foobar").unwrap();
@@ -47,9 +46,7 @@ assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foo
 How did we get to the Foobar page in the first place? We did a search!
 Let's make the program do that for us instead:
 
-```rust,no_run
-# use fantoccini::Client;
-# let mut c = Client::new("http://localhost:4444").unwrap();
+```rust
 // go to the Wikipedia frontpage this time
 c.goto("https://www.wikipedia.org/").unwrap();
 // find, fill out, and submit the search form
@@ -64,9 +61,7 @@ assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foo
 
 What if we want to download a raw file? Fantoccini has you covered:
 
-```rust,no_run
-# use fantoccini::Client;
-# let mut c = Client::new("http://localhost:4444").unwrap();
+```rust
 // go back to the frontpage
 c.goto("https://www.wikipedia.org/").unwrap();
 // find the source for the Wikipedia globe

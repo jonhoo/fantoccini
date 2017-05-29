@@ -25,7 +25,7 @@
 //!
 //! Let's start out clicking around on Wikipedia:
 //!
-//! ```rust,no_run
+//! ```no_run
 //! # use fantoccini::Client;
 //! let mut c = Client::new("http://localhost:4444").unwrap();
 //! // go to the Wikipedia page for Foobar
@@ -41,7 +41,7 @@
 //! How did we get to the Foobar page in the first place? We did a search!
 //! Let's make the program do that for us instead:
 //!
-//! ```rust,no_run
+//! ```no_run
 //! # use fantoccini::Client;
 //! # let mut c = Client::new("http://localhost:4444").unwrap();
 //! // go to the Wikipedia frontpage this time
@@ -58,7 +58,7 @@
 //!
 //! What if we want to download a raw file? Fantoccini has you covered:
 //!
-//! ```rust,no_run
+//! ```no_run
 //! # use fantoccini::Client;
 //! # let mut c = Client::new("http://localhost:4444").unwrap();
 //! // go back to the frontpage
@@ -593,7 +593,7 @@ impl Client {
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
+    /// ```no_run
     /// use fantoccini::Client;
     /// let mut c = Client::new("http://localhost:4444").unwrap();
     /// c.goto("https://www.wikipedia.org/").unwrap();
