@@ -373,11 +373,15 @@ impl Client {
             }
         }?;
 
-        if let WebDriverCommand::ElementClick(..) = cmd {
-            // unfortunately implementations seem to sometimes return very eagerly
-            use std::thread;
-            use std::time::Duration;
-            thread::sleep(Duration::from_millis(500));
+        match cmd {
+            WebDriverCommand::ElementClick(..) |
+            WebDriverCommand::Get(..) => {
+                // unfortunately implementations seem to sometimes return very eagerly
+                use std::thread;
+                use std::time::Duration;
+                thread::sleep(Duration::from_secs(1));
+            }
+            _ => {}
         }
 
         // check that the server sent us json
@@ -1013,7 +1017,7 @@ impl<'a> Form<'a> {
         // unfortunately implementations seem to sometimes return very eagerly
         use std::thread;
         use std::time::Duration;
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_secs(1));
 
         if res.is_null() {
             Ok(self.c)
