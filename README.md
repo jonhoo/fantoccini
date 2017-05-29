@@ -38,9 +38,9 @@ let mut c = Client::new("http://localhost:4444").unwrap();
 c.goto("https://en.wikipedia.org/wiki/Foobar").unwrap();
 assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 // click "Foo (disambiguation)"
-c.click(".mw-disambig").unwrap();
+c.by_selector(".mw-disambig").unwrap().click().unwrap();
 // click "Foo Lake"
-c.click_by_text("Foo Lake").unwrap();
+c.by_link_text("Foo Lake").unwrap().click().unwrap();
 assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
 ```
 
@@ -70,8 +70,10 @@ What if we want to download a raw file? Fantoccini has you covered:
 // go back to the frontpage
 c.goto("https://www.wikipedia.org/").unwrap();
 // find the source for the Wikipedia globe
-let img = c.lookup_attr("img.central-featured-logo", "src")
+let img = c.by_selector("img.central-featured-logo")
     .expect("image should be on page")
+    .attr("src")
+    .unwrap()
     .expect("image should have a src");
 // now build a raw HTTP client request (which also has all current cookies)
 let raw = c.raw_client_for(fantoccini::Method::Get, &img).unwrap();
