@@ -1059,8 +1059,14 @@ impl<'a> Form<'a> {
 
         let mut args = vec![self.f.clone().to_json()];
         self.c.fixup_elements(&mut args);
+        // some sites are silly, and name their submit button "submit". this ends up overwriting
+        // the "submit" function of the form with a reference to the submit button itself, so we
+        // can't call .submit(). we get around this by creating a *new* form, and using *its*
+        // submit() handler but with this pointed to the real form. solution from here:
+        // https://stackoverflow.com/q/833032/472927#comment23038712_834197
         let cmd = webdriver::command::JavascriptCommandParameters {
-            script: "arguments[0].submit()".to_string(),
+            script: "document.createElement('form').submit.call(arguments[0])"
+                .to_string(),
             args: webdriver::common::Nullable::Value(args),
         };
 
