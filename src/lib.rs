@@ -397,22 +397,30 @@ impl Client {
             false
         };
 
+        let mut is_success = res.status.is_success();
+        let mut legacy_status = 0;
+
         // https://www.w3.org/TR/webdriver/#dfn-send-a-response
         // NOTE: the standard specifies that even errors use the "Send a Reponse" steps
         let body = match Json::from_reader(&mut res)? {
             Json::Object(mut v) => {
-                if !self.legacy || !is_new_session {
-                    v.remove("value")
-                        .ok_or_else(|| error::CmdError::NotW3C(Json::Object(v)))
-                } else {
+                if self.legacy {
+                    legacy_status = v["status"].as_u64().unwrap();
+                    is_success = legacy_status == 0;
+                }
+
+                if self.legacy && is_new_session {
                     // legacy implementations do not wrap sessionId inside "value"
                     Ok(Json::Object(v))
+                } else {
+                    v.remove("value")
+                        .ok_or_else(|| error::CmdError::NotW3C(Json::Object(v)))
                 }
             }
             v => Err(error::CmdError::NotW3C(v)),
         }?;
 
-        if res.status.is_success() {
+        if is_success {
             return Ok(body);
         }
 
@@ -426,72 +434,105 @@ impl Client {
         // phantomjs injects a *huge* field with the entire screen contents -- remove that
         body.remove("screen");
 
-        if !body.contains_key("error") || !body.contains_key("message") ||
-           !body["error"].is_string() || !body["message"].is_string() {
-            return Err(error::CmdError::NotW3C(Json::Object(body)));
-        }
+        let es = if self.legacy {
+            // old clients use status codes instead of "error", and we now have to map them
+            // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol#response-status-codes
+            if !body.contains_key("message") || !body["message"].is_string() {
+                return Err(error::CmdError::NotW3C(Json::Object(body)));
+            }
+            match legacy_status {
+                6 => ErrorStatus::SessionNotCreated,
+                7 => ErrorStatus::NoSuchElement,
+                8 => ErrorStatus::NoSuchFrame,
+                9 => ErrorStatus::UnknownCommand,
+                10 => ErrorStatus::StaleElementReference,
+                11 => ErrorStatus::ElementNotInteractable,
+                12 => ErrorStatus::InvalidElementState,
+                13 => ErrorStatus::UnknownError,
+                15 => ErrorStatus::ElementNotSelectable,
+                17 => ErrorStatus::JavascriptError,
+                19 => ErrorStatus::InvalidSelector,
+                21 => ErrorStatus::Timeout,
+                23 => ErrorStatus::NoSuchWindow,
+                24 => ErrorStatus::InvalidCookieDomain,
+                25 => ErrorStatus::UnableToSetCookie,
+                26 => ErrorStatus::UnexpectedAlertOpen,
+                27 => ErrorStatus::NoSuchAlert,
+                28 => ErrorStatus::ScriptTimeout,
+                29 => ErrorStatus::InvalidCoordinates,
+                32 => ErrorStatus::InvalidSelector,
+                33 => ErrorStatus::SessionNotCreated,
+                34 => ErrorStatus::MoveTargetOutOfBounds,
+                _ => return Err(error::CmdError::NotW3C(Json::Object(body))),
+            }
+        } else {
+            if !body.contains_key("error") || !body.contains_key("message") ||
+               !body["error"].is_string() || !body["message"].is_string() {
+                return Err(error::CmdError::NotW3C(Json::Object(body)));
+            }
 
-        use hyper::status::StatusCode;
-        let error = body["error"].as_string().unwrap();
-        let error = match res.status {
-            StatusCode::BadRequest => {
-                match error {
-                    "element click intercepted" => ErrorStatus::ElementClickIntercepted,
-                    "element not selectable" => ErrorStatus::ElementNotSelectable,
-                    "element not interactable" => ErrorStatus::ElementNotInteractable,
-                    "insecure certificate" => ErrorStatus::InsecureCertificate,
-                    "invalid argument" => ErrorStatus::InvalidArgument,
-                    "invalid cookie domain" => ErrorStatus::InvalidCookieDomain,
-                    "invalid coordinates" => ErrorStatus::InvalidCoordinates,
-                    "invalid element state" => ErrorStatus::InvalidElementState,
-                    "invalid selector" => ErrorStatus::InvalidSelector,
-                    "no such alert" => ErrorStatus::NoSuchAlert,
-                    "no such frame" => ErrorStatus::NoSuchFrame,
-                    "no such window" => ErrorStatus::NoSuchWindow,
-                    "stale element reference" => ErrorStatus::StaleElementReference,
-                    _ => unreachable!(),
+            use hyper::status::StatusCode;
+            let error = body["error"].as_string().unwrap();
+            match res.status {
+                StatusCode::BadRequest => {
+                    match error {
+                        "element click intercepted" => ErrorStatus::ElementClickIntercepted,
+                        "element not selectable" => ErrorStatus::ElementNotSelectable,
+                        "element not interactable" => ErrorStatus::ElementNotInteractable,
+                        "insecure certificate" => ErrorStatus::InsecureCertificate,
+                        "invalid argument" => ErrorStatus::InvalidArgument,
+                        "invalid cookie domain" => ErrorStatus::InvalidCookieDomain,
+                        "invalid coordinates" => ErrorStatus::InvalidCoordinates,
+                        "invalid element state" => ErrorStatus::InvalidElementState,
+                        "invalid selector" => ErrorStatus::InvalidSelector,
+                        "no such alert" => ErrorStatus::NoSuchAlert,
+                        "no such frame" => ErrorStatus::NoSuchFrame,
+                        "no such window" => ErrorStatus::NoSuchWindow,
+                        "stale element reference" => ErrorStatus::StaleElementReference,
+                        _ => unreachable!(),
+                    }
                 }
-            }
-            StatusCode::NotFound => {
-                match error {
-                    "unknown command" => ErrorStatus::UnknownCommand,
-                    "no such cookie" => ErrorStatus::NoSuchCookie,
-                    "invalid session id" => ErrorStatus::InvalidSessionId,
-                    "no such element" => ErrorStatus::NoSuchElement,
-                    _ => unreachable!(),
+                StatusCode::NotFound => {
+                    match error {
+                        "unknown command" => ErrorStatus::UnknownCommand,
+                        "no such cookie" => ErrorStatus::NoSuchCookie,
+                        "invalid session id" => ErrorStatus::InvalidSessionId,
+                        "no such element" => ErrorStatus::NoSuchElement,
+                        _ => unreachable!(),
+                    }
                 }
-            }
-            StatusCode::InternalServerError => {
-                match error {
-                    "javascript error" => ErrorStatus::JavascriptError,
-                    "move target out of bounds" => ErrorStatus::MoveTargetOutOfBounds,
-                    "session not created" => ErrorStatus::SessionNotCreated,
-                    "unable to set cookie" => ErrorStatus::UnableToSetCookie,
-                    "unable to capture screen" => ErrorStatus::UnableToCaptureScreen,
-                    "unexpected alert open" => ErrorStatus::UnexpectedAlertOpen,
-                    "unknown error" => ErrorStatus::UnknownError,
-                    "unsupported operation" => ErrorStatus::UnsupportedOperation,
-                    _ => unreachable!(),
+                StatusCode::InternalServerError => {
+                    match error {
+                        "javascript error" => ErrorStatus::JavascriptError,
+                        "move target out of bounds" => ErrorStatus::MoveTargetOutOfBounds,
+                        "session not created" => ErrorStatus::SessionNotCreated,
+                        "unable to set cookie" => ErrorStatus::UnableToSetCookie,
+                        "unable to capture screen" => ErrorStatus::UnableToCaptureScreen,
+                        "unexpected alert open" => ErrorStatus::UnexpectedAlertOpen,
+                        "unknown error" => ErrorStatus::UnknownError,
+                        "unsupported operation" => ErrorStatus::UnsupportedOperation,
+                        _ => unreachable!(),
+                    }
                 }
-            }
-            StatusCode::RequestTimeout => {
-                match error {
-                    "timeout" => ErrorStatus::Timeout,
-                    "script timeout" => ErrorStatus::ScriptTimeout,
-                    _ => unreachable!(),
+                StatusCode::RequestTimeout => {
+                    match error {
+                        "timeout" => ErrorStatus::Timeout,
+                        "script timeout" => ErrorStatus::ScriptTimeout,
+                        _ => unreachable!(),
+                    }
                 }
-            }
-            StatusCode::MethodNotAllowed => {
-                match error {
-                    "unknown method" => ErrorStatus::UnknownMethod,
-                    _ => unreachable!(),
+                StatusCode::MethodNotAllowed => {
+                    match error {
+                        "unknown method" => ErrorStatus::UnknownMethod,
+                        _ => unreachable!(),
+                    }
                 }
+                _ => unreachable!(),
             }
-            _ => unreachable!(),
         };
 
         let message = body["message"].as_string().unwrap().to_string();
-        Err(WebDriverError::new(error, message).into())
+        Err(WebDriverError::new(es, message).into())
     }
 
     /// Navigate directly to the given URL.

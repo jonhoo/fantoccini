@@ -124,8 +124,8 @@ impl Error for CmdError {
             CmdError::Failed(..) => "webdriver could not be reached",
             CmdError::Lost(..) => "webdriver connection lost",
             CmdError::NotJson(..) => "webdriver returned invalid response",
-            CmdError::Json(..) => "webdriver return incoherent response",
-            CmdError::NotW3C(..) => "webdriver return non-conforming response",
+            CmdError::Json(..) => "webdriver returned incoherent response",
+            CmdError::NotW3C(..) => "webdriver returned non-conforming response",
         }
     }
 
