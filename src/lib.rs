@@ -534,6 +534,21 @@ impl Client {
         Err(error::CmdError::NotW3C(src))
     }
 
+    /// Execute the given JavaScript `script` in the current browser session.
+    ///
+    /// `args` is available to the script inside the `arguments` array. Since `Element` implements
+    /// `ToJson`, you can also provide serialized `Element`s as arguments, and they will correctly
+    /// serialize to DOM elements on the other side.
+    pub fn execute(&mut self, script: &str, mut args: Vec<Json>) -> Result<Json, error::CmdError> {
+        self.fixup_elements(&mut args);
+        let cmd = webdriver::command::JavascriptCommandParameters {
+            script: script.to_string(),
+            args: webdriver::common::Nullable::Value(args),
+        };
+
+        self.issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
+    }
+
     /// Get a `hyper::RequestBuilder` instance with all the same cookies as the current session has
     /// for the given `url`.
     ///
@@ -926,6 +941,13 @@ impl<'a> Element<'a> {
         Ok(self.c)
     }
 }
+
+impl<'a> rustc_serialize::json::ToJson for Element<'a> {
+    fn to_json(&self) -> Json {
+        self.e.to_json()
+    }
+}
+
 
 impl<'a> Form<'a> {
     /// Set the `value` of the given `field` in this form.
