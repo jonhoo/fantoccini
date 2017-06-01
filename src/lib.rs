@@ -160,6 +160,8 @@ impl Client {
                 }
             }
             Ok(v) => Err(error::NewSessionError::NotW3C(v)),
+            Err(error::CmdError::Failed(e)) => Err(error::NewSessionError::Failed(e)),
+            Err(error::CmdError::Lost(e)) => Err(error::NewSessionError::Lost(e)),
             Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
             Err(error::CmdError::NotJson(v)) => {
                 Err(error::NewSessionError::NotW3C(Json::String(v)))
@@ -1104,7 +1106,7 @@ impl<'a> Form<'a> {
                 h.setAttribute('name', arguments[1]);\
                 h.value = arguments[2];\
                 arguments[0].appendChild(h)"
-                    .to_string(),
+                .to_string(),
             args: webdriver::common::Nullable::Value(args),
         };
 

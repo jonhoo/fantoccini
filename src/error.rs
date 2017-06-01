@@ -10,6 +10,10 @@ use rustc_serialize::json;
 pub enum NewSessionError {
     /// The given WebDriver URL is invalid.
     BadWebdriverUrl(herror::ParseError),
+    /// The WebDriver server could not be reached.
+    Failed(herror::Error),
+    /// The connection to the WebDriver server was lost.
+    Lost(IOError),
     /// The server did not give a WebDriver-conforming response.
     NotW3C(json::Json),
     /// The WebDriver server refused to create a new session.
@@ -20,6 +24,8 @@ impl Error for NewSessionError {
     fn description(&self) -> &str {
         match *self {
             NewSessionError::BadWebdriverUrl(..) => "webdriver url is invalid",
+            NewSessionError::Failed(..) => "webdriver server did not respond",
+            NewSessionError::Lost(..) => "webdriver server disconnected",
             NewSessionError::NotW3C(..) => "webdriver server gave non-conformant response",
             NewSessionError::SessionNotCreated(..) => "webdriver did not create session",
 
@@ -29,6 +35,8 @@ impl Error for NewSessionError {
     fn cause(&self) -> Option<&Error> {
         match *self {
             NewSessionError::BadWebdriverUrl(ref e) => Some(e),
+            NewSessionError::Failed(ref e) => Some(e),
+            NewSessionError::Lost(ref e) => Some(e),
             NewSessionError::NotW3C(..) => None,
             NewSessionError::SessionNotCreated(ref e) => Some(e),
         }
@@ -40,6 +48,8 @@ impl fmt::Display for NewSessionError {
         write!(f, "{}: ", self.description())?;
         match *self {
             NewSessionError::BadWebdriverUrl(ref e) => write!(f, "{}", e),
+            NewSessionError::Failed(ref e) => write!(f, "{}", e),
+            NewSessionError::Lost(ref e) => write!(f, "{}", e),
             NewSessionError::NotW3C(ref e) => write!(f, "{:?}", e),
             NewSessionError::SessionNotCreated(ref e) => write!(f, "{}", e),
         }
