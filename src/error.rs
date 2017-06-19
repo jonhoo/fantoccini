@@ -4,12 +4,13 @@ use std::error::Error;
 use hyper::error as herror;
 use webdriver::error as wderror;
 use rustc_serialize::json;
+use url::ParseError;
 
 /// An error occured while attempting to establish a session for a new `Client`.
 #[derive(Debug)]
 pub enum NewSessionError {
     /// The given WebDriver URL is invalid.
-    BadWebdriverUrl(herror::ParseError),
+    BadWebdriverUrl(ParseError),
     /// The WebDriver server could not be reached.
     Failed(herror::Error),
     /// The connection to the WebDriver server was lost.
@@ -79,7 +80,7 @@ pub enum CmdError {
     ///
     /// This normally happens if a link is clicked or the current URL is requested, but the URL in
     /// question is invalid or otherwise malformed.
-    BadUrl(herror::ParseError),
+    BadUrl(ParseError),
 
     /// A request to the WebDriver server failed.
     Failed(herror::Error),
@@ -176,8 +177,8 @@ impl From<IOError> for CmdError {
     }
 }
 
-impl From<herror::ParseError> for CmdError {
-    fn from(e: herror::ParseError) -> Self {
+impl From<ParseError> for CmdError {
+    fn from(e: ParseError) -> Self {
         CmdError::BadUrl(e)
     }
 }
