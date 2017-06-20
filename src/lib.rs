@@ -105,9 +105,9 @@ use webdriver::error::WebDriverError;
 use webdriver::error::ErrorStatus;
 use webdriver::common::ELEMENT_KEY;
 use rustc_serialize::json::Json;
-
 use futures::{Future, Stream, future};
-use tokio_core::reactor::Core;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 pub use hyper::Method;
 
@@ -116,25 +116,31 @@ pub mod error;
 
 type Cmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 
-/// A WebDriver client tied to a single browser session.
-pub struct Client {
+/// State held by a `Client`
+struct Inner {
     c: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
     handle: tokio_core::reactor::Handle,
     wdb: url::Url,
-    session: Option<String>,
+    session: RefCell<Option<String>>,
     legacy: bool,
-    ua: Option<String>,
+    ua: RefCell<Option<String>>,
 }
 
+/// A WebDriver client tied to a single browser session.
+#[derive(Clone)]
+pub struct Client(Rc<Inner>);
+
 /// A single element on the current page.
-pub struct Element<'a> {
-    c: &'a mut Client,
+#[derive(Clone)]
+pub struct Element {
+    c: Client,
     e: webdriver::common::WebElement,
 }
 
 /// An HTML form on the current page.
-pub struct Form<'a> {
-    c: &'a mut Client,
+#[derive(Clone)]
+pub struct Form {
+    c: Client,
     f: webdriver::common::WebElement,
 }
 
@@ -145,21 +151,25 @@ impl Client {
     ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
 
         if let webdriver::command::NewSessionParameters::Legacy(..) = params {
-            self.legacy = true;
+            Rc::get_mut(&mut self.0)
+                .expect(
+                    "during legacy init there should be only one Client instance",
+                )
+                .legacy = true;
         }
 
         // Create a new session for this client
         // https://www.w3.org/TR/webdriver/#dfn-new-session
         self.issue_wd_cmd(WebDriverCommand::NewSession(params))
             .then(move |r| match r {
-                Ok((_, Json::Object(mut v))) => {
+                Ok((this, Json::Object(mut v))) => {
                     // TODO: not all impls are w3c compatible
                     // See https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L189
                     // and https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L200
                     if let Some(session_id) = v.remove("sessionId") {
                         if let Some(session_id) = session_id.as_string() {
-                            self.session = Some(session_id.to_string());
-                            return Ok(self);
+                            *this.0.session.borrow_mut() = Some(session_id.to_string());
+                            return Ok(this);
                         }
                         v.insert("sessionId".to_string(), session_id);
                         Err(error::NewSessionError::NotW3C(Json::Object(v)))
@@ -207,14 +217,14 @@ impl Client {
         let handle = handle.clone();
 
         // Set up our WebDriver client
-        let mut c = Client {
+        let c = Client(Rc::new(Inner {
             c: client.clone(),
             handle: handle.clone(),
             wdb: wdb.clone(),
-            session: None,
+            session: RefCell::new(None),
             legacy: false,
-            ua: None,
-        };
+            ua: RefCell::new(None),
+        }));
 
         // Required capabilities
         // https://www.w3.org/TR/webdriver/#capabilities
@@ -231,7 +241,7 @@ impl Client {
         };
         let spec = webdriver::command::NewSessionParameters::Spec(session_config);
 
-        let f = c.init(spec).or_else(move |e| {
+        let f = c.clone().init(spec).or_else(move |e| {
             match e {
                 error::NewSessionError::NotW3C(json) => {
                     let mut legacy = false;
@@ -265,15 +275,6 @@ impl Client {
                         let spec = webdriver::command::NewSessionParameters::Legacy(session_config);
 
                         // try a new client
-                        // it's annoying that we can't re-use the earlier c here :(
-                        let mut c = Client {
-                            c: client,
-                            handle: handle.clone(),
-                            wdb: wdb,
-                            session: None,
-                            legacy: false,
-                            ua: None,
-                        };
                         future::Either::A(c.init(spec))
                     } else {
                         future::Either::B(future::err(error::NewSessionError::NotW3C(json)))
@@ -287,7 +288,7 @@ impl Client {
 
     /// Set the User Agent string to use for all subsequent requests.
     pub fn set_ua<S: Into<String>>(&mut self, ua: S) {
-        self.ua = Some(ua.into());
+        *self.0.ua.borrow_mut() = Some(ua.into());
     }
 
     /// Helper for determining what URL endpoint to use for various requests.
@@ -295,15 +296,18 @@ impl Client {
     /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
     fn endpoint_for(&self, cmd: &Cmd) -> Result<url::Url, url::ParseError> {
         if let WebDriverCommand::NewSession(..) = *cmd {
-            return self.wdb.join("/session");
+            return self.0.wdb.join("/session");
         }
 
-        let session = self.session.as_ref().unwrap();
-        if let WebDriverCommand::DeleteSession = *cmd {
-            return self.wdb.join(&format!("/session/{}", session));
-        }
+        let base = {
+            let session = self.0.session.borrow();
+            let session = session.as_ref().unwrap();
+            if let WebDriverCommand::DeleteSession = *cmd {
+                return self.0.wdb.join(&format!("/session/{}", session));
+            }
 
-        let base = self.wdb.join(&format!("/session/{}/", session))?;
+            self.0.wdb.join(&format!("/session/{}/", session))?
+        };
         match *cmd {
             WebDriverCommand::NewSession(..) => unreachable!(),
             WebDriverCommand::DeleteSession => unreachable!(),
@@ -312,7 +316,7 @@ impl Client {
             WebDriverCommand::GetPageSource => base.join("source"),
             WebDriverCommand::FindElement(..) => base.join("element"),
             WebDriverCommand::GetCookies => base.join("cookie"),
-            WebDriverCommand::ExecuteScript(..) if self.legacy => base.join("execute"),
+            WebDriverCommand::ExecuteScript(..) if self.0.legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
                 base.join(&format!("element/{}/property/{}", we.id, prop))
@@ -343,10 +347,10 @@ impl Client {
     /// arguments (if any) into the body.
     ///
     /// [the spec]: https://www.w3.org/TR/webdriver/#list-of-endpoints
-    fn issue_wd_cmd<'a>(
-        &'a mut self,
+    fn issue_wd_cmd(
+        self,
         cmd: WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>,
-    ) -> impl Future<Item = (&'a mut Self, Json), Error = error::CmdError> + 'a {
+    ) -> impl Future<Item = (Self, Json), Error = error::CmdError> {
         use rustc_serialize::json::ToJson;
         use webdriver::command;
 
@@ -397,7 +401,7 @@ impl Client {
 
         // issue the command to the webdriver server
         let mut req = hyper::client::Request::new(method, url.as_ref().parse().unwrap());
-        if let Some(ref s) = self.ua {
+        if let Some(ref s) = *self.0.ua.borrow() {
             req.headers_mut()
                 .set(hyper::header::UserAgent::new(s.to_owned()));
         }
@@ -406,13 +410,12 @@ impl Client {
             req.set_body(body.clone());
         }
 
-        let req = self.c.request(req);
+        let req = self.0.c.request(req);
         let f = req.map_err(|e| error::CmdError::from(e)).and_then(move |res| {
             // keep track of result status (.body() consumes self -- ugh)
             let status = res.status();
 
             // check that the server sent us json
-            use hyper::mime;
             let ctype = {
                 let ctype = res.headers()
                     .get::<hyper::header::ContentType>()
@@ -453,12 +456,12 @@ impl Client {
             // NOTE: the standard specifies that even errors use the "Send a Reponse" steps
             let body = match Json::from_str(&*body)? {
                 Json::Object(mut v) => {
-                    if this.legacy {
+                    if this.0.legacy {
                         legacy_status = v["status"].as_u64().unwrap();
                         is_success = legacy_status == 0;
                     }
 
-                    if this.legacy && is_new_session {
+                    if this.0.legacy && is_new_session {
                         // legacy implementations do not wrap sessionId inside "value"
                         Ok(Json::Object(v))
                     } else {
@@ -483,7 +486,7 @@ impl Client {
             // phantomjs injects a *huge* field with the entire screen contents -- remove that
             body.remove("screen");
 
-            let es = if this.legacy {
+            let es = if this.0.legacy {
                 // old clients use status codes instead of "error", and we now have to map them
                 // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol#response-status-codes
                 if !body.contains_key("message") || !body["message"].is_string() {
@@ -588,12 +591,11 @@ impl Client {
         future::Either::A(f)
     }
 
-    fn goto_<'a>(
-        &'a mut self,
-        url: &str,
-    ) -> impl Future<Item = &'a mut Self, Error = error::CmdError> + 'a {
+    /// Navigate directly to the given URL.
+    fn goto(&self, url: &str) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
         let url = url.to_owned();
-        self.current_url_()
+        self.clone()
+            .current_url_()
             .and_then(move |(this, base)| Ok((this, base.join(&url)?)))
             .and_then(move |(this, url)| {
                 this.issue_wd_cmd(WebDriverCommand::Get(
@@ -603,18 +605,11 @@ impl Client {
             .map(|(this, _)| this)
     }
 
-    /// Navigate directly to the given URL.
-    pub fn goto<'a>(
-        &'a mut self,
-        url: &'a str,
-    ) -> impl Future<Item = (), Error = error::CmdError> + 'a {
-        self.goto(url).map(|_| ())
-    }
-
-    fn current_url_<'a>(
-        &'a mut self,
-    ) -> impl Future<Item = (&'a mut Self, url::Url), Error = error::CmdError> + 'a {
-        self.issue_wd_cmd(WebDriverCommand::GetCurrentUrl)
+    fn current_url_(
+        &self,
+    ) -> impl Future<Item = (Self, url::Url), Error = error::CmdError> + 'static {
+        self.clone()
+            .issue_wd_cmd(WebDriverCommand::GetCurrentUrl)
             .and_then(|(this, url)| {
                 if let Some(url) = url.as_string() {
                     return Ok((this, url.parse()?));
@@ -625,15 +620,14 @@ impl Client {
     }
 
     /// Retrieve the currently active URL for this session.
-    pub fn current_url<'a>(
-        &'a mut self,
-    ) -> impl Future<Item = url::Url, Error = error::CmdError> + 'a {
+    pub fn current_url(&self) -> impl Future<Item = url::Url, Error = error::CmdError> + 'static {
         self.current_url_().map(|(_, u)| u)
     }
 
     /// Get the HTML source for the current page.
-    pub fn source<'a>(&'a mut self) -> impl Future<Item = String, Error = error::CmdError> + 'a {
-        self.issue_wd_cmd(WebDriverCommand::GetPageSource)
+    pub fn source(&self) -> impl Future<Item = String, Error = error::CmdError> + 'static {
+        self.clone()
+            .issue_wd_cmd(WebDriverCommand::GetPageSource)
             .and_then(|(_, src)| {
                 if let Some(src) = src.as_string() {
                     return Ok(src.to_string());
@@ -648,18 +642,19 @@ impl Client {
     /// `args` is available to the script inside the `arguments` array. Since `Element` implements
     /// `ToJson`, you can also provide serialized `Element`s as arguments, and they will correctly
     /// serialize to DOM elements on the other side.
-    pub fn execute<'a>(
-        &'a mut self,
+    pub fn execute(
+        &self,
         script: &str,
         mut args: Vec<Json>,
-    ) -> impl Future<Item = Json, Error = error::CmdError> + 'a {
+    ) -> impl Future<Item = Json, Error = error::CmdError> + 'static {
         self.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: script.to_string(),
             args: webdriver::common::Nullable::Value(args),
         };
 
-        self.issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
+        self.clone()
+            .issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
             .map(|(_, v)| v)
     }
 
@@ -686,11 +681,11 @@ impl Client {
     ///     .unwrap();
     /// println!("Wikipedia logo is {}b", pixels.len());
     /// ```
-    pub fn raw_client_for<'a>(
-        &'a mut self,
+    pub fn raw_client_for(
+        &self,
         method: Method,
-        url: &'a str,
-    ) -> impl Future<Item = hyper::Response, Error = error::CmdError> + 'a {
+        url: &str,
+    ) -> impl Future<Item = hyper::Response, Error = error::CmdError> + 'static {
         self.with_raw_client_for(method, url, |_| {})
     }
 
@@ -724,14 +719,15 @@ impl Client {
     /// println!("Wikipedia logo is {}b", pixels.len());
     /// ```
     pub fn with_raw_client_for<'a, F>(
-        &'a mut self,
+        &self,
         method: Method,
-        url: &'a str,
+        url: &str,
         before: F,
     ) -> impl Future<Item = hyper::Response, Error = error::CmdError> + 'a
     where
         F: FnOnce(&mut hyper::Request) + 'a,
     {
+        let url = url.to_owned();
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
         // *current* domain, whereas we want the cookies for `url`'s domain. The fact that cookies
         // can have /path and security constraints makes this even more of a pain. So, to get
@@ -739,11 +735,12 @@ impl Client {
         // navigate back. *Except* that we can't do that either (what if `url` is some huge file?).
         // So we *actually* navigate to some weird url that's deeper than `url`, and hope that we
         // don't end up with a redirect to somewhere entirely different.
-        self.current_url_()
+        self.clone()
+            .current_url_()
             .and_then(move |(this, old_url)| {
                 old_url
                     .clone()
-                    .join(url)
+                    .join(&url)
                     .map(move |url| (this, old_url, url))
                     .map_err(|e| e.into())
             })
@@ -754,7 +751,7 @@ impl Client {
                     .map_err(|e| e.into())
             })
             .and_then(|(this, old_url, url, cookie_url)| {
-                this.goto_(cookie_url.as_str())
+                this.goto(cookie_url.as_str())
                     .map(|this| (this, old_url, url))
             })
             .and_then(|(this, old_url, url)| {
@@ -782,8 +779,7 @@ impl Client {
                 )
             })
             .and_then(|(this, old_url, url, cookies)| {
-                this.goto_(old_url.as_str())
-                    .map(|this| (this, url, cookies))
+                this.goto(old_url.as_str()).map(|this| (this, url, cookies))
             })
             .and_then(|(this, url, cookies)| {
                 let cookies = cookies.into_array().unwrap();
@@ -823,12 +819,12 @@ impl Client {
                     let mut req =
                         hyper::client::Request::new(method, url.as_ref().parse().unwrap());
                     req.headers_mut().set(jar);
-                    if let Some(ref s) = this.ua {
+                    if let Some(ref s) = *this.0.ua.borrow() {
                         req.headers_mut()
                             .set(hyper::header::UserAgent::new(s.to_owned()));
                     }
                     before(&mut req);
-                    future::Either::A(this.c.request(req).map_err(|e| e.into()))
+                    future::Either::A(this.0.c.request(req).map_err(|e| e.into()))
                 } else {
                     future::Either::B(future::err(error::CmdError::NotW3C(Json::Array(cookies))))
                 }
@@ -836,10 +832,10 @@ impl Client {
     }
 
     /// Find an element by CSS selector.
-    pub fn by_selector<'a>(
-        &'a mut self,
+    pub fn by_selector(
+        &self,
         selector: &str,
-    ) -> impl Future<Item = Element<'a>, Error = error::CmdError> {
+    ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
         let locator = Self::mklocator(selector);
         self.by(locator)
     }
@@ -847,10 +843,10 @@ impl Client {
     /// Find an element by its link text.
     ///
     /// The text matching is exact.
-    pub fn by_link_text<'a>(
-        &'a mut self,
+    pub fn by_link_text(
+        &self,
         text: &str,
-    ) -> impl Future<Item = Element<'a>, Error = error::CmdError> {
+    ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
         let locator = webdriver::command::LocatorParameters {
             using: webdriver::common::LocatorStrategy::LinkText,
             value: text.to_string(),
@@ -859,10 +855,10 @@ impl Client {
     }
 
     /// Find an element using an XPath expression.
-    pub fn by_xpath<'a>(
-        &'a mut self,
+    pub fn by_xpath(
+        &self,
         xpath: &str,
-    ) -> impl Future<Item = Element<'a>, Error = error::CmdError> {
+    ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
         let locator = webdriver::command::LocatorParameters {
             using: webdriver::common::LocatorStrategy::XPath,
             value: xpath.to_string(),
@@ -878,9 +874,9 @@ impl Client {
     /// the page.
     pub fn wait_for<'a, F>(&'a mut self, mut is_ready: F) -> &'a mut Self
     where
-        F: FnMut(&mut Client) -> bool,
+        F: FnMut(Client) -> bool,
     {
-        while !is_ready(self) {
+        while !is_ready(self.clone()) {
             use std::thread;
             thread::yield_now();
         }
@@ -892,14 +888,14 @@ impl Client {
     /// If the `current` URL is not provided, `self.current_url()` will be used. Note however that
     /// this introduces a race condition: the browser could finish navigating *before* we call
     /// `current_url()`, which would lead to an eternal wait.
-    pub fn wait_for_navigation<'a>(
-        &'a mut self,
+    pub fn wait_for_navigation(
+        self,
         current: Option<url::Url>,
-    ) -> impl Future<Item = &'a mut Self, Error = error::CmdError> + 'a {
+    ) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
         match current {
             Some(current) => future::Either::A(future::ok((self, current))),
             None => future::Either::B(self.current_url_()),
-        }.and_then(|(this, current)| {
+        }.and_then(|(mut this, current)| {
             let mut err = None;
 
             this.wait_for(|c| match c.current_url().wait() {
@@ -918,12 +914,13 @@ impl Client {
     /// Locate a form on the page.
     ///
     /// Through the returned `Form`, HTML forms can be filled out and submitted.
-    pub fn form<'a>(
-        &'a mut self,
+    pub fn form(
+        &self,
         selector: &str,
-    ) -> impl Future<Item = Form<'a>, Error = error::CmdError> + 'a {
+    ) -> impl Future<Item = Form, Error = error::CmdError> + 'static {
         let locator = Self::mklocator(selector);
-        self.issue_wd_cmd(WebDriverCommand::FindElement(locator))
+        self.clone()
+            .issue_wd_cmd(WebDriverCommand::FindElement(locator))
             .map_err(|e| e.into())
             .and_then(|(this, res)| {
                 let f = this.parse_lookup(res);
@@ -933,11 +930,12 @@ impl Client {
 
     // helpers
 
-    fn by<'a>(
-        &'a mut self,
+    fn by(
+        &self,
         locator: webdriver::command::LocatorParameters,
-    ) -> impl Future<Item = Element<'a>, Error = error::CmdError> + 'a {
-        self.issue_wd_cmd(WebDriverCommand::FindElement(locator))
+    ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
+        self.clone()
+            .issue_wd_cmd(WebDriverCommand::FindElement(locator))
             .map_err(|e| e.into())
             .and_then(|(this, res)| {
                 let e = this.parse_lookup(res);
@@ -952,7 +950,11 @@ impl Client {
         }
 
         // legacy protocol uses "ELEMENT" as identifier
-        let key = if self.legacy { "ELEMENT" } else { ELEMENT_KEY };
+        let key = if self.0.legacy {
+            "ELEMENT"
+        } else {
+            ELEMENT_KEY
+        };
 
         let mut res = res.into_object().unwrap();
         if !res.contains_key(key) {
@@ -973,7 +975,7 @@ impl Client {
     }
 
     fn fixup_elements(&self, args: &mut [Json]) {
-        if self.legacy {
+        if self.0.legacy {
             for arg in args {
                 // the serialization of WebElement uses the W3C index,
                 // but legacy implementations need us to use the "ELEMENT" index
@@ -999,23 +1001,25 @@ impl Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        if self.session.is_some() {
-            // TODO: this will block if reactor is driven by same thread :/
-            self.issue_wd_cmd(WebDriverCommand::DeleteSession).wait();
+        if self.0.session.borrow().is_some() {
+            let f = self.clone()
+                .issue_wd_cmd(WebDriverCommand::DeleteSession)
+                .then(|_| Ok(()));
+            self.0.handle.spawn(f);
         }
     }
 }
 
-impl<'a> Element<'a> {
+impl Element {
     /// Look up an [attribute] value for this element by name.
     ///
     /// `Ok(None)` is returned if the element does not have the given attribute.
     ///
     /// [attribute]: https://dom.spec.whatwg.org/#concept-attribute
-    pub fn attr<'s>(
-        &'s mut self,
+    pub fn attr(
+        self,
         attribute: &str,
-    ) -> impl Future<Item = Option<String>, Error = error::CmdError> + 's {
+    ) -> impl Future<Item = Option<String>, Error = error::CmdError> + 'static {
         let cmd = WebDriverCommand::GetElementAttribute(self.e.clone(), attribute.to_string());
         self.c.issue_wd_cmd(cmd).and_then(|(_, v)| match v {
             Json::String(v) => Ok(Some(v)),
@@ -1029,10 +1033,10 @@ impl<'a> Element<'a> {
     /// `Ok(None)` is returned if the element does not have the given property.
     ///
     /// [property]: https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.1
-    pub fn prop<'s>(
-        &'s mut self,
+    pub fn prop(
+        self,
         prop: &str,
-    ) -> impl Future<Item = Option<String>, Error = error::CmdError> + 's {
+    ) -> impl Future<Item = Option<String>, Error = error::CmdError> + 'static {
         let cmd = WebDriverCommand::GetElementProperty(self.e.clone(), prop.to_string());
         self.c.issue_wd_cmd(cmd).and_then(|(_, v)| match v {
             Json::String(v) => Ok(Some(v)),
@@ -1042,7 +1046,7 @@ impl<'a> Element<'a> {
     }
 
     /// Retrieve the text contents of this elment.
-    pub fn text<'s>(&'s mut self) -> impl Future<Item = String, Error = error::CmdError> + 's {
+    pub fn text(self) -> impl Future<Item = String, Error = error::CmdError> + 'static {
         let cmd = WebDriverCommand::GetElementText(self.e.clone());
         self.c.issue_wd_cmd(cmd).and_then(|(_, v)| match v {
             Json::String(v) => Ok(v),
@@ -1061,10 +1065,10 @@ impl<'a> Element<'a> {
     ///
     /// With `inner = true`, `<hr />` would be returned. With `inner = false`,
     /// `<div id="foo"><hr /></div>` would be returned instead.
-    pub fn html<'s>(
-        &'s mut self,
+    pub fn html(
+        self,
         inner: bool,
-    ) -> impl Future<Item = String, Error = error::CmdError> + 's {
+    ) -> impl Future<Item = String, Error = error::CmdError> + 'static {
         let prop = if inner { "innerHTML" } else { "outerHTML" };
         self.prop(prop).map(|v| v.unwrap())
     }
@@ -1072,7 +1076,7 @@ impl<'a> Element<'a> {
     /// Simulate the user clicking on this element.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub fn click(mut self) -> impl Future<Item = &'a mut Client, Error = error::CmdError> + 'a {
+    pub fn click(self) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         let cmd = WebDriverCommand::ElementClick(self.e);
         self.c.issue_wd_cmd(cmd).and_then(move |(c, r)| {
             if r.is_null() {
@@ -1090,7 +1094,7 @@ impl<'a> Element<'a> {
     /// click interaction.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub fn follow(mut self) -> impl Future<Item = &'a mut Client, Error = error::CmdError> + 'a {
+    pub fn follow(self) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         let cmd = WebDriverCommand::GetElementAttribute(self.e, "href".to_string());
         self.c
             .issue_wd_cmd(cmd)
@@ -1109,27 +1113,29 @@ impl<'a> Element<'a> {
                 this.current_url_()
                     .and_then(move |(this, url)| Ok((this, url.join(&href)?)))
             })
-            .and_then(|(this, href)| this.goto_(href.as_str()).map(|this| this))
+            .and_then(|(this, href)| this.goto(href.as_str()).map(|this| this))
     }
 }
 
-impl<'a> rustc_serialize::json::ToJson for Element<'a> {
+impl rustc_serialize::json::ToJson for Element {
     fn to_json(&self) -> Json {
         self.e.to_json()
     }
 }
 
 
-impl<'a> Form<'a> {
+impl Form {
     /// Set the `value` of the given `field` in this form.
     pub fn set_by_name<'s>(
-        &'s mut self,
+        &self,
         field: &str,
         value: &'s str,
-    ) -> impl Future<Item = (), Error = error::CmdError> + 's {
+    ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
         let locator = Client::mklocator(&format!("input[name='{}']", field));
         let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator);
+        let f = self.clone();
         self.c
+            .clone()
             .issue_wd_cmd(locator)
             .map_err(|e| e.into())
             .and_then(|(this, res)| {
@@ -1148,7 +1154,7 @@ impl<'a> Form<'a> {
                 this.issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
             })
             .and_then(|(_, res)| if res.is_null() {
-                Ok(())
+                Ok(f)
             } else {
                 Err(error::CmdError::NotW3C(res))
             })
@@ -1157,7 +1163,7 @@ impl<'a> Form<'a> {
     /// Submit this form using the first available submit button.
     ///
     /// `false` is returned if no submit button was not found.
-    pub fn submit(self) -> impl Future<Item = &'a mut Client, Error = error::CmdError> {
+    pub fn submit(self) -> impl Future<Item = Client, Error = error::CmdError> {
         self.submit_with("input[type=submit],button[type=submit]")
     }
 
@@ -1167,7 +1173,7 @@ impl<'a> Form<'a> {
     pub fn submit_with(
         self,
         button: &str,
-    ) -> impl Future<Item = &'a mut Client, Error = error::CmdError> + 'a {
+    ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         let locator = Client::mklocator(button);
         let locator = WebDriverCommand::FindElementElement(self.f, locator);
         self.c
@@ -1198,7 +1204,7 @@ impl<'a> Form<'a> {
     pub fn submit_using(
         self,
         button_label: &str,
-    ) -> impl Future<Item = &'a mut Client, Error = error::CmdError> {
+    ) -> impl Future<Item = Client, Error = error::CmdError> {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
         self.submit_with(&format!(
             "input[type=submit][value=\"{}\" i],\
@@ -1216,7 +1222,7 @@ impl<'a> Form<'a> {
     ///
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
-    pub fn submit_direct(self) -> impl Future<Item = &'a mut Client, Error = error::CmdError> + 'a {
+    pub fn submit_direct(self) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         use rustc_serialize::json::ToJson;
 
         let mut args = vec![self.f.clone().to_json()];
@@ -1255,7 +1261,7 @@ impl<'a> Form<'a> {
         self,
         field: &str,
         value: &str,
-    ) -> impl Future<Item = &'a mut Client, Error = error::CmdError> + 'a {
+    ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         use rustc_serialize::json::ToJson;
         let mut args = vec![
             self.f.clone().to_json(),
@@ -1293,14 +1299,18 @@ impl<'a> Form<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio_core::reactor::Core;
 
-    fn tester<F>(f: F)
+    fn tester<'a, F, R>(f: F)
     where
-        F: FnOnce(Client) -> Result<(), error::CmdError>,
+        F: FnOnce(&'a Client) -> R,
+        R: Future<Item = (), Error = error::CmdError> + 'a,
     {
-        match Client::new("http://localhost:4444") {
+        let mut core = Core::new().unwrap();
+        let h = core.handle();
+        match core.run(Client::new("http://localhost:4444", &h)) {
             Ok(c) => {
-                match f(c) {
+                match core.run(f(&c)) {
                     Ok(_) => {}
                     Err(e) => {
                         println!("{}", e);
@@ -1315,22 +1325,26 @@ mod tests {
         }
     }
 
-    fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
+    fn works_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
         // go to the Wikipedia page for Foobar
-        c.goto("https://en.wikipedia.org/wiki/Foobar")?;
-        assert_eq!(
-            c.current_url()?.as_ref(),
-            "https://en.wikipedia.org/wiki/Foobar"
-        );
-        // click "Foo (disambiguation)"
-        c.by_selector(".mw-disambig")?.click()?;
-        // click "Foo Lake"
-        c.by_link_text("Foo Lake")?.click()?;
-        assert_eq!(
-            c.current_url()?.as_ref(),
-            "https://en.wikipedia.org/wiki/Foo_Lake"
-        );
-        Ok(())
+        c.goto("https://en.wikipedia.org/wiki/Foobar")
+            .and_then(move |_| c.current_url())
+            .and_then(move |url| {
+                assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+                // click "Foo (disambiguation)"
+                c.by_selector(".mw-disambig")
+            })
+            .and_then(|e| e.click())
+            .and_then(move |_| {
+                // click "Foo Lake"
+                c.by_link_text("Foo Lake")
+            })
+            .and_then(|e| e.click())
+            .and_then(move |_| c.current_url())
+            .and_then(|url| {
+                assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+                Ok(())
+            })
     }
 
     #[test]
@@ -1338,21 +1352,21 @@ mod tests {
         tester(works_inner)
     }
 
-    fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
+    fn clicks_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
         // go to the Wikipedia frontpage this time
-        c.goto("https://www.wikipedia.org/")?;
-        // find, fill out, and submit the search form
-        {
-            let mut f = c.form("#search-form")?;
-            f.set_by_name("search", "foobar")?;
-            f.submit()?;
-        }
-        // we should now have ended up in the rigth place
-        assert_eq!(
-            c.current_url()?.as_ref(),
-            "https://en.wikipedia.org/wiki/Foobar"
-        );
-        Ok(())
+        c.goto("https://www.wikipedia.org/")
+            .and_then(move |_| {
+                // find, fill out, and submit the search form
+                c.form("#search-form")
+            })
+            .and_then(|f| f.set_by_name("search", "foobar"))
+            .and_then(|f| f.submit())
+            .and_then(move |_| c.current_url())
+            .and_then(|url| {
+                // we should now have ended up in the rigth place
+                assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+                Ok(())
+            })
     }
 
     #[test]
@@ -1360,30 +1374,38 @@ mod tests {
         tester(clicks_inner)
     }
 
-    fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
+    fn raw_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
         // go back to the frontpage
-        c.goto("https://www.wikipedia.org/")?;
-        // find the source for the Wikipedia globe
-        let img = c.by_selector("img.central-featured-logo")?
-            .attr("src")?
-            .expect("image should have a src");
-        // now build a raw HTTP client request (which also has all current cookies)
-        println!("FOO");
-        let res = c.raw_client_for(Method::Get, &img)?;
-        println!("BAT");
-        // we then read out the image bytes
-        let pixels: Vec<u8> = res.body()
-            .fold(Vec::new(), |mut pixels, chunk| -> Result<_, hyper::Error> {
-                pixels.extend(&*chunk);
-                Ok(pixels)
+        c.goto("https://www.wikipedia.org/")
+            .and_then(move |_| {
+                // find the source for the Wikipedia globe
+                c.by_selector("img.central-featured-logo")
             })
-            .wait()
-            .unwrap();
-        println!("BAX");
-        // and voilla, we now have the bytes for the Wikipedia logo!
-        assert!(pixels.len() > 0);
-        println!("Wikipedia logo is {}b", pixels.len());
-        Ok(())
+            .and_then(|img| {
+                img.attr("src")
+                    .map(|src| src.expect("image should have a src"))
+            })
+            .and_then(move |src| {
+                // now build a raw HTTP client request (which also has all current cookies)
+                c.raw_client_for(Method::Get, &src)
+            })
+            .and_then(|raw| {
+                // we then read out the image bytes
+                raw.body()
+                    .fold(Vec::new(), |mut pixels,
+                     chunk|
+                     -> Result<Vec<u8>, hyper::Error> {
+                        pixels.extend(&*chunk);
+                        Ok(pixels)
+                    })
+                    .map_err(|e| e.into())
+            })
+            .and_then(|pixels| {
+                // and voilla, we now have the bytes for the Wikipedia logo!
+                assert!(pixels.len() > 0);
+                println!("Wikipedia logo is {}b", pixels.len());
+                Ok(())
+            })
     }
 
     #[test]
