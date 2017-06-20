@@ -119,17 +119,39 @@ type Cmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 /// State held by a `Client`
 struct Inner {
     c: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
+    handle: tokio_core::reactor::Handle,
     wdb: url::Url,
     session: RefCell<Option<String>>,
     legacy: bool,
     ua: RefCell<Option<String>>,
-    closed: RefCell<bool>,
+    tx: futures::unsync::mpsc::Sender<()>,
 }
 
 impl Drop for Inner {
     fn drop(&mut self) {
         // NOTE: we must implement Drop for Inner, *not* for Client, since Client is dropped often
-        assert!(*self.closed.borrow());
+        if self.session.borrow().is_some() {
+            let url = {
+                let s = self.session.borrow();
+                self.wdb
+                    .join(&format!("/session/{}", s.as_ref().unwrap()))
+                    .unwrap()
+            };
+
+            // TODO: ensure that there are no other outstanding futures
+            // keep a copy of tx so the "final" future is not yet resolved
+            let tx = self.tx.clone();
+            let f = self.c
+                .request(hyper::client::Request::new(
+                    Method::Delete,
+                    url.as_ref().parse().unwrap(),
+                ))
+                .then(move |_| {
+                    drop(tx);
+                    Ok(())
+                });
+            self.handle.spawn(f);
+        }
     }
 }
 
@@ -173,7 +195,6 @@ impl Client {
                     if let Some(session_id) = v.remove("sessionId") {
                         if let Some(session_id) = session_id.as_string() {
                             *this.0.session.borrow_mut() = Some(session_id.to_string());
-                            *this.0.closed.borrow_mut() = false;
                             return Ok(this);
                         }
                         v.insert("sessionId".to_string(), session_id);
@@ -202,15 +223,30 @@ impl Client {
 
     /// Create a new `Client` associated with a new WebDriver session on the server at the given
     /// URL.
+    ///
+    /// Returns two futures -- one that resolves to a handle for issuing additional WebDriver
+    /// tasks, and one that resolves once all tasks have been completed and the WebDriver session
+    /// has been destroyed. Note that it is important to eventually wait for this future, as
+    /// otherwise the WebDriver browser session may not be closed. For some drivers, such as
+    /// geckodriver, this is particularly important, as multiple simulatenous sessions are not
+    /// supported.
+    ///
+    /// Note that the second future will *not* resolve until the `Client` has been dropped.
     pub fn new(
         webdriver: &str,
         handle: &tokio_core::reactor::Handle,
-    ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
+    ) -> (
+        impl Future<Item = Self, Error = error::NewSessionError> + 'static,
+        impl Future<Item = (), Error = ()> + 'static,
+    ) {
         // Where is the WebDriver server?
         let wdb = match webdriver.parse::<url::Url>() {
             Ok(wdb) => wdb,
             Err(e) => {
-                return future::Either::B(future::err(error::NewSessionError::BadWebdriverUrl(e)))
+                return (
+                    future::Either::B(future::err(error::NewSessionError::BadWebdriverUrl(e))),
+                    future::Either::B(future::err(())),
+                );
             }
         };
 
@@ -219,14 +255,20 @@ impl Client {
             .connector(hyper_tls::HttpsConnector::new(4, &handle).unwrap())
             .build(&handle);
 
+        // Keep a channel for tracking when all outstanding references to the client has gone away
+        // (i.e., when all futures have resolved, no more commands can be issued, and the session
+        // has been closed assuming the user remembered to call end()).
+        let (tx, rx) = futures::unsync::mpsc::channel(0);
+
         // Set up our WebDriver client
         let c = Client(Rc::new(Inner {
             c: client.clone(),
+            handle: handle.clone(),
             wdb: wdb.clone(),
             session: RefCell::new(None),
             legacy: false,
             ua: RefCell::new(None),
-            closed: RefCell::new(true),
+            tx: tx,
         }));
 
         // Required capabilities
@@ -244,7 +286,7 @@ impl Client {
         };
         let spec = webdriver::command::NewSessionParameters::Spec(session_config);
 
-        let f = Client(c.0.clone()).init(spec).or_else(move |e| {
+        let f = c.dup().init(spec).or_else(move |e| {
             match e {
                 error::NewSessionError::NotW3C(json) => {
                     let mut legacy = false;
@@ -286,44 +328,14 @@ impl Client {
                 e => future::Either::B(future::err(e.into())),
             }
         });
-        future::Either::A(f)
+        (
+            future::Either::A(f),
+            future::Either::A(rx.into_future().then(|_| Ok(()))),
+        )
     }
 
     fn dup(&self) -> Self {
         Client(self.0.clone())
-    }
-
-    /// Signal to the WebDriver server that the current session has finished.
-    ///
-    /// Note that this method *must* be called, and the returned future *must* be waited for, in
-    /// order for the WebDriver browser session to be closed. For some drivers, such as
-    /// geckodriver, this is particularly important, as multiple simulatenous sessions may not be
-    /// supported.
-    pub fn end(self) -> impl Future<Item = (), Error = ()> + 'static {
-        if self.0.session.borrow().is_some() {
-            let url = {
-                let s = self.0.session.borrow();
-                self.0
-                    .wdb
-                    .join(&format!("/session/{}", s.as_ref().unwrap()))
-                    .unwrap()
-            };
-
-            future::Either::A(
-                self.0
-                    .c
-                    .request(hyper::client::Request::new(
-                        Method::Delete,
-                        url.as_ref().parse().unwrap(),
-                    ))
-                    .then(move |_| {
-                        *self.0.closed.borrow_mut() = true;
-                        Ok(())
-                    }),
-            )
-        } else {
-            future::Either::B(future::ok(()))
-        }
     }
 
     /// Set the User Agent string to use for all subsequent requests.
@@ -1332,11 +1344,13 @@ mod tests {
         ($f:ident) => {{
             let mut core = Core::new().unwrap();
             let h = core.handle();
-            let c = core.run(Client::new("http://localhost:4444", &h))
+            let (c, fin) = Client::new("http://localhost:4444", &h);
+            let c = core.run(c)
                 .expect("failed to construct test client");
             core.run($f(&c))
                 .expect("test produced unexpected error response");
-            core.run(c.end()).expect("failed to close test session");
+            drop(c);
+            core.run(fin).expect("failed to close test session");
         }}
     }
 
