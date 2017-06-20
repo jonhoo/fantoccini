@@ -1335,6 +1335,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn it_works() {
         tester!(works_inner)
     }
@@ -1357,6 +1358,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn it_clicks() {
         tester!(clicks_inner)
     }
@@ -1396,6 +1398,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn it_can_be_raw() {
         tester!(raw_inner)
     }
