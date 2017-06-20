@@ -729,7 +729,7 @@ impl Client {
     }
 
     /// Navigate directly to the given URL.
-    fn goto(&self, url: &str) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
+    pub fn goto(&self, url: &str) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
         let url = url.to_owned();
         self.clone()
             .current_url_()
