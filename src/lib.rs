@@ -1302,12 +1302,12 @@ mod tests {
     use tokio_core::reactor::Core;
 
     macro_rules! tester {
-        ($c:ident, $f:expr) => {{
+        ($f:ident) => {{
             let mut core = Core::new().unwrap();
             let h = core.handle();
-            let $c = core.run(Client::new("http://localhost:4444", &h))
+            let c = core.run(Client::new("http://localhost:4444", &h))
                 .expect("failed to construct test client");
-            core.run($f)
+            core.run($f(&c))
                 .expect("test produced unexpected error response");
         }}
     }
@@ -1336,7 +1336,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        tester!(c, works_inner(&c))
+        tester!(works_inner)
     }
 
     fn clicks_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
@@ -1358,7 +1358,7 @@ mod tests {
 
     #[test]
     fn it_clicks() {
-        tester!(c, clicks_inner(&c))
+        tester!(clicks_inner)
     }
 
     fn raw_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
@@ -1397,6 +1397,6 @@ mod tests {
 
     #[test]
     fn it_can_be_raw() {
-        tester!(c, raw_inner(&c))
+        tester!(raw_inner)
     }
 }
