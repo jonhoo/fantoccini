@@ -142,13 +142,13 @@ impl Error for CmdError {
 
     fn cause(&self) -> Option<&Error> {
         match *self {
-            CmdError::Standard(ref e) => Some(e),
+            CmdError::Standard(ref e) |
             CmdError::NoSuchElement(ref e) => Some(e),
             CmdError::BadUrl(ref e) => Some(e),
             CmdError::Failed(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
-            CmdError::NotJson(_) => None,
             CmdError::Json(ref e) => Some(e),
+            CmdError::NotJson(_) |
             CmdError::NotW3C(_) => None,
         }
     }

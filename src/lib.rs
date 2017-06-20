@@ -294,10 +294,9 @@ impl Client {
                         Err(error::NewSessionError::NotW3C(Json::Object(v)))
                     }
                 }
-                Ok((_, v)) => Err(error::NewSessionError::NotW3C(v)),
+                Ok((_, v)) | Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
                 Err(error::CmdError::Failed(e)) => Err(error::NewSessionError::Failed(e)),
                 Err(error::CmdError::Lost(e)) => Err(error::NewSessionError::Lost(e)),
-                Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
                 Err(error::CmdError::NotJson(v)) => {
                     Err(error::NewSessionError::NotW3C(Json::String(v)))
                 }
@@ -323,6 +322,7 @@ impl Client {
     /// supported.
     ///
     /// Note that the second future will *not* resolve until the `Client` has been dropped.
+    #[cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
     pub fn new(
         webdriver: &str,
         handle: &tokio_core::reactor::Handle,
@@ -343,8 +343,8 @@ impl Client {
 
         // We want a tls-enabled client
         let client = hyper::Client::configure()
-            .connector(hyper_tls::HttpsConnector::new(4, &handle).unwrap())
-            .build(&handle);
+            .connector(hyper_tls::HttpsConnector::new(4, handle).unwrap())
+            .build(handle);
 
         // Keep a channel for tracking when all outstanding references to the client has gone away
         // (i.e., when all futures have resolved, no more commands can be issued, and the session
@@ -548,7 +548,7 @@ impl Client {
         }
 
         let req = self.0.c.request(req);
-        let f = req.map_err(|e| error::CmdError::from(e)).and_then(move |res| {
+        let f = req.map_err(error::CmdError::from).and_then(move |res| {
             // keep track of result status (.body() consumes self -- ugh)
             let status = res.status();
 
@@ -630,7 +630,7 @@ impl Client {
                     return Err(error::CmdError::NotW3C(Json::Object(body)));
                 }
                 match legacy_status {
-                    6 => ErrorStatus::SessionNotCreated,
+                    6 | 33 => ErrorStatus::SessionNotCreated,
                     7 => ErrorStatus::NoSuchElement,
                     8 => ErrorStatus::NoSuchFrame,
                     9 => ErrorStatus::UnknownCommand,
@@ -640,7 +640,7 @@ impl Client {
                     13 => ErrorStatus::UnknownError,
                     15 => ErrorStatus::ElementNotSelectable,
                     17 => ErrorStatus::JavascriptError,
-                    19 => ErrorStatus::InvalidSelector,
+                    19 | 32 => ErrorStatus::InvalidSelector,
                     21 => ErrorStatus::Timeout,
                     23 => ErrorStatus::NoSuchWindow,
                     24 => ErrorStatus::InvalidCookieDomain,
@@ -649,8 +649,6 @@ impl Client {
                     27 => ErrorStatus::NoSuchAlert,
                     28 => ErrorStatus::ScriptTimeout,
                     29 => ErrorStatus::InvalidCoordinates,
-                    32 => ErrorStatus::InvalidSelector,
-                    33 => ErrorStatus::SessionNotCreated,
                     34 => ErrorStatus::MoveTargetOutOfBounds,
                     _ => return Err(error::CmdError::NotW3C(Json::Object(body))),
                 }
@@ -731,8 +729,7 @@ impl Client {
     /// Navigate directly to the given URL.
     pub fn goto(&self, url: &str) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
         let url = url.to_owned();
-        self.clone()
-            .current_url_()
+        self.current_url_()
             .and_then(move |(this, base)| Ok((this, base.join(&url)?)))
             .and_then(move |(this, url)| {
                 this.issue_wd_cmd(WebDriverCommand::Get(
@@ -828,8 +825,7 @@ impl Client {
         // navigate back. *Except* that we can't do that either (what if `url` is some huge file?).
         // So we *actually* navigate to some weird url that's deeper than `url`, and hope that we
         // don't end up with a redirect to somewhere entirely different.
-        self.clone()
-            .current_url_()
+        self.current_url_()
             .and_then(move |(this, old_url)| {
                 old_url
                     .clone()
@@ -965,7 +961,7 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub fn wait_for<'a, F>(&'a mut self, mut is_ready: F) -> &'a mut Self
+    pub fn wait_for<F>(&mut self, mut is_ready: F) -> &mut Self
     where
         F: FnMut(Client) -> bool,
     {
@@ -1161,9 +1157,7 @@ impl Element {
     pub fn click(self) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         let cmd = WebDriverCommand::ElementClick(self.e);
         self.c.issue_wd_cmd(cmd).and_then(move |(c, r)| {
-            if r.is_null() {
-                Ok(c)
-            } else if r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+            if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
                 // geckodriver returns {} :(
                 Ok(c)
             } else {
@@ -1272,9 +1266,7 @@ impl Form {
                 this.issue_wd_cmd(WebDriverCommand::ElementClick(submit))
             })
             .and_then(move |(this, res)| {
-                if res.is_null() {
-                    Ok(this)
-                } else if res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
                     // geckodriver returns {} :(
                     Ok(this)
                 } else {
@@ -1325,9 +1317,7 @@ impl Form {
         self.c
             .issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
             .and_then(move |(this, res)| {
-                if res.is_null() {
-                    Ok(this)
-                } else if res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
                     // geckodriver returns {} :(
                     Ok(this)
                 } else {
@@ -1369,9 +1359,7 @@ impl Form {
         self.c
             .issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
             .and_then(move |(this, res)| {
-                if res.is_null() {
-                    future::Either::A(Form { f: f, c: this }.submit_direct())
-                } else if res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                if res.is_null() | res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
                     // geckodriver returns {} :(
                     future::Either::A(Form { f: f, c: this }.submit_direct())
                 } else {
