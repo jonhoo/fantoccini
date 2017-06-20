@@ -444,10 +444,9 @@ impl Client {
 
         let base = {
             let session = self.0.session.borrow();
-            self.0.wdb.join(&format!(
-                "/session/{}/",
-                session.as_ref().unwrap()
-            ))?
+            self.0
+                .wdb
+                .join(&format!("/session/{}/", session.as_ref().unwrap()))?
         };
         match *cmd {
             WebDriverCommand::NewSession(..) => unreachable!(),
@@ -1294,7 +1293,7 @@ impl Form {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
         self.submit_with(&format!(
             "input[type=submit][value=\"{}\" i],\
-                                  button[type=submit][value=\"{}\" i]",
+             button[type=submit][value=\"{}\" i]",
             escaped,
             escaped
         ))
@@ -1357,11 +1356,11 @@ impl Form {
         self.c.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "\
-                var h = document.createElement('input');\
-                h.setAttribute('type', 'hidden');\
-                h.setAttribute('name', arguments[1]);\
-                h.value = arguments[2];\
-                arguments[0].appendChild(h)"
+                     var h = document.createElement('input');\
+                     h.setAttribute('type', 'hidden');\
+                     h.setAttribute('name', arguments[1]);\
+                     h.value = arguments[2];\
+                     arguments[0].appendChild(h)"
                 .to_string(),
             args: webdriver::common::Nullable::Value(args),
         };
