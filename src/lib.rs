@@ -26,61 +26,152 @@
 //! Let's start out clicking around on Wikipedia:
 //!
 //! ```no_run
+//! # extern crate tokio_core;
+//! # extern crate futures;
+//! # extern crate fantoccini;
+//! # fn main() {
 //! # use fantoccini::Client;
-//! let mut c = Client::new("http://localhost:4444").unwrap();
-//! // go to the Wikipedia page for Foobar
-//! c.goto("https://en.wikipedia.org/wiki/Foobar").unwrap();
-//! assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-//! // click "Foo (disambiguation)"
-//! c.by_selector(".mw-disambig").unwrap().click().unwrap();
-//! // click "Foo Lake"
-//! c.by_link_text("Foo Lake").unwrap().click().unwrap();
-//! assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+//! # use futures::future::Future;
+//! let mut core = tokio_core::reactor::Core::new().unwrap();
+//! let (c, fin) = Client::new("http://localhost:4444", &core.handle());
+//! let c = core.run(c).unwrap();
+//!
+//! {
+//!     // we want to have a reference to c so we can use it in the and_thens below
+//!     let c = &c;
+//!
+//!     // now let's set up the sequence of steps we want the browser to take
+//!     // first, go to the Wikipedia page for Foobar
+//!     let f = c.goto("https://en.wikipedia.org/wiki/Foobar")
+//!         .and_then(move |_| c.current_url())
+//!         .and_then(move |url| {
+//!             assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+//!             // click "Foo (disambiguation)"
+//!             c.by_selector(".mw-disambig")
+//!         })
+//!         .and_then(|e| e.click())
+//!         .and_then(move |_| {
+//!             // click "Foo Lake"
+//!             c.by_link_text("Foo Lake")
+//!         })
+//!         .and_then(|e| e.click())
+//!         .and_then(move |_| c.current_url())
+//!         .and_then(|url| {
+//!             assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+//!             Ok(())
+//!         });
+//!
+//!     // and set the browser off to do those things
+//!     core.run(f).unwrap();
+//! }
+//!
+//! // drop the client to delete the browser session
+//! drop(c);
+//! // and wait for cleanup to finish
+//! core.run(fin).unwrap();
+//! # }
 //! ```
 //!
 //! How did we get to the Foobar page in the first place? We did a search!
 //! Let's make the program do that for us instead:
 //!
 //! ```no_run
+//! # extern crate tokio_core;
+//! # extern crate futures;
+//! # extern crate fantoccini;
+//! # fn main() {
 //! # use fantoccini::Client;
-//! # let mut c = Client::new("http://localhost:4444").unwrap();
+//! # use futures::future::Future;
+//! # let mut core = tokio_core::reactor::Core::new().unwrap();
+//! # let (c, fin) = Client::new("http://localhost:4444", &core.handle());
+//! # let c = core.run(c).unwrap();
+//! # {
+//! #    let c = &c;
+//! #    let f =
+//! // -- snip wrapper code --
 //! // go to the Wikipedia frontpage this time
-//! c.goto("https://www.wikipedia.org/").unwrap();
-//! // find, fill out, and submit the search form
-//! {
-//!     let mut f = c.form("#search-form").unwrap();
-//!     f.set_by_name("search", "foobar").unwrap();
-//!     f.submit().unwrap();
-//! }
-//! // we should now have ended up in the rigth place
-//! assert_eq!(c.current_url().unwrap().as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+//! c.goto("https://www.wikipedia.org/")
+//!     .and_then(move |_| {
+//!         // find the search form
+//!         c.form("#search-form")
+//!     })
+//!     .and_then(|f| {
+//!         // fill it out
+//!         f.set_by_name("search", "foobar")
+//!     })
+//!     .and_then(|f| {
+//!         // and submit it
+//!         f.submit()
+//!     })
+//!     // we should now have ended up in the rigth place
+//!     .and_then(move |_| c.current_url())
+//!     .and_then(|url| {
+//!         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+//!         Ok(())
+//!     })
+//! // -- snip wrapper code --
+//! #    ;
+//! #    core.run(f).unwrap();
+//! # }
+//! # drop(c);
+//! # core.run(fin).unwrap();
+//! # }
 //! ```
 //!
 //! What if we want to download a raw file? Fantoccini has you covered:
 //!
 //! ```no_run
+//! # extern crate tokio_core;
+//! # extern crate futures;
+//! # extern crate fantoccini;
+//! # fn main() {
 //! # use fantoccini::Client;
-//! # let mut c = Client::new("http://localhost:4444").unwrap();
+//! # use futures::future::Future;
+//! # let mut core = tokio_core::reactor::Core::new().unwrap();
+//! # let (c, fin) = Client::new("http://localhost:4444", &core.handle());
+//! # let c = core.run(c).unwrap();
+//! # {
+//! #    let c = &c;
+//! #    let f =
+//! // -- snip wrapper code --
 //! // go back to the frontpage
-//! c.goto("https://www.wikipedia.org/").unwrap();
-//! // find the source for the Wikipedia globe
-//! let img = c.by_selector("img.central-featured-logo")
-//!     .expect("image should be on page")
-//!     .attr("src")
-//!     .unwrap()
-//!     .expect("image should have a src");
-//! // now build a raw HTTP client request (which also has all current cookies)
-//! let raw = c.raw_client_for(fantoccini::Method::Get, &img).unwrap();
-//! // this is a RequestBuilder from hyper, so we could also add POST data here
-//! // but for this we just send the request
-//! let mut res = raw.send().unwrap();
-//! // we then read out the image bytes
-//! use std::io::prelude::*;
-//! let mut pixels = Vec::new();
-//! res.read_to_end(&mut pixels).unwrap();
-//! // and voilla, we now have the bytes for the Wikipedia logo!
-//! assert!(pixels.len() > 0);
-//! println!("Wikipedia logo is {}b", pixels.len());
+//! c.goto("https://www.wikipedia.org/")
+//!     .and_then(move |_| {
+//!         // find the source for the Wikipedia globe
+//!         c.by_selector("img.central-featured-logo")
+//!     })
+//!     .and_then(|img| {
+//!         img.attr("src")
+//!             .map(|src| src.expect("image should have a src"))
+//!     })
+//!     .and_then(move |src| {
+//!         // now build a raw HTTP client request (which also has all current cookies)
+//!         c.raw_client_for(fantoccini::Method::Get, &src)
+//!     })
+//!     .and_then(|raw| {
+//!         use futures::Stream;
+//!         // we then read out the image bytes
+//!         raw.body().map_err(fantoccini::error::CmdError::from).fold(
+//!             Vec::new(),
+//!             |mut pixels, chunk| {
+//!                 pixels.extend(&*chunk);
+//!                 futures::future::ok::<Vec<u8>, fantoccini::error::CmdError>(pixels)
+//!             },
+//!         )
+//!     })
+//!     .and_then(|pixels| {
+//!         // and voilla, we now have the bytes for the Wikipedia logo!
+//!         assert!(pixels.len() > 0);
+//!         println!("Wikipedia logo is {}b", pixels.len());
+//!         Ok(())
+//!     })
+//! // -- snip wrapper code --
+//! #    ;
+//! #    core.run(f).unwrap();
+//! # }
+//! # drop(c);
+//! # core.run(fin).unwrap();
+//! # }
 //! ```
 //!
 //! [WebDriver protocol]: https://www.w3.org/TR/webdriver/
@@ -708,26 +799,6 @@ impl Client {
     /// Issue an HTTP request to the given `url` with all the same cookies as the current session.
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// use fantoccini::Client;
-    /// let mut c = Client::new("http://localhost:4444").unwrap();
-    /// c.goto("https://www.wikipedia.org/").unwrap();
-    /// let img = c.by_selector("img.central-featured-logo").unwrap()
-    ///            .attr("src").unwrap().unwrap();
-    /// let mut res = c.raw_client_for(fantoccini::Method::Get, &img).unwrap();
-    ///
-    /// let pixels: Vec<u8> = res.body()
-    ///     .fold(Vec::new(), |mut pixels, chunk| -> Result<_, hyper::Error> {
-    ///         pixels.extend(&*chunk);
-    ///         Ok(pixels)
-    ///     })
-    ///     .wait()
-    ///     .unwrap();
-    /// println!("Wikipedia logo is {}b", pixels.len());
-    /// ```
     pub fn raw_client_for(
         &self,
         method: Method,
@@ -741,30 +812,6 @@ impl Client {
     ///
     /// Before the HTTP request is issued, the given `before` closure will be called with a handle
     /// to the `Request` about to be sent.
-    ///
-    /// # Examples
-    ///
-    /// ```no_run
-    /// # extern crate fantoccini;
-    /// # extern crate hyper;
-    /// use fantoccini::Client;
-    /// let mut c = Client::new("http://localhost:4444").unwrap();
-    /// c.goto("https://www.wikipedia.org/").unwrap();
-    /// let img = c.by_selector("img.central-featured-logo").unwrap()
-    ///            .attr("src").unwrap().unwrap();
-    /// let mut res = c.with_raw_client_for(fantoccini::Method::Get, &img, |req| {
-    ///     req.headers_mut().set(hyper::header::UserAgent::new("cURL"));
-    /// }).unwrap();
-    ///
-    /// let pixels: Vec<u8> = res.body()
-    ///     .fold(Vec::new(), |mut pixels, chunk| -> Result<_, hyper::Error> {
-    ///         pixels.extend(&*chunk);
-    ///         Ok(pixels)
-    ///     })
-    ///     .wait()
-    ///     .unwrap();
-    /// println!("Wikipedia logo is {}b", pixels.len());
-    /// ```
     pub fn with_raw_client_for<'a, F>(
         &self,
         method: Method,
