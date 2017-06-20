@@ -1301,28 +1301,15 @@ mod tests {
     use super::*;
     use tokio_core::reactor::Core;
 
-    fn tester<'a, F, R>(f: F)
-    where
-        F: FnOnce(&'a Client) -> R,
-        R: Future<Item = (), Error = error::CmdError> + 'a,
-    {
-        let mut core = Core::new().unwrap();
-        let h = core.handle();
-        match core.run(Client::new("http://localhost:4444", &h)) {
-            Ok(c) => {
-                match core.run(f(&c)) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        println!("{}", e);
-                        assert!(false);
-                    }
-                }
-            }
-            Err(e) => {
-                println!("{}", e);
-                assert!(false);
-            }
-        }
+    macro_rules! tester {
+        ($c:ident, $f:expr) => {{
+            let mut core = Core::new().unwrap();
+            let h = core.handle();
+            let $c = core.run(Client::new("http://localhost:4444", &h))
+                .expect("failed to construct test client");
+            core.run($f)
+                .expect("test produced unexpected error response");
+        }}
     }
 
     fn works_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
@@ -1349,7 +1336,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        tester(works_inner)
+        tester!(c, works_inner(&c))
     }
 
     fn clicks_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
@@ -1371,7 +1358,7 @@ mod tests {
 
     #[test]
     fn it_clicks() {
-        tester(clicks_inner)
+        tester!(c, clicks_inner(&c))
     }
 
     fn raw_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
@@ -1410,6 +1397,6 @@ mod tests {
 
     #[test]
     fn it_can_be_raw() {
-        tester(raw_inner)
+        tester!(c, raw_inner(&c))
     }
 }
