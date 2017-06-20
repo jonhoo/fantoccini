@@ -119,26 +119,30 @@ type Cmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 /// State held by a `Client`
 struct Inner {
     c: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
-    handle: tokio_core::reactor::Handle,
     wdb: url::Url,
     session: RefCell<Option<String>>,
     legacy: bool,
     ua: RefCell<Option<String>>,
+    closed: RefCell<bool>,
+}
+
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // NOTE: we must implement Drop for Inner, *not* for Client, since Client is dropped often
+        assert!(*self.closed.borrow());
+    }
 }
 
 /// A WebDriver client tied to a single browser session.
-#[derive(Clone)]
 pub struct Client(Rc<Inner>);
 
 /// A single element on the current page.
-#[derive(Clone)]
 pub struct Element {
     c: Client,
     e: webdriver::common::WebElement,
 }
 
 /// An HTML form on the current page.
-#[derive(Clone)]
 pub struct Form {
     c: Client,
     f: webdriver::common::WebElement,
@@ -169,6 +173,7 @@ impl Client {
                     if let Some(session_id) = v.remove("sessionId") {
                         if let Some(session_id) = session_id.as_string() {
                             *this.0.session.borrow_mut() = Some(session_id.to_string());
+                            *this.0.closed.borrow_mut() = false;
                             return Ok(this);
                         }
                         v.insert("sessionId".to_string(), session_id);
@@ -214,16 +219,14 @@ impl Client {
             .connector(hyper_tls::HttpsConnector::new(4, &handle).unwrap())
             .build(&handle);
 
-        let handle = handle.clone();
-
         // Set up our WebDriver client
         let c = Client(Rc::new(Inner {
             c: client.clone(),
-            handle: handle.clone(),
             wdb: wdb.clone(),
             session: RefCell::new(None),
             legacy: false,
             ua: RefCell::new(None),
+            closed: RefCell::new(true),
         }));
 
         // Required capabilities
@@ -241,7 +244,7 @@ impl Client {
         };
         let spec = webdriver::command::NewSessionParameters::Spec(session_config);
 
-        let f = c.clone().init(spec).or_else(move |e| {
+        let f = Client(c.0.clone()).init(spec).or_else(move |e| {
             match e {
                 error::NewSessionError::NotW3C(json) => {
                     let mut legacy = false;
@@ -286,6 +289,43 @@ impl Client {
         future::Either::A(f)
     }
 
+    fn dup(&self) -> Self {
+        Client(self.0.clone())
+    }
+
+    /// Signal to the WebDriver server that the current session has finished.
+    ///
+    /// Note that this method *must* be called, and the returned future *must* be waited for, in
+    /// order for the WebDriver browser session to be closed. For some drivers, such as
+    /// geckodriver, this is particularly important, as multiple simulatenous sessions may not be
+    /// supported.
+    pub fn end(self) -> impl Future<Item = (), Error = ()> + 'static {
+        if self.0.session.borrow().is_some() {
+            let url = {
+                let s = self.0.session.borrow();
+                self.0
+                    .wdb
+                    .join(&format!("/session/{}", s.as_ref().unwrap()))
+                    .unwrap()
+            };
+
+            future::Either::A(
+                self.0
+                    .c
+                    .request(hyper::client::Request::new(
+                        Method::Delete,
+                        url.as_ref().parse().unwrap(),
+                    ))
+                    .then(move |_| {
+                        *self.0.closed.borrow_mut() = true;
+                        Ok(())
+                    }),
+            )
+        } else {
+            future::Either::B(future::ok(()))
+        }
+    }
+
     /// Set the User Agent string to use for all subsequent requests.
     pub fn set_ua<S: Into<String>>(&mut self, ua: S) {
         *self.0.ua.borrow_mut() = Some(ua.into());
@@ -301,12 +341,10 @@ impl Client {
 
         let base = {
             let session = self.0.session.borrow();
-            let session = session.as_ref().unwrap();
-            if let WebDriverCommand::DeleteSession = *cmd {
-                return self.0.wdb.join(&format!("/session/{}", session));
-            }
-
-            self.0.wdb.join(&format!("/session/{}/", session))?
+            self.0.wdb.join(&format!(
+                "/session/{}/",
+                session.as_ref().unwrap()
+            ))?
         };
         match *cmd {
             WebDriverCommand::NewSession(..) => unreachable!(),
@@ -392,9 +430,6 @@ impl Client {
             WebDriverCommand::ElementClick(..) => {
                 body = Some("{}".to_string());
                 method = Method::Post;
-            }
-            WebDriverCommand::DeleteSession => {
-                method = Method::Delete;
             }
             _ => {}
         }
@@ -608,7 +643,7 @@ impl Client {
     fn current_url_(
         &self,
     ) -> impl Future<Item = (Self, url::Url), Error = error::CmdError> + 'static {
-        self.clone()
+        self.dup()
             .issue_wd_cmd(WebDriverCommand::GetCurrentUrl)
             .and_then(|(this, url)| {
                 if let Some(url) = url.as_string() {
@@ -626,7 +661,7 @@ impl Client {
 
     /// Get the HTML source for the current page.
     pub fn source(&self) -> impl Future<Item = String, Error = error::CmdError> + 'static {
-        self.clone()
+        self.dup()
             .issue_wd_cmd(WebDriverCommand::GetPageSource)
             .and_then(|(_, src)| {
                 if let Some(src) = src.as_string() {
@@ -653,7 +688,7 @@ impl Client {
             args: webdriver::common::Nullable::Value(args),
         };
 
-        self.clone()
+        self.dup()
             .issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
             .map(|(_, v)| v)
     }
@@ -876,7 +911,7 @@ impl Client {
     where
         F: FnMut(Client) -> bool,
     {
-        while !is_ready(self.clone()) {
+        while !is_ready(self.dup()) {
             use std::thread;
             thread::yield_now();
         }
@@ -919,7 +954,7 @@ impl Client {
         selector: &str,
     ) -> impl Future<Item = Form, Error = error::CmdError> + 'static {
         let locator = Self::mklocator(selector);
-        self.clone()
+        self.dup()
             .issue_wd_cmd(WebDriverCommand::FindElement(locator))
             .map_err(|e| e.into())
             .and_then(|(this, res)| {
@@ -934,7 +969,7 @@ impl Client {
         &self,
         locator: webdriver::command::LocatorParameters,
     ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
-        self.clone()
+        self.dup()
             .issue_wd_cmd(WebDriverCommand::FindElement(locator))
             .map_err(|e| e.into())
             .and_then(|(this, res)| {
@@ -995,17 +1030,6 @@ impl Client {
         webdriver::command::LocatorParameters {
             using: webdriver::common::LocatorStrategy::CSSSelector,
             value: selector.to_string(),
-        }
-    }
-}
-
-impl Drop for Client {
-    fn drop(&mut self) {
-        if self.0.session.borrow().is_some() {
-            let f = self.clone()
-                .issue_wd_cmd(WebDriverCommand::DeleteSession)
-                .then(|_| Ok(()));
-            self.0.handle.spawn(f);
         }
     }
 }
@@ -1133,9 +1157,12 @@ impl Form {
     ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
         let locator = Client::mklocator(&format!("input[name='{}']", field));
         let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator);
-        let f = self.clone();
+        let f = Form {
+            c: self.c.dup(),
+            f: self.f.clone(),
+        };
         self.c
-            .clone()
+            .dup()
             .issue_wd_cmd(locator)
             .map_err(|e| e.into())
             .and_then(|(this, res)| {
@@ -1309,6 +1336,7 @@ mod tests {
                 .expect("failed to construct test client");
             core.run($f(&c))
                 .expect("test produced unexpected error response");
+            core.run(c.end()).expect("failed to close test session");
         }}
     }
 
