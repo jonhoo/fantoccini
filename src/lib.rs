@@ -1422,14 +1422,13 @@ mod tests {
             })
             .and_then(|raw| {
                 // we then read out the image bytes
-                raw.body()
-                    .fold(Vec::new(), |mut pixels,
-                     chunk|
-                     -> Result<Vec<u8>, hyper::Error> {
+                raw.body().map_err(error::CmdError::from).fold(
+                    Vec::new(),
+                    |mut pixels, chunk| {
                         pixels.extend(&*chunk);
-                        Ok(pixels)
-                    })
-                    .map_err(|e| e.into())
+                        future::ok::<Vec<u8>, error::CmdError>(pixels)
+                    },
+                )
             })
             .and_then(|pixels| {
                 // and voilla, we now have the bytes for the Wikipedia logo!
