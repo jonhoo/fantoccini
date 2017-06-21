@@ -544,6 +544,8 @@ impl Client {
         }
         if let Some(ref body) = body {
             req.headers_mut().set(hyper::header::ContentType::json());
+            req.headers_mut()
+                .set(hyper::header::ContentLength(body.len() as u64));
             req.set_body(body.clone());
         }
 
