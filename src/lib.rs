@@ -390,10 +390,13 @@ impl Client {
                             if err.contains_key("message") &&
                                 err["message"]
                                     .as_string()
-                                    .map(|s| s.contains("cannot find dict 'desiredCapabilities'"))
+                                    .map(|s| {
+                                        // chromedriver < 2.29 || chromedriver == 2.29
+                                        s.contains("cannot find dict 'desiredCapabilities'") ||
+                                            s.contains("Missing or invalid capabilities")
+                                    })
                                     .unwrap_or(false)
                             {
-                                // chromedriver
                                 legacy = true;
                             }
                         }
