@@ -998,7 +998,11 @@ impl Client {
                 Ok(_) => true,
             });
 
-            if let Some(e) = err { Err(e) } else { Ok(this) }
+            if let Some(e) = err {
+                Err(e)
+            } else {
+                Ok(this)
+            }
         })
     }
 
