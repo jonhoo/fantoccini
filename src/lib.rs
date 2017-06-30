@@ -567,17 +567,14 @@ impl Client {
 
             // What did the server send us?
             res.body()
-                .fold(Vec::new(), |mut s, chunk| -> Result<_, hyper::Error> {
-                    s.extend(&*chunk);
-                    Ok(s)
-                })
+                .concat2()
                 .map(move |body| {
                     (self, body, ctype, status)
                 })
                 .map_err(|e| -> error::CmdError { e.into() })
         }).and_then(|(this, body, ctype, status)| {
             // Too bad we can't stream into a String :(
-            let body = String::from_utf8(body).expect("non utf-8 response from webdriver");
+            let body = String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
             if ctype.type_() == hyper::mime::APPLICATION && ctype.subtype() == hyper::mime::JSON {
                 Ok((this, body, status))
             } else {
