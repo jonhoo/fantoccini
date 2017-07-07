@@ -425,7 +425,7 @@ impl Client {
             }
         });
         (
-            future::Either::A(f),
+            future::Either::A(Box::new(f) as Box<Future<Item = _, Error = _>>),
             future::Either::A(rx.into_future().then(|_| Ok(()))),
         )
     }
@@ -736,14 +736,16 @@ impl Client {
     /// Navigate directly to the given URL.
     pub fn goto(&self, url: &str) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
         let url = url.to_owned();
-        self.current_url_()
-            .and_then(move |(this, base)| Ok((this, base.join(&url)?)))
-            .and_then(move |(this, url)| {
-                this.issue_wd_cmd(WebDriverCommand::Get(
-                    webdriver::command::GetParameters { url: url.into_string() },
-                ))
-            })
-            .map(|(this, _)| this)
+        Box::new(
+            self.current_url_()
+                .and_then(move |(this, base)| Ok((this, base.join(&url)?)))
+                .and_then(move |(this, url)| {
+                    this.issue_wd_cmd(WebDriverCommand::Get(webdriver::command::GetParameters {
+                        url: url.into_string(),
+                    }))
+                })
+                .map(|(this, _)| this),
+        ) as Box<Future<Item = _, Error = _>>
     }
 
     #[inline]
@@ -1020,13 +1022,15 @@ impl Client {
         selector: &str,
     ) -> impl Future<Item = Form, Error = error::CmdError> + 'static {
         let locator = Self::mklocator(selector);
-        self.dup()
-            .issue_wd_cmd(WebDriverCommand::FindElement(locator))
-            .map_err(|e| e.into())
-            .and_then(|(this, res)| {
-                let f = this.parse_lookup(res);
-                f.map(move |f| Form { c: this, f: f })
-            })
+        Box::new(
+            self.dup()
+                .issue_wd_cmd(WebDriverCommand::FindElement(locator))
+                .map_err(|e| e.into())
+                .and_then(|(this, res)| {
+                    let f = this.parse_lookup(res);
+                    f.map(move |f| Form { c: this, f: f })
+                }),
+        ) as Box<Future<Item = _, Error = _>>
     }
 
     // helpers
@@ -1036,13 +1040,15 @@ impl Client {
         &self,
         locator: webdriver::command::LocatorParameters,
     ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
-        self.dup()
-            .issue_wd_cmd(WebDriverCommand::FindElement(locator))
-            .map_err(|e| e.into())
-            .and_then(|(this, res)| {
-                let e = this.parse_lookup(res);
-                e.map(move |e| Element { c: this, e: e })
-            })
+        Box::new(
+            self.dup()
+                .issue_wd_cmd(WebDriverCommand::FindElement(locator))
+                .map_err(|e| e.into())
+                .and_then(|(this, res)| {
+                    let e = this.parse_lookup(res);
+                    e.map(move |e| Element { c: this, e: e })
+                }),
+        ) as Box<Future<Item = _, Error = _>>
     }
 
     /// Extract the `WebElement` from a `FindElement` or `FindElementElement` command.
@@ -1187,24 +1193,26 @@ impl Element {
     /// Note that since this *may* result in navigation, we give up the handle to the element.
     pub fn follow(self) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         let cmd = WebDriverCommand::GetElementAttribute(self.e, "href".to_string());
-        self.c
-            .issue_wd_cmd(cmd)
-            .and_then(|(this, href)| match href {
-                Json::String(v) => Ok((this, v)),
-                Json::Null => {
-                    let e = WebDriverError::new(
-                        webdriver::error::ErrorStatus::InvalidArgument,
-                        "cannot follow element without href attribute",
-                    );
-                    Err(error::CmdError::Standard(e))
-                }
-                v => Err(error::CmdError::NotW3C(v)),
-            })
-            .and_then(|(this, href)| {
-                this.current_url_()
-                    .and_then(move |(this, url)| Ok((this, url.join(&href)?)))
-            })
-            .and_then(|(this, href)| this.goto(href.as_str()).map(|this| this))
+        Box::new(
+            self.c
+                .issue_wd_cmd(cmd)
+                .and_then(|(this, href)| match href {
+                    Json::String(v) => Ok((this, v)),
+                    Json::Null => {
+                        let e = WebDriverError::new(
+                            webdriver::error::ErrorStatus::InvalidArgument,
+                            "cannot follow element without href attribute",
+                        );
+                        Err(error::CmdError::Standard(e))
+                    }
+                    v => Err(error::CmdError::NotW3C(v)),
+                })
+                .and_then(|(this, href)| {
+                    this.current_url_()
+                        .and_then(move |(this, url)| Ok((this, url.join(&href)?)))
+                })
+                .and_then(|(this, href)| this.goto(href.as_str()).map(|this| this)),
+        ) as Box<Future<Item = _, Error = _>>
     }
 }
 
@@ -1270,24 +1278,26 @@ impl Form {
     ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         let locator = Client::mklocator(button);
         let locator = WebDriverCommand::FindElementElement(self.f, locator);
-        self.c
-            .issue_wd_cmd(locator)
-            .map_err(|e| e.into())
-            .and_then(|(this, res)| {
-                let s = this.parse_lookup(res);
-                s.map(move |s| (this, s))
-            })
-            .and_then(move |(this, submit)| {
-                this.issue_wd_cmd(WebDriverCommand::ElementClick(submit))
-            })
-            .and_then(move |(this, res)| {
-                if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
-                    // geckodriver returns {} :(
-                    Ok(this)
-                } else {
-                    Err(error::CmdError::NotW3C(res))
-                }
-            })
+        Box::new(
+            self.c
+                .issue_wd_cmd(locator)
+                .map_err(|e| e.into())
+                .and_then(|(this, res)| {
+                    let s = this.parse_lookup(res);
+                    s.map(move |s| (this, s))
+                })
+                .and_then(move |(this, submit)| {
+                    this.issue_wd_cmd(WebDriverCommand::ElementClick(submit))
+                })
+                .and_then(move |(this, res)| {
+                    if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                        // geckodriver returns {} :(
+                        Ok(this)
+                    } else {
+                        Err(error::CmdError::NotW3C(res))
+                    }
+                }),
+        ) as Box<Future<Item = _, Error = _>>
     }
 
     /// Submit this form using the form submit button with the given label (case-insensitive).
@@ -1296,14 +1306,14 @@ impl Form {
     pub fn submit_using(
         self,
         button_label: &str,
-    ) -> impl Future<Item = Client, Error = error::CmdError> {
+    ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
-        self.submit_with(&format!(
+        Box::new(self.submit_with(&format!(
             "input[type=submit][value=\"{}\" i],\
              button[type=submit][value=\"{}\" i]",
             escaped,
             escaped
-        ))
+        ))) as Box<Future<Item = _, Error = _>>
     }
 
     /// Submit this form directly, without clicking any buttons.
@@ -1329,16 +1339,18 @@ impl Form {
             args: webdriver::common::Nullable::Value(args),
         };
 
-        self.c
-            .issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
-            .and_then(move |(this, res)| {
-                if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
-                    // geckodriver returns {} :(
-                    Ok(this)
-                } else {
-                    Err(error::CmdError::NotW3C(res))
-                }
-            })
+        Box::new(
+            self.c
+                .issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
+                .and_then(move |(this, res)| {
+                    if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                        // geckodriver returns {} :(
+                        Ok(this)
+                    } else {
+                        Err(error::CmdError::NotW3C(res))
+                    }
+                }),
+        ) as Box<Future<Item = _, Error = _>>
     }
 
     /// Submit this form directly, without clicking any buttons, and with an extra field.
@@ -1371,16 +1383,18 @@ impl Form {
         };
 
         let f = self.f;
-        self.c
-            .issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
-            .and_then(move |(this, res)| {
-                if res.is_null() | res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
-                    // geckodriver returns {} :(
-                    future::Either::A(Form { f: f, c: this }.submit_direct())
-                } else {
-                    future::Either::B(future::err(error::CmdError::NotW3C(res)))
-                }
-            })
+        Box::new(
+            self.c
+                .issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
+                .and_then(move |(this, res)| {
+                    if res.is_null() | res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                        // geckodriver returns {} :(
+                        future::Either::A(Form { f: f, c: this }.submit_direct())
+                    } else {
+                        future::Either::B(future::err(error::CmdError::NotW3C(res)))
+                    }
+                }),
+        ) as Box<Future<Item = _, Error = _>>
     }
 }
 
