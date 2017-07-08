@@ -842,23 +842,30 @@ impl Client {
     ///
     /// Before the HTTP request is issued, the given `before` closure will be called with a handle
     /// to the `Request` about to be sent.
-    pub fn with_raw_client_for<'a, F>(
+    pub fn with_raw_client_for<F>(
         &self,
         method: Method,
         url: &str,
         before: F,
-    ) -> impl Future<Item = hyper::Response, Error = error::CmdError> + 'a
+    ) -> impl Future<Item = hyper::Response, Error = error::CmdError> + 'static
     where
-        F: FnOnce(&mut hyper::Request) + 'a,
+        F: FnOnce(&mut hyper::Request) + 'static,
     {
         let url = url.to_owned();
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
-        // *current* domain, whereas we want the cookies for `url`'s domain. The fact that cookies
-        // can have /path and security constraints makes this even more of a pain. So, to get
-        // around all this, we navigate to the URL in question, fetch its cookies, and then
-        // navigate back. *Except* that we can't do that either (what if `url` is some huge file?).
-        // So we *actually* navigate to some weird url that's deeper than `url`, and hope that we
-        // don't end up with a redirect to somewhere entirely different.
+        // *current* domain, whereas we want the cookies for `url`'s domain. So, we navigate to the
+        // URL in question, fetch its cookies, and then navigate back. *Except* that we can't do
+        // that either (what if `url` is some huge file?). So we *actually* navigate to some weird
+        // url that's unlikely to exist on the target doamin, and which won't resolve into the
+        // actual content, but will still give the same cookies.
+        //
+        // The fact that cookies can have /path and security constraints makes this even more of a
+        // pain. /path in particular is tricky, because you could have a URL like:
+        //
+        //    example.com/download/some_identifier/ignored_filename_just_for_show
+        //
+        // Imagine if a cookie is set with path=/download/some_identifier. How do we get that
+        // cookie without triggering a request for the (large) file? I don't know. Hence: TODO.
         self.current_url_()
             .and_then(move |(this, old_url)| {
                 old_url
@@ -869,7 +876,7 @@ impl Client {
             })
             .and_then(|(this, old_url, url)| {
                 url.clone()
-                    .join("please_give_me_your_cookies")
+                    .join("/please_give_me_your_cookies")
                     .map(move |cookie_url| (this, old_url, url, cookie_url))
                     .map_err(|e| e.into())
             })
