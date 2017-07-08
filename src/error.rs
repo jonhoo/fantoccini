@@ -191,7 +191,11 @@ impl From<herror::Error> for CmdError {
 
 impl From<wderror::WebDriverError> for CmdError {
     fn from(e: wderror::WebDriverError) -> Self {
-        if let wderror::WebDriverError { error: wderror::ErrorStatus::NoSuchElement, .. } = e {
+        if let wderror::WebDriverError {
+            error: wderror::ErrorStatus::NoSuchElement,
+            ..
+        } = e
+        {
             CmdError::NoSuchElement(e)
         } else {
             CmdError::Standard(e)
