@@ -218,9 +218,8 @@ struct Inner {
     tx: futures::unsync::mpsc::Sender<()>,
 }
 
-impl Drop for Inner {
-    fn drop(&mut self) {
-        // NOTE: we must implement Drop for Inner, *not* for Client, since Client is dropped often
+impl Inner {
+    fn shutdown(&mut self) -> bool {
         if self.session.borrow().is_some() {
             let url = {
                 let s = self.session.borrow();
@@ -228,6 +227,7 @@ impl Drop for Inner {
                     .join(&format!("/session/{}", s.as_ref().unwrap()))
                     .unwrap()
             };
+            *self.session.borrow_mut() = None;
 
             // TODO: ensure that there are no other outstanding futures
             // keep a copy of tx so the "final" future is not yet resolved
@@ -242,7 +242,17 @@ impl Drop for Inner {
                     Ok(())
                 });
             self.handle.spawn(f);
+            true
+        } else {
+            false
         }
+    }
+}
+
+impl Drop for Inner {
+    fn drop(&mut self) {
+        // NOTE: we must implement Drop for Inner, *not* for Client, since Client is dropped often
+        self.shutdown();
     }
 }
 
@@ -731,6 +741,20 @@ impl Client {
         });
 
         future::Either::A(f)
+    }
+
+    /// Terminate the connection to the webservice.
+    ///
+    /// This function may be useful in conjunction with `raw_client_for`, as it allows you to close
+    /// the automated browser window while doing e.g., a large download.
+    ///
+    /// Note that this call only takes effect if there are no other copies of this `Client`. This
+    /// function is safe to call multiple times. Returns true if the shutdown took effect.
+    /// Returns true if the shutd
+    pub fn shutdown(&mut self) -> bool {
+        Rc::get_mut(&mut self.0)
+            .map(|i| i.shutdown())
+            .unwrap_or(false)
     }
 
     /// Navigate directly to the given URL.
