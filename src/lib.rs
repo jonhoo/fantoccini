@@ -470,6 +470,8 @@ impl Client {
             WebDriverCommand::DeleteSession => unreachable!(),
             WebDriverCommand::Get(..) |
             WebDriverCommand::GetCurrentUrl => base.join("url"),
+            WebDriverCommand::GoBack => base.join("back"),
+            WebDriverCommand::Refresh => base.join("refresh"),
             WebDriverCommand::GetPageSource => base.join("source"),
             WebDriverCommand::FindElement(..) => base.join("element"),
             WebDriverCommand::GetCookies => base.join("cookie"),
@@ -549,6 +551,10 @@ impl Client {
             }
             WebDriverCommand::ElementClick(..) => {
                 body = Some("{}".to_string());
+                method = Method::Post;
+            }
+            WebDriverCommand::GoBack |
+            WebDriverCommand::Refresh => {
                 method = Method::Post;
             }
             _ => {}
@@ -805,6 +811,24 @@ impl Client {
             })
     }
 
+    /// Go back to the previous page.
+    pub fn back(&self) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
+        Box::new(
+            self.dup()
+                .issue_wd_cmd(WebDriverCommand::GoBack)
+                .map(|(this, _)| this),
+        ) as Box<Future<Item = _, Error = _>>
+    }
+
+    /// Refresh the current previous page.
+    pub fn refresh(&self) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
+        Box::new(
+            self.dup()
+                .issue_wd_cmd(WebDriverCommand::Refresh)
+                .map(|(this, _)| this),
+        ) as Box<Future<Item = _, Error = _>>
+    }
+
     /// Execute the given JavaScript `script` in the current browser session.
     ///
     /// `args` is available to the script inside the `arguments` array. Since `Element` implements
@@ -871,26 +895,25 @@ impl Client {
                 old_url
                     .clone()
                     .join(&url)
-                    .map(move |url| (this, old_url, url))
+                    .map(move |url| (this, url))
                     .map_err(|e| e.into())
             })
-            .and_then(|(this, old_url, url)| {
+            .and_then(|(this, url)| {
                 url.clone()
                     .join("/please_give_me_your_cookies")
-                    .map(move |cookie_url| (this, old_url, url, cookie_url))
+                    .map(move |cookie_url| (this, url, cookie_url))
                     .map_err(|e| e.into())
             })
-            .and_then(|(this, old_url, url, cookie_url)| {
-                this.goto(cookie_url.as_str())
-                    .map(|this| (this, old_url, url))
+            .and_then(|(this, url, cookie_url)| {
+                this.goto(cookie_url.as_str()).map(|this| (this, url))
             })
-            .and_then(|(this, old_url, url)| {
+            .and_then(|(this, url)| {
                 this.issue_wd_cmd(WebDriverCommand::GetCookies).then(
                     |cookies| {
                         match cookies {
                             Ok((this, cookies)) => {
                                 if cookies.is_array() {
-                                    future::ok((this, old_url, url, cookies))
+                                    future::ok((this, url, cookies))
                                 } else {
                                     future::err(error::CmdError::NotW3C(cookies))
                                 }
@@ -908,8 +931,8 @@ impl Client {
                     },
                 )
             })
-            .and_then(|(this, old_url, url, cookies)| {
-                this.goto(old_url.as_str()).map(|this| (this, url, cookies))
+            .and_then(|(this, url, cookies)| {
+                this.back().map(|this| (this, url, cookies))
             })
             .and_then(|(this, url, cookies)| {
                 let cookies = cookies.into_array().unwrap();
