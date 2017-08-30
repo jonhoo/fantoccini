@@ -8,6 +8,8 @@ A high-level API for programmatically interacting with web pages through WebDriv
 
 This crate uses the [WebDriver protocol] to drive a conforming (potentially headless) browser
 through relatively high-level operations such as "click this element", "submit this form", etc.
+It is currently nightly-only, but this will change once
+[`conservative_impl_trait`](https://github.com/rust-lang/rust/issues/34511) lands in stable.
 
 Most interactions are driven by using [CSS selectors]. With most WebDriver-compatible browser
 being fairly recent, the more expressive levels of the CSS standard are also supported, giving
