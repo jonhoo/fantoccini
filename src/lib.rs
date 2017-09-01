@@ -274,8 +274,6 @@ pub struct Form {
 }
 
 impl Client {
-    // inline to work around https://github.com/rust-lang/rust/issues/41297#issuecomment-312197433
-    #[inline]
     fn init(
         mut self,
         params: webdriver::command::NewSessionParameters,
@@ -443,7 +441,6 @@ impl Client {
         )
     }
 
-    #[inline]
     fn dup(&self) -> Self {
         Client(self.0.clone())
     }
@@ -456,7 +453,6 @@ impl Client {
     /// Helper for determining what URL endpoint to use for various requests.
     ///
     /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
-    #[inline]
     fn endpoint_for(&self, cmd: &Cmd) -> Result<url::Url, url::ParseError> {
         if let WebDriverCommand::NewSession(..) = *cmd {
             return self.0.wdb.join("/session");
@@ -508,7 +504,6 @@ impl Client {
     /// arguments (if any) into the body.
     ///
     /// [the spec]: https://www.w3.org/TR/webdriver/#list-of-endpoints
-    #[inline]
     fn issue_wd_cmd(
         self,
         cmd: WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>,
@@ -779,7 +774,6 @@ impl Client {
         ) as Box<Future<Item = _, Error = _>>
     }
 
-    #[inline]
     fn current_url_(
         &self,
     ) -> impl Future<Item = (Self, url::Url), Error = error::CmdError> + 'static {
@@ -1087,7 +1081,6 @@ impl Client {
 
     // helpers
 
-    #[inline]
     fn by(
         &self,
         locator: webdriver::command::LocatorParameters,
@@ -1104,7 +1097,6 @@ impl Client {
     }
 
     /// Extract the `WebElement` from a `FindElement` or `FindElementElement` command.
-    #[inline]
     fn parse_lookup(&self, res: Json) -> Result<webdriver::common::WebElement, error::CmdError> {
         if !res.is_object() {
             return Err(error::CmdError::NotW3C(res));
@@ -1135,7 +1127,6 @@ impl Client {
         Err(error::CmdError::NotW3C(Json::Object(res)))
     }
 
-    #[inline]
     fn fixup_elements(&self, args: &mut [Json]) {
         if self.0.legacy {
             for arg in args {
