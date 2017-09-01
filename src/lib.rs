@@ -185,20 +185,20 @@
 #![deny(missing_docs)]
 #![feature(conservative_impl_trait)]
 
-extern crate rustc_serialize;
-extern crate webdriver;
 extern crate futures;
-extern crate url;
 extern crate hyper;
 extern crate hyper_tls;
+extern crate rustc_serialize;
 extern crate tokio_core;
+extern crate url;
+extern crate webdriver;
 
 use webdriver::command::WebDriverCommand;
 use webdriver::error::WebDriverError;
 use webdriver::error::ErrorStatus;
 use webdriver::common::ELEMENT_KEY;
 use rustc_serialize::json::Json;
-use futures::{Future, Stream, future};
+use futures::{future, Future, Stream};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -280,7 +280,6 @@ impl Client {
         mut self,
         params: webdriver::command::NewSessionParameters,
     ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
-
         if let webdriver::command::NewSessionParameters::Legacy(..) = params {
             Rc::get_mut(&mut self.0)
                 .expect(
@@ -308,7 +307,9 @@ impl Client {
                         Err(error::NewSessionError::NotW3C(Json::Object(v)))
                     }
                 }
-                Ok((_, v)) | Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
+                Ok((_, v)) | Err(error::CmdError::NotW3C(v)) => {
+                    Err(error::NewSessionError::NotW3C(v))
+                },
                 Err(error::CmdError::Failed(e)) => Err(error::NewSessionError::Failed(e)),
                 Err(error::CmdError::Lost(e)) => Err(error::NewSessionError::Lost(e)),
                 Err(error::CmdError::NotJson(v)) => {
@@ -470,8 +471,7 @@ impl Client {
         match *cmd {
             WebDriverCommand::NewSession(..) => unreachable!(),
             WebDriverCommand::DeleteSession => unreachable!(),
-            WebDriverCommand::Get(..) |
-            WebDriverCommand::GetCurrentUrl => base.join("url"),
+            WebDriverCommand::Get(..) | WebDriverCommand::GetCurrentUrl => base.join("url"),
             WebDriverCommand::GoBack => base.join("back"),
             WebDriverCommand::Refresh => base.join("refresh"),
             WebDriverCommand::GetPageSource => base.join("source"),
@@ -555,8 +555,7 @@ impl Client {
                 body = Some("{}".to_string());
                 method = Method::Post;
             }
-            WebDriverCommand::GoBack |
-            WebDriverCommand::Refresh => {
+            WebDriverCommand::GoBack | WebDriverCommand::Refresh => {
                 method = Method::Post;
             }
             _ => {}
@@ -910,16 +909,14 @@ impl Client {
                 this.goto(cookie_url.as_str()).map(|this| (this, url))
             })
             .and_then(|(this, url)| {
-                this.issue_wd_cmd(WebDriverCommand::GetCookies).then(
-                    |cookies| {
+                this.issue_wd_cmd(WebDriverCommand::GetCookies)
+                    .then(|cookies| {
                         match cookies {
-                            Ok((this, cookies)) => {
-                                if cookies.is_array() {
-                                    future::ok((this, url, cookies))
-                                } else {
-                                    future::err(error::CmdError::NotW3C(cookies))
-                                }
-                            }
+                            Ok((this, cookies)) => if cookies.is_array() {
+                                future::ok((this, url, cookies))
+                            } else {
+                                future::err(error::CmdError::NotW3C(cookies))
+                            },
                             Err(e) => {
                                 // TODO: go back before we return
                                 // can't get a handle to this here though :(
@@ -930,8 +927,7 @@ impl Client {
                                 future::err(e)
                             }
                         }
-                    },
-                )
+                    })
             })
             .and_then(|(this, url, cookies)| {
                 this.back().map(|this| (this, url, cookies))
@@ -1541,13 +1537,12 @@ mod tests {
             })
             .and_then(|raw| {
                 // we then read out the image bytes
-                raw.body().map_err(error::CmdError::from).fold(
-                    Vec::new(),
-                    |mut pixels, chunk| {
+                raw.body()
+                    .map_err(error::CmdError::from)
+                    .fold(Vec::new(), |mut pixels, chunk| {
                         pixels.extend(&*chunk);
                         future::ok::<Vec<u8>, error::CmdError>(pixels)
-                    },
-                )
+                    })
             })
             .and_then(|pixels| {
                 // and voilla, we now have the bytes for the Wikipedia logo!
