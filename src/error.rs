@@ -167,7 +167,6 @@ impl fmt::Display for CmdError {
     }
 }
 
-
 impl From<IOError> for CmdError {
     fn from(e: IOError) -> Self {
         CmdError::Lost(e)

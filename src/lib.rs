@@ -280,9 +280,7 @@ impl Client {
     ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
         if let webdriver::command::NewSessionParameters::Legacy(..) = params {
             Rc::get_mut(&mut self.0)
-                .expect(
-                    "during legacy init there should be only one Client instance",
-                )
+                .expect("during legacy init there should be only one Client instance")
                 .legacy = true;
         }
 
@@ -307,17 +305,18 @@ impl Client {
                 }
                 Ok((_, v)) | Err(error::CmdError::NotW3C(v)) => {
                     Err(error::NewSessionError::NotW3C(v))
-                },
+                }
                 Err(error::CmdError::Failed(e)) => Err(error::NewSessionError::Failed(e)),
                 Err(error::CmdError::Lost(e)) => Err(error::NewSessionError::Lost(e)),
                 Err(error::CmdError::NotJson(v)) => {
                     Err(error::NewSessionError::NotW3C(Json::String(v)))
                 }
-                Err(
-                    error::CmdError::Standard(
-                        e @ WebDriverError { error: ErrorStatus::SessionNotCreated, .. },
-                    ),
-                ) => Err(error::NewSessionError::SessionNotCreated(e)),
+                Err(error::CmdError::Standard(
+                    e @ WebDriverError {
+                        error: ErrorStatus::SessionNotCreated,
+                        ..
+                    },
+                )) => Err(error::NewSessionError::SessionNotCreated(e)),
                 Err(e) => {
                     panic!("unexpected webdriver error; {}", e);
                 }
@@ -400,13 +399,13 @@ impl Client {
                             legacy = true;
                         }
                         Json::Object(ref err) => {
-                            if err.contains_key("message") &&
-                                err["message"]
+                            if err.contains_key("message")
+                                && err["message"]
                                     .as_string()
                                     .map(|s| {
                                         // chromedriver < 2.29 || chromedriver == 2.29
-                                        s.contains("cannot find dict 'desiredCapabilities'") ||
-                                            s.contains("Missing or invalid capabilities")
+                                        s.contains("cannot find dict 'desiredCapabilities'")
+                                            || s.contains("Missing or invalid capabilities")
                                     })
                                     .unwrap_or(false)
                             {
@@ -533,8 +532,8 @@ impl Client {
                 body = Some(format!("{}", params.to_json()));
                 method = Method::Post;
             }
-            WebDriverCommand::FindElement(ref loc) |
-            WebDriverCommand::FindElementElement(_, ref loc) => {
+            WebDriverCommand::FindElement(ref loc)
+            | WebDriverCommand::FindElementElement(_, ref loc) => {
                 body = Some(format!("{}", loc.to_json()));
                 method = Method::Post;
             }
@@ -570,119 +569,122 @@ impl Client {
         }
 
         let req = self.0.c.request(req);
-        let f = req.map_err(error::CmdError::from).and_then(move |res| {
-            // keep track of result status (.body() consumes self -- ugh)
-            let status = res.status();
+        let f = req.map_err(error::CmdError::from)
+            .and_then(move |res| {
+                // keep track of result status (.body() consumes self -- ugh)
+                let status = res.status();
 
-            // check that the server sent us json
-            let ctype = {
-                let ctype = res.headers()
-                    .get::<hyper::header::ContentType>()
-                    .expect("webdriver response did not have a content type");
-                (**ctype).clone()
-            };
+                // check that the server sent us json
+                let ctype = {
+                    let ctype = res.headers()
+                        .get::<hyper::header::ContentType>()
+                        .expect("webdriver response did not have a content type");
+                    (**ctype).clone()
+                };
 
-            // What did the server send us?
-            res.body()
-                .concat2()
-                .map(move |body| {
-                    (self, body, ctype, status)
-                })
-                .map_err(|e| -> error::CmdError { e.into() })
-        }).and_then(|(this, body, ctype, status)| {
-            // Too bad we can't stream into a String :(
-            let body = String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
-            if ctype.type_() == hyper::mime::APPLICATION && ctype.subtype() == hyper::mime::JSON {
-                Ok((this, body, status))
-            } else {
-                // nope, something else...
-                Err(error::CmdError::NotJson(body))
-            }
-        }).and_then(move |(this, body, status)| {
-            let is_new_session = if let WebDriverCommand::NewSession(..) = cmd {
-                true
-            } else {
-                false
-            };
-
-            let mut is_success = status.is_success();
-            let mut legacy_status = 0;
-
-            // https://www.w3.org/TR/webdriver/#dfn-send-a-response
-            // NOTE: the standard specifies that even errors use the "Send a Reponse" steps
-            let body = match Json::from_str(&*body)? {
-                Json::Object(mut v) => {
-                    if this.0.legacy {
-                        legacy_status = v["status"].as_u64().unwrap();
-                        is_success = legacy_status == 0;
-                    }
-
-                    if this.0.legacy && is_new_session {
-                        // legacy implementations do not wrap sessionId inside "value"
-                        Ok(Json::Object(v))
-                    } else {
-                        v.remove("value")
-                            .ok_or_else(|| error::CmdError::NotW3C(Json::Object(v)))
-                    }
-                }
-                v => Err(error::CmdError::NotW3C(v)),
-            }?;
-
-            if is_success {
-                return Ok((this, body));
-            }
-
-            // https://www.w3.org/TR/webdriver/#dfn-send-an-error
-            // https://www.w3.org/TR/webdriver/#handling-errors
-            if !body.is_object() {
-                return Err(error::CmdError::NotW3C(body));
-            }
-            let mut body = body.into_object().unwrap();
-
-            // phantomjs injects a *huge* field with the entire screen contents -- remove that
-            body.remove("screen");
-
-            let es = if this.0.legacy {
-                // old clients use status codes instead of "error", and we now have to map them
-                // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol#response-status-codes
-                if !body.contains_key("message") || !body["message"].is_string() {
-                    return Err(error::CmdError::NotW3C(Json::Object(body)));
-                }
-                match legacy_status {
-                    6 | 33 => ErrorStatus::SessionNotCreated,
-                    7 => ErrorStatus::NoSuchElement,
-                    8 => ErrorStatus::NoSuchFrame,
-                    9 => ErrorStatus::UnknownCommand,
-                    10 => ErrorStatus::StaleElementReference,
-                    11 => ErrorStatus::ElementNotInteractable,
-                    12 => ErrorStatus::InvalidElementState,
-                    13 => ErrorStatus::UnknownError,
-                    15 => ErrorStatus::ElementNotSelectable,
-                    17 => ErrorStatus::JavascriptError,
-                    19 | 32 => ErrorStatus::InvalidSelector,
-                    21 => ErrorStatus::Timeout,
-                    23 => ErrorStatus::NoSuchWindow,
-                    24 => ErrorStatus::InvalidCookieDomain,
-                    25 => ErrorStatus::UnableToSetCookie,
-                    26 => ErrorStatus::UnexpectedAlertOpen,
-                    27 => ErrorStatus::NoSuchAlert,
-                    28 => ErrorStatus::ScriptTimeout,
-                    29 => ErrorStatus::InvalidCoordinates,
-                    34 => ErrorStatus::MoveTargetOutOfBounds,
-                    _ => return Err(error::CmdError::NotW3C(Json::Object(body))),
-                }
-            } else {
-                if !body.contains_key("error") || !body.contains_key("message") ||
-                    !body["error"].is_string() || !body["message"].is_string()
+                // What did the server send us?
+                res.body()
+                    .concat2()
+                    .map(move |body| (self, body, ctype, status))
+                    .map_err(|e| -> error::CmdError { e.into() })
+            })
+            .and_then(|(this, body, ctype, status)| {
+                // Too bad we can't stream into a String :(
+                let body =
+                    String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
+                if ctype.type_() == hyper::mime::APPLICATION && ctype.subtype() == hyper::mime::JSON
                 {
-                    return Err(error::CmdError::NotW3C(Json::Object(body)));
+                    Ok((this, body, status))
+                } else {
+                    // nope, something else...
+                    Err(error::CmdError::NotJson(body))
+                }
+            })
+            .and_then(move |(this, body, status)| {
+                let is_new_session = if let WebDriverCommand::NewSession(..) = cmd {
+                    true
+                } else {
+                    false
+                };
+
+                let mut is_success = status.is_success();
+                let mut legacy_status = 0;
+
+                // https://www.w3.org/TR/webdriver/#dfn-send-a-response
+                // NOTE: the standard specifies that even errors use the "Send a Reponse" steps
+                let body = match Json::from_str(&*body)? {
+                    Json::Object(mut v) => {
+                        if this.0.legacy {
+                            legacy_status = v["status"].as_u64().unwrap();
+                            is_success = legacy_status == 0;
+                        }
+
+                        if this.0.legacy && is_new_session {
+                            // legacy implementations do not wrap sessionId inside "value"
+                            Ok(Json::Object(v))
+                        } else {
+                            v.remove("value")
+                                .ok_or_else(|| error::CmdError::NotW3C(Json::Object(v)))
+                        }
+                    }
+                    v => Err(error::CmdError::NotW3C(v)),
+                }?;
+
+                if is_success {
+                    return Ok((this, body));
                 }
 
-                use hyper::StatusCode;
-                let error = body["error"].as_string().unwrap();
-                match status {
-                    StatusCode::BadRequest => {
-                        match error {
+                // https://www.w3.org/TR/webdriver/#dfn-send-an-error
+                // https://www.w3.org/TR/webdriver/#handling-errors
+                if !body.is_object() {
+                    return Err(error::CmdError::NotW3C(body));
+                }
+                let mut body = body.into_object().unwrap();
+
+                // phantomjs injects a *huge* field with the entire screen contents -- remove that
+                body.remove("screen");
+
+                let es = if this.0.legacy {
+                    // old clients use status codes instead of "error", and we now have to map them
+                    // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol#response-status-codes
+                    if !body.contains_key("message") || !body["message"].is_string() {
+                        return Err(error::CmdError::NotW3C(Json::Object(body)));
+                    }
+                    match legacy_status {
+                        6 | 33 => ErrorStatus::SessionNotCreated,
+                        7 => ErrorStatus::NoSuchElement,
+                        8 => ErrorStatus::NoSuchFrame,
+                        9 => ErrorStatus::UnknownCommand,
+                        10 => ErrorStatus::StaleElementReference,
+                        11 => ErrorStatus::ElementNotInteractable,
+                        12 => ErrorStatus::InvalidElementState,
+                        13 => ErrorStatus::UnknownError,
+                        15 => ErrorStatus::ElementNotSelectable,
+                        17 => ErrorStatus::JavascriptError,
+                        19 | 32 => ErrorStatus::InvalidSelector,
+                        21 => ErrorStatus::Timeout,
+                        23 => ErrorStatus::NoSuchWindow,
+                        24 => ErrorStatus::InvalidCookieDomain,
+                        25 => ErrorStatus::UnableToSetCookie,
+                        26 => ErrorStatus::UnexpectedAlertOpen,
+                        27 => ErrorStatus::NoSuchAlert,
+                        28 => ErrorStatus::ScriptTimeout,
+                        29 => ErrorStatus::InvalidCoordinates,
+                        34 => ErrorStatus::MoveTargetOutOfBounds,
+                        _ => return Err(error::CmdError::NotW3C(Json::Object(body))),
+                    }
+                } else {
+                    if !body.contains_key("error") || !body.contains_key("message")
+                        || !body["error"].is_string()
+                        || !body["message"].is_string()
+                    {
+                        return Err(error::CmdError::NotW3C(Json::Object(body)));
+                    }
+
+                    use hyper::StatusCode;
+                    let error = body["error"].as_string().unwrap();
+                    match status {
+                        StatusCode::BadRequest => match error {
                             "element click intercepted" => ErrorStatus::ElementClickIntercepted,
                             "element not selectable" => ErrorStatus::ElementNotSelectable,
                             "element not interactable" => ErrorStatus::ElementNotInteractable,
@@ -697,19 +699,15 @@ impl Client {
                             "no such window" => ErrorStatus::NoSuchWindow,
                             "stale element reference" => ErrorStatus::StaleElementReference,
                             _ => unreachable!(),
-                        }
-                    }
-                    StatusCode::NotFound => {
-                        match error {
+                        },
+                        StatusCode::NotFound => match error {
                             "unknown command" => ErrorStatus::UnknownCommand,
                             "no such cookie" => ErrorStatus::NoSuchCookie,
                             "invalid session id" => ErrorStatus::InvalidSessionId,
                             "no such element" => ErrorStatus::NoSuchElement,
                             _ => unreachable!(),
-                        }
-                    }
-                    StatusCode::InternalServerError => {
-                        match error {
+                        },
+                        StatusCode::InternalServerError => match error {
                             "javascript error" => ErrorStatus::JavascriptError,
                             "move target out of bounds" => ErrorStatus::MoveTargetOutOfBounds,
                             "session not created" => ErrorStatus::SessionNotCreated,
@@ -719,28 +717,23 @@ impl Client {
                             "unknown error" => ErrorStatus::UnknownError,
                             "unsupported operation" => ErrorStatus::UnsupportedOperation,
                             _ => unreachable!(),
-                        }
-                    }
-                    StatusCode::RequestTimeout => {
-                        match error {
+                        },
+                        StatusCode::RequestTimeout => match error {
                             "timeout" => ErrorStatus::Timeout,
                             "script timeout" => ErrorStatus::ScriptTimeout,
                             _ => unreachable!(),
-                        }
-                    }
-                    StatusCode::MethodNotAllowed => {
-                        match error {
+                        },
+                        StatusCode::MethodNotAllowed => match error {
                             "unknown method" => ErrorStatus::UnknownMethod,
                             _ => unreachable!(),
-                        }
+                        },
+                        _ => unreachable!(),
                     }
-                    _ => unreachable!(),
-                }
-            };
+                };
 
-            let message = body["message"].as_string().unwrap().to_string();
-            Err(error::CmdError::from(WebDriverError::new(es, message)))
-        });
+                let message = body["message"].as_string().unwrap().to_string();
+                Err(error::CmdError::from(WebDriverError::new(es, message)))
+            });
 
         future::Either::A(f)
     }
@@ -923,9 +916,7 @@ impl Client {
                         }
                     })
             })
-            .and_then(|(this, url, cookies)| {
-                this.back().map(|this| (this, url, cookies))
-            })
+            .and_then(|(this, url, cookies)| this.back().map(|this| (this, url, cookies)))
             .and_then(|(this, url, cookies)| {
                 let cookies = cookies.into_array().unwrap();
 
@@ -1265,7 +1256,6 @@ impl rustc_serialize::json::ToJson for Element {
     }
 }
 
-
 impl Form {
     /// Set the `value` of the given `field` in this form.
     pub fn set_by_name<'s>(
@@ -1298,10 +1288,12 @@ impl Form {
 
                 this.issue_wd_cmd(WebDriverCommand::ExecuteScript(cmd))
             })
-            .and_then(|(_, res)| if res.is_null() {
-                Ok(f)
-            } else {
-                Err(error::CmdError::NotW3C(res))
+            .and_then(|(_, res)| {
+                if res.is_null() {
+                    Ok(f)
+                } else {
+                    Err(error::CmdError::NotW3C(res))
+                }
             })
     }
 
@@ -1354,8 +1346,7 @@ impl Form {
         Box::new(self.submit_with(&format!(
             "input[type=submit][value=\"{}\" i],\
              button[type=submit][value=\"{}\" i]",
-            escaped,
-            escaped
+            escaped, escaped
         ))) as Box<Future<Item = _, Error = _>>
     }
 
