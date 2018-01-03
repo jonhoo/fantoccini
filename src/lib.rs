@@ -545,11 +545,10 @@ impl Client {
                 body = Some(format!("{}", keys.to_json()));
                 method = Method::Post;
             }
-            WebDriverCommand::ElementClick(..) => {
+            WebDriverCommand::ElementClick(..)
+            | WebDriverCommand::GoBack
+            | WebDriverCommand::Refresh => {
                 body = Some("{}".to_string());
-                method = Method::Post;
-            }
-            WebDriverCommand::GoBack | WebDriverCommand::Refresh => {
                 method = Method::Post;
             }
             _ => {}
