@@ -32,7 +32,7 @@
 //! # extern crate futures;
 //! # extern crate fantoccini;
 //! # fn main() {
-//! # use fantoccini::Client;
+//! # use fantoccini::{Client, Locator};
 //! # use futures::future::Future;
 //! let mut core = tokio_core::reactor::Core::new().unwrap();
 //! let (c, fin) = Client::new("http://localhost:4444", &core.handle());
@@ -49,12 +49,12 @@
 //!         .and_then(move |url| {
 //!             assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 //!             // click "Foo (disambiguation)"
-//!             c.by_selector(".mw-disambig")
+//!             c.find(Locator::Css(".mw-disambig"))
 //!         })
 //!         .and_then(|e| e.click())
 //!         .and_then(move |_| {
 //!             // click "Foo Lake"
-//!             c.by_link_text("Foo Lake")
+//!             c.find(Locator::LinkText("Foo Lake"))
 //!         })
 //!         .and_then(|e| e.click())
 //!         .and_then(move |_| c.current_url())
@@ -82,7 +82,7 @@
 //! # extern crate futures;
 //! # extern crate fantoccini;
 //! # fn main() {
-//! # use fantoccini::Client;
+//! # use fantoccini::{Client, Locator};
 //! # use futures::future::Future;
 //! # let mut core = tokio_core::reactor::Core::new().unwrap();
 //! # let (c, fin) = Client::new("http://localhost:4444", &core.handle());
@@ -95,7 +95,7 @@
 //! c.goto("https://www.wikipedia.org/")
 //!     .and_then(move |_| {
 //!         // find the search form
-//!         c.form("#search-form")
+//!         c.form(Locator::Css("#search-form"))
 //!     })
 //!     .and_then(|f| {
 //!         // fill it out
@@ -127,7 +127,7 @@
 //! # extern crate futures;
 //! # extern crate fantoccini;
 //! # fn main() {
-//! # use fantoccini::Client;
+//! # use fantoccini::{Client, Locator};
 //! # use futures::future::Future;
 //! # let mut core = tokio_core::reactor::Core::new().unwrap();
 //! # let (c, fin) = Client::new("http://localhost:4444", &core.handle());
@@ -140,7 +140,7 @@
 //! c.goto("https://www.wikipedia.org/")
 //!     .and_then(move |_| {
 //!         // find the source for the Wikipedia globe
-//!         c.by_selector("img.central-featured-logo")
+//!         c.find(Locator::Css("img.central-featured-logo"))
 //!     })
 //!     .and_then(|img| {
 //!         img.attr("src")
@@ -206,6 +206,42 @@ pub use hyper::Method;
 
 /// Error types.
 pub mod error;
+
+/// An element locator.
+///
+/// See https://www.w3.org/TR/webdriver/#element-retrieval.
+#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
+pub enum Locator<'a> {
+    /// Find an element matching the given CSS selector.
+    Css(&'a str),
+
+    /// Find a link element with the given link text.
+    ///
+    /// The text matching is exact.
+    LinkText(&'a str),
+
+    /// Find an element using the given XPath expression.
+    XPath(&'a str),
+}
+
+impl<'a> Into<webdriver::command::LocatorParameters> for Locator<'a> {
+    fn into(self) -> webdriver::command::LocatorParameters {
+        match self {
+            Locator::Css(s) => webdriver::command::LocatorParameters {
+                using: webdriver::common::LocatorStrategy::CSSSelector,
+                value: s.to_string(),
+            },
+            Locator::XPath(s) => webdriver::command::LocatorParameters {
+                using: webdriver::common::LocatorStrategy::XPath,
+                value: s.to_string(),
+            },
+            Locator::LinkText(s) => webdriver::command::LocatorParameters {
+                using: webdriver::common::LocatorStrategy::LinkText,
+                value: s.to_string(),
+            },
+        }
+    }
+}
 
 type Cmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 
@@ -966,39 +1002,12 @@ impl Client {
             })
     }
 
-    /// Find an element by CSS selector.
-    pub fn by_selector(
+    /// Find an element on the page.
+    pub fn find(
         &self,
-        selector: &str,
+        search: Locator,
     ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
-        let locator = Self::mklocator(selector);
-        self.by(locator)
-    }
-
-    /// Find an element by its link text.
-    ///
-    /// The text matching is exact.
-    pub fn by_link_text(
-        &self,
-        text: &str,
-    ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
-        let locator = webdriver::command::LocatorParameters {
-            using: webdriver::common::LocatorStrategy::LinkText,
-            value: text.to_string(),
-        };
-        self.by(locator)
-    }
-
-    /// Find an element using an XPath expression.
-    pub fn by_xpath(
-        &self,
-        xpath: &str,
-    ) -> impl Future<Item = Element, Error = error::CmdError> + 'static {
-        let locator = webdriver::command::LocatorParameters {
-            using: webdriver::common::LocatorStrategy::XPath,
-            value: xpath.to_string(),
-        };
-        self.by(locator)
+        self.by(search.into())
     }
 
     /// Wait for the given function to return `true` before proceeding.
@@ -1055,12 +1064,11 @@ impl Client {
     /// Through the returned `Form`, HTML forms can be filled out and submitted.
     pub fn form(
         &self,
-        selector: &str,
+        search: Locator,
     ) -> impl Future<Item = Form, Error = error::CmdError> + 'static {
-        let locator = Self::mklocator(selector);
         Box::new(
             self.dup()
-                .issue_wd_cmd(WebDriverCommand::FindElement(locator))
+                .issue_wd_cmd(WebDriverCommand::FindElement(search.into()))
                 .map_err(|e| e.into())
                 .and_then(|(this, res)| {
                     let f = this.parse_lookup(res);
@@ -1128,16 +1136,6 @@ impl Client {
                     }
                 }
             }
-        }
-    }
-
-    /// Make a WebDriver locator for the given CSS selector.
-    ///
-    /// See https://www.w3.org/TR/webdriver/#element-retrieval.
-    fn mklocator(selector: &str) -> webdriver::command::LocatorParameters {
-        webdriver::command::LocatorParameters {
-            using: webdriver::common::LocatorStrategy::CSSSelector,
-            value: selector.to_string(),
         }
     }
 }
@@ -1262,8 +1260,9 @@ impl Form {
         field: &str,
         value: &'s str,
     ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
-        let locator = Client::mklocator(&format!("input[name='{}']", field));
-        let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator);
+        let locator = format!("input[name='{}']", field);
+        let locator = Locator::Css(&locator);
+        let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator.into());
         let f = Form {
             c: self.c.dup(),
             f: self.f.clone(),
@@ -1300,18 +1299,17 @@ impl Form {
     ///
     /// `false` is returned if no submit button was not found.
     pub fn submit(self) -> impl Future<Item = Client, Error = error::CmdError> {
-        self.submit_with("input[type=submit],button[type=submit]")
+        self.submit_with(Locator::Css("input[type=submit],button[type=submit]"))
     }
 
-    /// Submit this form using the button matched by the given CSS selector.
+    /// Submit this form using the button matched by the given selector.
     ///
     /// `false` is returned if a matching button was not found.
     pub fn submit_with(
         self,
-        button: &str,
+        button: Locator,
     ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
-        let locator = Client::mklocator(button);
-        let locator = WebDriverCommand::FindElementElement(self.f, locator);
+        let locator = WebDriverCommand::FindElementElement(self.f, button.into());
         Box::new(
             self.c
                 .issue_wd_cmd(locator)
@@ -1342,11 +1340,12 @@ impl Form {
         button_label: &str,
     ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
-        Box::new(self.submit_with(&format!(
+        let btn = format!(
             "input[type=submit][value=\"{}\" i],\
              button[type=submit][value=\"{}\" i]",
             escaped, escaped
-        ))) as Box<Future<Item = _, Error = _>>
+        );
+        Box::new(self.submit_with(Locator::Css(&btn))) as Box<Future<Item = _, Error = _>>
     }
 
     /// Submit this form directly, without clicking any buttons.
@@ -1457,12 +1456,12 @@ mod tests {
             .and_then(move |url| {
                 assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
                 // click "Foo (disambiguation)"
-                c.by_selector(".mw-disambig")
+                c.find(Locator::Css(".mw-disambig"))
             })
             .and_then(|e| e.click())
             .and_then(move |_| {
                 // click "Foo Lake"
-                c.by_link_text("Foo Lake")
+                c.find(Locator::LinkText("Foo Lake"))
             })
             .and_then(|e| e.click())
             .and_then(move |_| c.current_url())
@@ -1483,7 +1482,7 @@ mod tests {
         c.goto("https://www.wikipedia.org/")
             .and_then(move |_| {
                 // find, fill out, and submit the search form
-                c.form("#search-form")
+                c.form(Locator::Css("#search-form"))
             })
             .and_then(|f| f.set_by_name("search", "foobar"))
             .and_then(|f| f.submit())
@@ -1506,7 +1505,7 @@ mod tests {
         c.goto("https://www.wikipedia.org/")
             .and_then(move |_| {
                 // find the source for the Wikipedia globe
-                c.by_selector("img.central-featured-logo")
+                c.find(Locator::Css("img.central-featured-logo"))
             })
             .and_then(|img| {
                 img.attr("src")
