@@ -1027,6 +1027,29 @@ impl Client {
         self
     }
 
+    /// Wait for the given element to be present on the page.
+    ///
+    /// This can be useful to wait for something to appear on the page before interacting with it.
+    /// While this currently just spins and yields, it may be more efficient than this in the
+    /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
+    /// the page.
+    pub fn wait_for_find<'a>(
+        &'a self,
+        search: Locator<'a>,
+    ) -> impl Future<Item = Element, Error = error::CmdError> + 'a {
+        futures::future::loop_fn((), move |_| {
+            self.by(search.into())
+                .map(|e| futures::future::Loop::Break(e))
+                .or_else(|e| {
+                    if let error::CmdError::NoSuchElement(_) = e {
+                        Ok(futures::future::Loop::Continue(()))
+                    } else {
+                        Err(e)
+                    }
+                })
+        })
+    }
+
     /// Wait for the page to navigate to a new URL before proceeding.
     ///
     /// If the `current` URL is not provided, `self.current_url()` will be used. Note however that
