@@ -35,7 +35,7 @@ Let's start out clicking around on Wikipedia:
 
 ```rust
 let mut core = tokio_core::reactor::Core::new().unwrap();
-let (c, fin) = Client::new("http://localhost:4444", &core.handle());
+let c = Client::new("http://localhost:4444", &core.handle());
 let c = core.run(c).unwrap();
 
 {
@@ -49,12 +49,12 @@ let c = core.run(c).unwrap();
         .and_then(move |url| {
             assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
             // click "Foo (disambiguation)"
-            c.by_selector(".mw-disambig")
+            c.find(Locator::Css(".mw-disambig"))
         })
         .and_then(|e| e.click())
         .and_then(move |_| {
             // click "Foo Lake"
-            c.by_link_text("Foo Lake")
+            c.find(Locator::LinkText("Foo Lake"))
         })
         .and_then(|e| e.click())
         .and_then(move |_| c.current_url())
@@ -68,7 +68,7 @@ let c = core.run(c).unwrap();
 }
 
 // drop the client to delete the browser session
-drop(c);
+let fin = c.close();
 // and wait for cleanup to finish
 core.run(fin).unwrap();
 ```
@@ -82,7 +82,7 @@ Let's make the program do that for us instead:
 c.goto("https://www.wikipedia.org/")
     .and_then(move |_| {
         // find the search form
-        c.form("#search-form")
+        c.form(Locator::Css("#search-form"))
     })
     .and_then(|f| {
         // fill it out
@@ -109,7 +109,7 @@ What if we want to download a raw file? Fantoccini has you covered:
 c.goto("https://www.wikipedia.org/")
     .and_then(move |_| {
         // find the source for the Wikipedia globe
-        c.by_selector("img.central-featured-logo")
+        c.find(Locator::Css("img.central-featured-logo"))
     })
     .and_then(|img| {
         img.attr("src")
