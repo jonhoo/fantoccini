@@ -155,8 +155,7 @@ impl fmt::Display for CmdError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}: ", self.description())?;
         match *self {
-            CmdError::Standard(ref e) => write!(f, "{}", e),
-            CmdError::NoSuchElement(ref e) => write!(f, "{}", e),
+            CmdError::Standard(ref e) | CmdError::NoSuchElement(ref e) => write!(f, "{}", e),
             CmdError::BadUrl(ref e) => write!(f, "{}", e),
             CmdError::Failed(ref e) => write!(f, "{}", e),
             CmdError::Lost(ref e) => write!(f, "{}", e),

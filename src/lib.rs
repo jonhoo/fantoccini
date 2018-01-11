@@ -209,7 +209,7 @@ pub mod error;
 
 /// An element locator.
 ///
-/// See https://www.w3.org/TR/webdriver/#element-retrieval.
+/// See <https://www.w3.org/TR/webdriver/#element-retrieval>.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Locator<'a> {
     /// Find an element matching the given CSS selector.
@@ -418,18 +418,14 @@ impl Client {
                             legacy = true;
                         }
                         Json::Object(ref err) => {
-                            if err.contains_key("message")
-                                && err["message"]
-                                    .as_string()
-                                    .map(|s| {
-                                        // chromedriver < 2.29 || chromedriver == 2.29
-                                        s.contains("cannot find dict 'desiredCapabilities'")
-                                            || s.contains("Missing or invalid capabilities")
-                                    })
-                                    .unwrap_or(false)
-                            {
-                                legacy = true;
-                            }
+                            legacy = err.get("message")
+                                .and_then(|m| m.as_string())
+                                .map(|s| {
+                                    // chromedriver < 2.29 || chromedriver == 2.29
+                                    s.contains("cannot find dict 'desiredCapabilities'")
+                                        || s.contains("Missing or invalid capabilities")
+                                })
+                                .unwrap_or(false);
                         }
                         _ => {}
                     }
@@ -450,7 +446,7 @@ impl Client {
                         future::Either::B(future::err(error::NewSessionError::NotW3C(json)))
                     }
                 }
-                e => future::Either::B(future::err(e.into())),
+                e => future::Either::B(future::err(e)),
             }
         });
 
@@ -458,7 +454,7 @@ impl Client {
     }
 
     fn dup(&self) -> Self {
-        Client(self.0.clone())
+        Client(Rc::clone(&self.0))
     }
 
     /// Set the User Agent string to use for all subsequent requests.
@@ -1024,7 +1020,7 @@ impl Client {
     ) -> impl Future<Item = Element, Error = error::CmdError> + 'a {
         futures::future::loop_fn((), move |_| {
             self.by(search.into())
-                .map(|e| futures::future::Loop::Break(e))
+                .map(futures::future::Loop::Break)
                 .or_else(|e| {
                     if let error::CmdError::NoSuchElement(_) = e {
                         Ok(futures::future::Loop::Continue(()))
@@ -1077,7 +1073,6 @@ impl Client {
         Box::new(
             self.dup()
                 .issue_wd_cmd(WebDriverCommand::FindElement(search.into()))
-                .map_err(|e| e.into())
                 .and_then(|(this, res)| {
                     let f = this.parse_lookup(res);
                     f.map(move |f| Form { c: this, f: f })
@@ -1094,7 +1089,6 @@ impl Client {
         Box::new(
             self.dup()
                 .issue_wd_cmd(WebDriverCommand::FindElement(locator))
-                .map_err(|e| e.into())
                 .and_then(|(this, res)| {
                     let e = this.parse_lookup(res);
                     e.map(move |e| Element { c: this, e: e })
@@ -1278,7 +1272,6 @@ impl Form {
         self.c
             .dup()
             .issue_wd_cmd(locator)
-            .map_err(|e| e.into())
             .and_then(|(this, res)| {
                 let f = this.parse_lookup(res);
                 f.map(move |f| (this, f))
@@ -1321,7 +1314,6 @@ impl Form {
         Box::new(
             self.c
                 .issue_wd_cmd(locator)
-                .map_err(|e| e.into())
                 .and_then(|(this, res)| {
                     let s = this.parse_lookup(res);
                     s.map(move |s| (this, s))
