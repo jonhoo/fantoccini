@@ -68,9 +68,10 @@ let c = core.run(c).unwrap();
 }
 
 // drop the client to delete the browser session
-let fin = c.close();
-// and wait for cleanup to finish
-core.run(fin).unwrap();
+if let Some(fin) = c.close() {
+    // and wait for cleanup to finish
+    core.run(fin).unwrap();
+}
 ```
 
 How did we get to the Foobar page in the first place? We did a search!

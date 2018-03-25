@@ -68,9 +68,10 @@
 //! }
 //!
 //! // drop the client to delete the browser session
-//! let fin = c.close();
-//! // and wait for cleanup to finish
-//! core.run(fin).unwrap();
+//! if let Some(fin) = c.close() {
+//!     // and wait for cleanup to finish
+//!     core.run(fin).unwrap();
+//! }
 //! # }
 //! ```
 //!
@@ -115,8 +116,9 @@
 //! #    ;
 //! #    core.run(f).unwrap();
 //! # }
-//! # let fin = c.close();
-//! # core.run(fin).unwrap();
+//! # if let Some(fin) = c.close() {
+//! #     core.run(fin).unwrap();
+//! # }
 //! # }
 //! ```
 //!
@@ -171,8 +173,9 @@
 //! #    ;
 //! #    core.run(f).unwrap();
 //! # }
-//! # let fin = c.close();
-//! # core.run(fin).unwrap();
+//! # if let Some(fin) = c.close() {
+//! #     core.run(fin).unwrap();
+//! # }
 //! # }
 //! ```
 //!
@@ -1425,8 +1428,9 @@ mod tests {
             let c = core.run(c).expect("failed to construct test client");
             core.run($f(&c))
                 .expect("test produced unexpected error response");
-            let fin = c.close();
-            core.run(fin).expect("failed to close test session");
+            if let Some(fin) = c.close() {
+                core.run(fin).expect("failed to close test session");
+            }
         }};
     }
 
