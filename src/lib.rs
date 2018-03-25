@@ -1418,17 +1418,16 @@ mod tests {
     use tokio_core::reactor::Core;
 
     macro_rules! tester {
-        ($f:ident) => {{
+        ($f: ident) => {{
             let mut core = Core::new().unwrap();
             let h = core.handle();
             let c = Client::new("http://localhost:4444", &h);
-            let c = core.run(c)
-                .expect("failed to construct test client");
+            let c = core.run(c).expect("failed to construct test client");
             core.run($f(&c))
                 .expect("test produced unexpected error response");
             let fin = c.close();
             core.run(fin).expect("failed to close test session");
-        }}
+        }};
     }
 
     fn works_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
