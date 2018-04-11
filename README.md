@@ -24,7 +24,7 @@ source code, and `Client::raw_client_for` to build a raw HTTP request for a part
 ## Examples
 
 These examples all assume that you have a [WebDriver compatible] process running on port 4444.
-A quick way to get one is to run [`geckodriver`] at the command line. The code also has
+A quick way to get one is to run [`geckodriver`](https://github.com/mozilla/geckodriver/releases) at the command line. The code also has
 partial support for the legacy WebDriver protocol used by `chromedriver` and `ghostdriver`.
 
 The examples will be using `unwrap` generously --- you should probably not do that in your
@@ -34,43 +34,53 @@ you *expect* might fail, such as lookups by CSS selector.
 Let's start out clicking around on Wikipedia:
 
 ```rust
-let mut core = tokio_core::reactor::Core::new().unwrap();
-let c = Client::new("http://localhost:4444", &core.handle());
-let c = core.run(c).unwrap();
+extern crate tokio_core;
+extern crate fantoccini;
+extern crate futures;
 
-{
-    // we want to have a reference to c so we can use it in the and_thens below
-    let c = &c;
+use futures::future::Future;
+use fantoccini::Client;
+use fantoccini::Locator;
 
-    // now let's set up the sequence of steps we want the browser to take
-    // first, go to the Wikipedia page for Foobar
-    let f = c.goto("https://en.wikipedia.org/wiki/Foobar")
-        .and_then(move |_| c.current_url())
-        .and_then(move |url| {
-            assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-            // click "Foo (disambiguation)"
-            c.find(Locator::Css(".mw-disambig"))
-        })
-        .and_then(|e| e.click())
-        .and_then(move |_| {
-            // click "Foo Lake"
-            c.find(Locator::LinkText("Foo Lake"))
-        })
-        .and_then(|e| e.click())
-        .and_then(move |_| c.current_url())
-        .and_then(|url| {
-            assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
-            Ok(())
-        });
+fn main() {
+    let mut core = tokio_core::reactor::Core::new().unwrap();
+    let c = Client::new("http://localhost:4444", &core.handle());
+    let c = core.run(c).unwrap();
 
-    // and set the browser off to do those things
-    core.run(f).unwrap();
-}
+    {
+        // we want to have a reference to c so we can use it in the and_thens below
+        let c = &c;
 
-// drop the client to delete the browser session
-if let Some(fin) = c.close() {
-    // and wait for cleanup to finish
-    core.run(fin).unwrap();
+        // now let's set up the sequence of steps we want the browser to take
+        // first, go to the Wikipedia page for Foobar
+        let f = c.goto("https://en.wikipedia.org/wiki/Foobar")
+            .and_then(move |_| c.current_url())
+            .and_then(move |url| {
+                assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+                // click "Foo (disambiguation)"
+                c.find(Locator::Css(".mw-disambig"))
+            })
+            .and_then(|e| e.click())
+            .and_then(move |_| {
+                // click "Foo Lake"
+                c.find(Locator::LinkText("Foo Lake"))
+            })
+            .and_then(|e| e.click())
+            .and_then(move |_| c.current_url())
+            .and_then(|url| {
+                assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+                Ok(())
+            });
+
+        // and set the browser off to do those things
+        core.run(f).unwrap();
+    }
+
+    // drop the client to delete the browser session
+    if let Some(fin) = c.close() {
+        // and wait for cleanup to finish
+        core.run(fin).unwrap();
+    }
 }
 ```
 
