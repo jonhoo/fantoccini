@@ -218,6 +218,9 @@ pub enum Locator<'a> {
     /// Find an element matching the given CSS selector.
     Css(&'a str),
 
+    /// Find an element using the given `id`
+    Id(&'a str),
+
     /// Find a link element with the given link text.
     ///
     /// The text matching is exact.
@@ -233,6 +236,10 @@ impl<'a> Into<webdriver::command::LocatorParameters> for Locator<'a> {
             Locator::Css(s) => webdriver::command::LocatorParameters {
                 using: webdriver::common::LocatorStrategy::CSSSelector,
                 value: s.to_string(),
+            },
+            Locator::Id(s) => webdriver::command::LocatorParameters {
+                using: webdriver::common::LocatorStrategy::XPath,
+                value: format!("//*[@id=\"{}\"]", s),
             },
             Locator::XPath(s) => webdriver::command::LocatorParameters {
                 using: webdriver::common::LocatorStrategy::XPath,
@@ -1437,7 +1444,16 @@ mod tests {
     fn works_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
         // go to the Wikipedia page for Foobar
         c.goto("https://en.wikipedia.org/wiki/Foobar")
-            .and_then(move |_| c.current_url())
+            .and_then(move |_| {
+                c.find(Locator::Id("History_and_etymology"))
+            })
+            .and_then(move |e| {
+                e.text()
+            })
+            .and_then(move |text| {
+                assert_eq!(text, "History and etymology");
+                c.current_url()
+            })
             .and_then(move |url| {
                 assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
                 // click "Foo (disambiguation)"
