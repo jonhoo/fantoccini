@@ -32,8 +32,8 @@
 //! # extern crate futures;
 //! # extern crate fantoccini;
 //! # fn main() {
-//! # use fantoccini::{Client, Locator};
-//! # use futures::future::Future;
+//! use fantoccini::{Client, Locator};
+//! use futures::future::Future;
 //! let mut core = tokio_core::reactor::Core::new().unwrap();
 //! let c = Client::new("http://localhost:4444", &core.handle());
 //! let c = core.run(c).unwrap();

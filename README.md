@@ -34,6 +34,8 @@ you *expect* might fail, such as lookups by CSS selector.
 Let's start out clicking around on Wikipedia:
 
 ```rust
+use fantoccini::{Client, Locator};
+use futures::future::Future;
 let mut core = tokio_core::reactor::Core::new().unwrap();
 let c = Client::new("http://localhost:4444", &core.handle());
 let c = core.run(c).unwrap();
