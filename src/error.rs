@@ -109,7 +109,9 @@ impl CmdError {
     /// Returns true if this error indicates that a matching element was not found.
     ///
     /// Equivalent to
-    /// ```rust,ignore
+    /// ```no_run
+    /// # use fantoccini::error::CmdError;
+    /// # let e = CmdError::NotJson(String::new());
     /// let is_miss = if let CmdError::NoSuchElement(..) = e {
     ///   true
     /// } else {
