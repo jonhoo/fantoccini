@@ -3,6 +3,7 @@ dist: trusty
 sudo: false
 rust:
   - nightly
+  - beta
 cache: cargo
 matrix:
   allow_failures:

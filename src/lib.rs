@@ -186,7 +186,6 @@
 //! [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
-#![feature(conservative_impl_trait)]
 
 extern crate futures;
 extern crate hyper;
