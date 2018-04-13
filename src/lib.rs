@@ -196,14 +196,14 @@ extern crate tokio_core;
 extern crate url;
 extern crate webdriver;
 
-use webdriver::command::WebDriverCommand;
-use webdriver::error::WebDriverError;
-use webdriver::error::ErrorStatus;
-use webdriver::common::ELEMENT_KEY;
-use rustc_serialize::json::Json;
 use futures::{future, Future, Stream};
+use rustc_serialize::json::Json;
 use std::cell::RefCell;
 use std::rc::Rc;
+use webdriver::command::WebDriverCommand;
+use webdriver::common::ELEMENT_KEY;
+use webdriver::error::ErrorStatus;
+use webdriver::error::WebDriverError;
 
 pub use hyper::Method;
 
@@ -1428,7 +1428,7 @@ mod tests {
     use tokio_core::reactor::Core;
 
     macro_rules! tester {
-        ($f: ident) => {{
+        ($f:ident) => {{
             let mut core = Core::new().unwrap();
             let h = core.handle();
             let c = Client::new("http://localhost:4444", &h);
@@ -1444,12 +1444,8 @@ mod tests {
     fn works_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
         // go to the Wikipedia page for Foobar
         c.goto("https://en.wikipedia.org/wiki/Foobar")
-            .and_then(move |_| {
-                c.find(Locator::Id("History_and_etymology"))
-            })
-            .and_then(move |e| {
-                e.text()
-            })
+            .and_then(move |_| c.find(Locator::Id("History_and_etymology")))
+            .and_then(move |e| e.text())
             .and_then(move |text| {
                 assert_eq!(text, "History and etymology");
                 c.current_url()

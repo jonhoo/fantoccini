@@ -1,10 +1,10 @@
+use hyper::error as herror;
+use rustc_serialize::json;
+use std::error::Error;
 use std::fmt;
 use std::io::Error as IOError;
-use std::error::Error;
-use hyper::error as herror;
-use webdriver::error as wderror;
-use rustc_serialize::json;
 use url::ParseError;
+use webdriver::error as wderror;
 
 /// An error occured while attempting to establish a session for a new `Client`.
 #[derive(Debug)]
