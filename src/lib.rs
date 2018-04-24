@@ -514,6 +514,8 @@ impl Client {
             WebDriverCommand::ElementSendKeys(ref we, _) => {
                 base.join(&format!("element/{}/value", we.id))
             }
+            WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
+            WebDriverCommand::GetWindowRect => base.join("window/rect"),
             _ => unimplemented!(),
         }
     }
@@ -571,6 +573,10 @@ impl Client {
             | WebDriverCommand::GoBack
             | WebDriverCommand::Refresh => {
                 body = Some("{}".to_string());
+                method = Method::Post;
+            }
+            WebDriverCommand::SetWindowRect(ref params) => {
+                body = Some(format!("{}", params.to_json()));
                 method = Method::Post;
             }
             _ => {}
@@ -775,6 +781,200 @@ impl Client {
     /// the automated browser window while doing e.g., a large download.
     pub fn close(self) -> Option<impl Future<Item = (), Error = hyper::Error>> {
         self.0.shutdown()
+    }
+
+    /// Sets the x, y, width, and height properties of the current window. All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
+    pub fn set_window_rect(
+        &self,
+        x: i32,
+        y: i32,
+        width: i32,
+        height: i32,
+    ) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
+        use webdriver::common::Nullable;
+
+        if x < 0 {
+            return future::Either::A(future::err(error::CmdError::InvalidArgument(
+                stringify!(x).into(),
+                format!("Expected to be `>= 0` but was `{}`", x),
+            )));
+        }
+
+        if y < 0 {
+            return future::Either::A(future::err(error::CmdError::InvalidArgument(
+                stringify!(y).into(),
+                format!("Expected to be `>= 0` but was `{}`", y),
+            )));
+        }
+
+        if width < 0 {
+            return future::Either::A(future::err(error::CmdError::InvalidArgument(
+                stringify!(width).into(),
+                format!("Expected to be `>= 0` but was `{}`", width),
+            )));
+        }
+
+        if height < 0 {
+            return future::Either::A(future::err(error::CmdError::InvalidArgument(
+                stringify!(height).into(),
+                format!("Expected to be `>= 0` but was `{}`", height),
+            )));
+        }
+
+        let cmd = WebDriverCommand::SetWindowRect(webdriver::command::WindowRectParameters {
+            x: Nullable::Value(x),
+            y: Nullable::Value(y),
+            width: Nullable::Value(width),
+            height: Nullable::Value(height),
+        });
+
+        future::Either::B(self.dup().issue_wd_cmd(cmd).map(|(this, _)| this))
+    }
+
+    /// Gets the x, y, width, and height properties of the current window.
+    pub fn get_window_rect(
+        &self,
+    ) -> impl Future<Item = (u64, u64, u64, u64), Error = error::CmdError> + 'static {
+        self.dup()
+            .issue_wd_cmd(WebDriverCommand::GetWindowRect)
+            .and_then(|(_, v)| match v {
+                Json::Object(mut obj) => {
+                    let x = match obj.remove("x").and_then(|x| x.as_u64()) {
+                        Some(x) => x,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    };
+
+                    let y = match obj.remove("y").and_then(|y| y.as_u64()) {
+                        Some(y) => y,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    };
+
+                    let width = match obj.remove("width").and_then(|width| width.as_u64()) {
+                        Some(width) => width,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    };
+
+                    let height = match obj.remove("height").and_then(|height| height.as_u64()) {
+                        Some(height) => height,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    };
+
+                    Ok((x, y, width, height))
+                }
+                _ => Err(error::CmdError::NotW3C(v)),
+            })
+    }
+
+    /// Sets the width and height of the current window. All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
+    pub fn set_window_size(
+        &self,
+        width: i32,
+        height: i32,
+    ) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
+        use webdriver::common::Nullable;
+
+        if width < 0 {
+            return future::Either::A(future::err(error::CmdError::InvalidArgument(
+                stringify!(width).into(),
+                format!("Expected to be `>= 0` but was `{}`", width),
+            )));
+        }
+
+        if height < 0 {
+            return future::Either::A(future::err(error::CmdError::InvalidArgument(
+                stringify!(height).into(),
+                format!("Expected to be `>= 0` but was `{}`", height),
+            )));
+        }
+
+        let cmd = WebDriverCommand::SetWindowRect(webdriver::command::WindowRectParameters {
+            x: Nullable::Null,
+            y: Nullable::Null,
+            width: Nullable::Value(width),
+            height: Nullable::Value(height),
+        });
+
+        future::Either::B(self.dup().issue_wd_cmd(cmd).map(|(this, _)| this))
+    }
+
+    /// Gets the width and height of the current window.
+    pub fn get_window_size(
+        &self,
+    ) -> impl Future<Item = (u64, u64), Error = error::CmdError> + 'static {
+        self.dup()
+            .issue_wd_cmd(WebDriverCommand::GetWindowRect)
+            .and_then(|(_, v)| match v {
+                Json::Object(mut obj) => {
+                    let width = match obj.remove("width").and_then(|width| width.as_u64()) {
+                        Some(width) => width,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    };
+
+                    let height = match obj.remove("height").and_then(|height| height.as_u64()) {
+                        Some(height) => height,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    };
+
+                    Ok((width, height))
+                }
+                _ => Err(error::CmdError::NotW3C(v)),
+            })
+    }
+
+    /// Sets the x and y top-left coordinate of the current window. All values must be `>= 0`.
+    pub fn set_window_position(
+        &self,
+        x: i32,
+        y: i32,
+    ) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
+        use webdriver::common::Nullable;
+
+        if x < 0 {
+            return future::Either::A(future::err(error::CmdError::InvalidArgument(
+                stringify!(x).into(),
+                format!("Expected to be `>= 0` but was `{}`", x),
+            )));
+        }
+
+        if y < 0 {
+            return future::Either::A(future::err(error::CmdError::InvalidArgument(
+                stringify!(y).into(),
+                format!("Expected to be `>= 0` but was `{}`", y),
+            )));
+        }
+
+        let cmd = WebDriverCommand::SetWindowRect(webdriver::command::WindowRectParameters {
+            x: Nullable::Value(x),
+            y: Nullable::Value(y),
+            width: Nullable::Null,
+            height: Nullable::Null,
+        });
+
+        future::Either::B(self.dup().issue_wd_cmd(cmd).map(|(this, _)| this))
+    }
+
+    /// Gets the x and y top-left coordinate of the current window.
+    pub fn get_window_position(
+        &self,
+    ) -> impl Future<Item = (u64, u64), Error = error::CmdError> + 'static {
+        self.dup()
+            .issue_wd_cmd(WebDriverCommand::GetWindowRect)
+            .and_then(|(_, v)| match v {
+                Json::Object(mut obj) => {
+                    let x = match obj.remove("x").and_then(|x| x.as_u64()) {
+                        Some(x) => x,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    };
+
+                    let y = match obj.remove("y").and_then(|y| y.as_u64()) {
+                        Some(y) => y,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    };
+
+                    Ok((x, y))
+                }
+                _ => Err(error::CmdError::NotW3C(v)),
+            })
     }
 
     /// Navigate directly to the given URL.
@@ -1532,5 +1732,43 @@ mod tests {
     #[ignore]
     fn it_can_be_raw() {
         tester!(raw_inner)
+    }
+
+    fn window_size_inner<'a>(
+        c: &'a Client,
+    ) -> impl Future<Item = (), Error = error::CmdError> + 'a {
+        c.goto("https://www.wikipedia.org/")
+            .and_then(move |_| c.set_window_size(500, 400))
+            .and_then(move |_| c.get_window_size())
+            .and_then(move |(width, height)| {
+                assert_eq!(width, 500);
+                assert_eq!(height, 400);
+                Ok(())
+            })
+    }
+
+    #[test]
+    #[ignore]
+    fn it_can_get_and_set_window_size() {
+        tester!(window_size_inner)
+    }
+
+    fn window_position_inner<'a>(
+        c: &'a Client,
+    ) -> impl Future<Item = (), Error = error::CmdError> + 'a {
+        c.goto("https://www.wikipedia.org/")
+            .and_then(move |_| c.set_window_position(500, 400))
+            .and_then(move |_| c.get_window_position())
+            .and_then(move |(x, y)| {
+                assert_eq!(x, 500);
+                assert_eq!(y, 400);
+                Ok(())
+            })
+    }
+
+    #[test]
+    #[ignore]
+    fn it_can_get_and_set_window_position() {
+        tester!(window_position_inner)
     }
 }
