@@ -783,7 +783,9 @@ impl Client {
         self.0.shutdown()
     }
 
-    /// Sets the x, y, width, and height properties of the current window. All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
+    /// Sets the x, y, width, and height properties of the current window.
+    ///
+    /// All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
     pub fn set_window_rect(
         &self,
         x: i32,
@@ -865,7 +867,9 @@ impl Client {
             })
     }
 
-    /// Sets the width and height of the current window. All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
+    /// Sets the x, y, width, and height properties of the current window.
+    ///
+    /// All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
     pub fn set_window_size(
         &self,
         width: i32,
@@ -921,7 +925,9 @@ impl Client {
             })
     }
 
-    /// Sets the x and y top-left coordinate of the current window. All values must be `>= 0`.
+    /// Sets the x, y, width, and height properties of the current window.
+    ///
+    /// All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
     pub fn set_window_position(
         &self,
         x: i32,
