@@ -103,6 +103,9 @@ pub enum CmdError {
     ///
     /// [spec]: https://www.w3.org/TR/webdriver/
     NotW3C(json::Json),
+
+    /// A function was invoked with an invalid argument.
+    InvalidArgument(String, String),
 }
 
 impl CmdError {
@@ -138,6 +141,7 @@ impl Error for CmdError {
             CmdError::NotJson(..) => "webdriver returned invalid response",
             CmdError::Json(..) => "webdriver returned incoherent response",
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
+            CmdError::InvalidArgument(..) => "invalid argument provided",
         }
     }
 
@@ -148,7 +152,7 @@ impl Error for CmdError {
             CmdError::Failed(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
-            CmdError::NotJson(_) | CmdError::NotW3C(_) => None,
+            CmdError::NotJson(_) | CmdError::NotW3C(_) | CmdError::InvalidArgument(..) => None,
         }
     }
 }
@@ -164,6 +168,9 @@ impl fmt::Display for CmdError {
             CmdError::NotJson(ref e) => write!(f, "{}", e),
             CmdError::Json(ref e) => write!(f, "{}", e),
             CmdError::NotW3C(ref e) => write!(f, "{:?}", e),
+            CmdError::InvalidArgument(ref arg, ref msg) => {
+                write!(f, "Invalid argument `{}`: {}", arg, msg)
+            }
         }
     }
 }
