@@ -1450,6 +1450,24 @@ impl Element {
             })
             .and_then(|(this, href)| this.goto(href.as_str()).map(|this| this))
     }
+
+    /// Find and click an `option` child element by its `value` attribute.
+    pub fn select_by_value(
+        self,
+        value: &str
+    ) -> impl Future<Item = Client, Error = error::CmdError> {
+        let locator = format!("option[value='{}']", value);
+        let locator = webdriver::command::LocatorParameters {
+            using: webdriver::common::LocatorStrategy::CSSSelector,
+            value: locator,
+        };
+
+        let cmd = WebDriverCommand::FindElementElement(self.e, locator);
+        self.c
+            .issue_wd_cmd(cmd)
+            .and_then(move |(c, v)| c.parse_lookup(v).map(move |e| Element { c, e }))
+            .and_then(move |e| e.click())
+    }
 }
 
 impl rustc_serialize::json::ToJson for Element {
