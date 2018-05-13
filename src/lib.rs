@@ -1681,11 +1681,11 @@ mod tests {
             let h = core.handle();
             let c = Client::new("http://localhost:4444", &h);
             let c = core.run(c).expect("failed to construct test client");
-            core.run($f(&c))
-                .expect("test produced unexpected error response");
+            let x = core.run($f(&c));
             if let Some(fin) = c.close() {
                 core.run(fin).expect("failed to close test session");
             }
+            x.expect("test produced unexpected error response");
         }};
     }
 
