@@ -364,6 +364,25 @@ impl Client {
     /// Create a new `Client` associated with a new WebDriver session on the server at the given
     /// URL.
     ///
+    /// Calls `with_capabilities` with an empty capabilities list.
+    #[cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
+    pub fn new(
+        webdriver: &str,
+        handle: &tokio_core::reactor::Handle,
+    ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
+        Self::with_capabilities(
+            webdriver,
+            webdriver::capabilities::Capabilities::new(),
+            handle,
+        )
+    }
+
+    /// Create a new `Client` associated with a new WebDriver session on the server at the given
+    /// URL.
+    ///
+    /// The given capabilities will be requested in `alwaysMatch` or `desiredCapabilities`
+    /// depending on the protocol version supported by the server.
+    ///
     /// Returns a future that resolves to a handle for issuing additional WebDriver tasks.
     ///
     /// Note that most callers should explicitly call `Client::close`, and wait for the returned
@@ -372,9 +391,9 @@ impl Client {
     /// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
     /// session close request will be spawned on the given `handle` when the last instance of this
     /// `Client` is dropped.
-    #[cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
-    pub fn new(
+    pub fn with_capabilities(
         webdriver: &str,
+        mut cap: webdriver::capabilities::Capabilities,
         handle: &tokio_core::reactor::Handle,
     ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
         // Where is the WebDriver server?
@@ -402,7 +421,6 @@ impl Client {
 
         // Required capabilities
         // https://www.w3.org/TR/webdriver/#capabilities
-        let mut cap = webdriver::capabilities::Capabilities::new();
         //  - we want the browser to wait for the page to load
         cap.insert(
             "pageLoadStrategy".to_string(),
@@ -589,10 +607,11 @@ impl Client {
         }
         // because https://github.com/hyperium/hyper/pull/727
         if !url.username().is_empty() || url.password().is_some() {
-            req.headers_mut().set(hyper::header::Authorization(hyper::header::Basic{
-                username: url.username().to_string(),
-                password: url.password().map(|pwd| pwd.to_string()),
-            }));
+            req.headers_mut()
+                .set(hyper::header::Authorization(hyper::header::Basic {
+                    username: url.username().to_string(),
+                    password: url.password().map(|pwd| pwd.to_string()),
+                }));
         }
         if let Some(ref body) = body {
             req.headers_mut().set(hyper::header::ContentType::json());
