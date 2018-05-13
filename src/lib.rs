@@ -1479,7 +1479,7 @@ impl Element {
     /// Find and click an `option` child element by its `value` attribute.
     pub fn select_by_value(
         self,
-        value: &str
+        value: &str,
     ) -> impl Future<Item = Client, Error = error::CmdError> {
         let locator = format!("option[value='{}']", value);
         let locator = webdriver::command::LocatorParameters {
@@ -1676,10 +1676,73 @@ mod tests {
     use tokio_core::reactor::Core;
 
     macro_rules! tester {
-        ($f:ident) => {{
+        ($f:ident, $endpoint:expr) => {{
+            use std::env;
             let mut core = Core::new().unwrap();
             let h = core.handle();
-            let c = Client::new("http://localhost:4444", &h);
+            let c = match env::var_os("SAUCE_USERNAME") {
+                Some(username) => {
+                    let pwd = env::var_os("SAUCE_ACCESS_KEY").unwrap();
+                    let mut cap = webdriver::capabilities::Capabilities::new();
+                    match $endpoint {
+                        "firefox" => {
+                            cap.insert(
+                                "platform".to_string(),
+                                Json::String("Windows 10".to_string()),
+                            );
+                            cap.insert(
+                                "browserName".to_string(),
+                                Json::String("firefox".to_string()),
+                            );
+                            cap.insert("version".to_string(), Json::String("60.0".to_string()));
+                        }
+                        "chrome" => {
+                            cap.insert(
+                                "platform".to_string(),
+                                Json::String("Windows 10".to_string()),
+                            );
+                            cap.insert(
+                                "browserName".to_string(),
+                                Json::String("chrome".to_string()),
+                            );
+                            cap.insert("version".to_string(), Json::String("66.0".to_string()));
+                        }
+                        _ => {}
+                    }
+                    cap.insert(
+                        "username".to_string(),
+                        Json::String(username.to_string_lossy().into_owned()),
+                    );
+                    cap.insert(
+                        "accessKey".to_string(),
+                        Json::String(pwd.to_string_lossy().into_owned()),
+                    );
+                    if let Some(tunnel) = env::var_os("TRAVIS_JOB_NUMBER") {
+                        cap.insert(
+                            "tunnel-identifier".to_string(),
+                            Json::String(tunnel.to_string_lossy().into_owned()),
+                        );
+                    }
+
+                    Client::with_capabilities(
+                        &format!(
+                            "http://{}:{}@ondemand.saucelabs.com:80/wd/hub/",
+                            username.to_string_lossy(),
+                            pwd.to_string_lossy()
+                        ),
+                        cap,
+                        &h,
+                    )
+                }
+                None => {
+                    // NOTE: can't be ::new because impl Future won't match
+                    Client::with_capabilities(
+                        "http://localhost:4444",
+                        webdriver::capabilities::Capabilities::new(),
+                        &h,
+                    )
+                }
+            };
             let c = core.run(c).expect("failed to construct test client");
             let x = core.run($f(&c));
             if let Some(fin) = c.close() {
@@ -1716,12 +1779,6 @@ mod tests {
             })
     }
 
-    #[test]
-    #[ignore]
-    fn it_works() {
-        tester!(works_inner)
-    }
-
     fn clicks_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
         // go to the Wikipedia frontpage this time
         c.goto("https://www.wikipedia.org/")
@@ -1737,12 +1794,6 @@ mod tests {
                 assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
                 Ok(())
             })
-    }
-
-    #[test]
-    #[ignore]
-    fn it_clicks() {
-        tester!(clicks_inner)
     }
 
     fn raw_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
@@ -1777,12 +1828,6 @@ mod tests {
             })
     }
 
-    #[test]
-    #[ignore]
-    fn it_can_be_raw() {
-        tester!(raw_inner)
-    }
-
     fn window_size_inner<'a>(
         c: &'a Client,
     ) -> impl Future<Item = (), Error = error::CmdError> + 'a {
@@ -1796,28 +1841,110 @@ mod tests {
             })
     }
 
-    #[test]
-    #[ignore]
-    fn it_can_get_and_set_window_size() {
-        tester!(window_size_inner)
-    }
-
     fn window_position_inner<'a>(
         c: &'a Client,
     ) -> impl Future<Item = (), Error = error::CmdError> + 'a {
         c.goto("https://www.wikipedia.org/")
-            .and_then(move |_| c.set_window_position(500, 400))
+            .and_then(move |_| c.set_window_size(200, 100))
+            .and_then(move |_| c.set_window_position(0, 0))
+            .and_then(move |_| c.set_window_position(1, 2))
             .and_then(move |_| c.get_window_position())
             .and_then(move |(x, y)| {
-                assert_eq!(x, 500);
-                assert_eq!(y, 400);
+                assert_eq!(x, 1);
+                assert_eq!(y, 2);
                 Ok(())
             })
     }
 
-    #[test]
-    #[ignore]
-    fn it_can_get_and_set_window_position() {
-        tester!(window_position_inner)
+    fn window_rect_inner<'a>(
+        c: &'a Client,
+    ) -> impl Future<Item = (), Error = error::CmdError> + 'a {
+        c.goto("https://www.wikipedia.org/")
+            .and_then(move |_| c.set_window_rect(0, 0, 500, 400))
+            .and_then(move |_| c.get_window_position())
+            .and_then(move |(x, y)| {
+                assert_eq!(x, 0);
+                assert_eq!(y, 0);
+                Ok(())
+            })
+            .and_then(move |_| c.get_window_size())
+            .and_then(move |(width, height)| {
+                assert_eq!(width, 500);
+                assert_eq!(height, 400);
+                Ok(())
+            })
+            .and_then(move |_| c.set_window_rect(1, 2, 600, 300))
+            .and_then(move |_| c.get_window_position())
+            .and_then(move |(x, y)| {
+                assert_eq!(x, 1);
+                assert_eq!(y, 2);
+                Ok(())
+            })
+            .and_then(move |_| c.get_window_size())
+            .and_then(move |(width, height)| {
+                assert_eq!(width, 600);
+                assert_eq!(height, 300);
+                Ok(())
+            })
+    }
+
+    mod chrome {
+        use super::*;
+
+        #[test]
+        fn it_works() {
+            tester!(works_inner, "chrome")
+        }
+        #[test]
+        fn it_clicks() {
+            tester!(clicks_inner, "chrome")
+        }
+        #[test]
+        fn it_can_be_raw() {
+            tester!(raw_inner, "chrome")
+        }
+        #[test]
+        fn it_can_get_and_set_window_size() {
+            tester!(window_size_inner, "chrome")
+        }
+        #[test]
+        fn it_can_get_and_set_window_position() {
+            tester!(window_position_inner, "chrome")
+        }
+        #[test]
+        fn it_can_get_and_set_window_rect() {
+            tester!(window_rect_inner, "chrome")
+        }
+    }
+
+    mod firefox {
+        use super::*;
+
+        #[test]
+        fn it_works() {
+            tester!(works_inner, "firefox")
+        }
+        #[test]
+        fn it_clicks() {
+            tester!(clicks_inner, "firefox")
+        }
+        #[test]
+        fn it_can_be_raw() {
+            tester!(raw_inner, "firefox")
+        }
+        #[test]
+        fn it_can_get_and_set_window_size() {
+            tester!(window_size_inner, "firefox")
+        }
+        #[test]
+        #[ignore]
+        fn it_can_get_and_set_window_position() {
+            tester!(window_position_inner, "firefox")
+        }
+        #[test]
+        #[ignore]
+        fn it_can_get_and_set_window_rect() {
+            tester!(window_rect_inner, "firefox")
+        }
     }
 }

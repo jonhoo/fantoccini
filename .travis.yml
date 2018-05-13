@@ -1,11 +1,18 @@
 language: rust
-dist: trusty
-sudo: false
 rust:
   - nightly
   - beta
   - stable
 cache: cargo
+addons:
+  sauce_connect:
+    username: "jonhoo"
+  jwt:
+    secure: "Kl0JpMtlCdoEU+FzsQCO6Vk16kEFJBH9Not0OoQ98zJbL1S9WL2A1ZFOhzp3ohlt8DLOzzCUPmDX+P+ziVCC/xs4reHhcghUI7hbwrfHU6KQqp6g8C0/EVOKHxHjCgivbFhNxuAmny7ESqcBUohfn62cFuoFQPCkfZG6j785sPyjdMRdS1E29Xg0l/j8dSbZhcs78r3ugRotp76rZK6kqJeSa4q4irHXvmTG/pe94JKR7VcbYFIA3CraO/FlDyb+B8Cl8d6s5fQf08sNSr5K8BoliVxS2kuvuIW3LsPMNWJyQRtrnLfesCemvKbQTzW8GXiAUmPAbptYK9VJezIhahYTQ5Vr0M8XuD3UyIV6nbsKyeyIJn7kXrCmllTwtyMDzscRwGd8IBLUGWtz7oA7Z/eQE6KQCKoY41o1zDTom6bHRH5hvn6ERs8dtryNtswW9XqGiBOr4HN1Y2LFIhd3Vm8zQg3gy+OAkeuuLbFe4aybJzW0ylWrkQOumTpEkvvTJ/QAcioPMWW3oaxJ/nBlnCdYuqTkjXkhvCBTMDGRvSAzFsUfqtf5/hDJKvodDbXGq1jYNML9GaB5d/Gy+HDarG3LJnqkgzxYTtUWUIhPoN/IucVRaE2pmK+ublohcmK/As+KDOsW7lqTEekAJswCA9tHBdva8NPhWF/zGHw/gY4="
+script:
+  - cargo build --verbose
+  - cargo test --verbose -- --test-threads=4
+# test-threads 4 because we are only allowed 5 concurrent tests
 matrix:
   allow_failures:
     - rust: nightly
