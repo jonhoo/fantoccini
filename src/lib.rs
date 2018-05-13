@@ -268,7 +268,7 @@ impl Inner {
             let url = {
                 let s = self.session.borrow();
                 self.wdb
-                    .join(&format!("/session/{}", s.as_ref().unwrap()))
+                    .join(&format!("session/{}", s.as_ref().unwrap()))
                     .unwrap()
             };
             *self.session.borrow_mut() = None;
@@ -428,9 +428,10 @@ impl Client {
                             legacy = err.get("message")
                                 .and_then(|m| m.as_string())
                                 .map(|s| {
-                                    // chromedriver < 2.29 || chromedriver == 2.29
+                                    // chromedriver < 2.29 || chromedriver == 2.29 || saucelabs
                                     s.contains("cannot find dict 'desiredCapabilities'")
                                         || s.contains("Missing or invalid capabilities")
+                                        || s.contains("Unexpected server error.")
                                 })
                                 .unwrap_or(false);
                         }
@@ -442,8 +443,8 @@ impl Client {
                         // WebDriver protocol:
                         // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
                         let session_config = webdriver::capabilities::LegacyNewSessionParameters {
-                            required: cap,
-                            desired: webdriver::capabilities::Capabilities::new(),
+                            desired: cap,
+                            required: webdriver::capabilities::Capabilities::new(),
                         };
                         let spec = webdriver::command::NewSessionParameters::Legacy(session_config);
 
@@ -474,14 +475,14 @@ impl Client {
     /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
     fn endpoint_for(&self, cmd: &Cmd) -> Result<url::Url, url::ParseError> {
         if let WebDriverCommand::NewSession(..) = *cmd {
-            return self.0.wdb.join("/session");
+            return self.0.wdb.join("session");
         }
 
         let base = {
             let session = self.0.session.borrow();
             self.0
                 .wdb
-                .join(&format!("/session/{}/", session.as_ref().unwrap()))?
+                .join(&format!("session/{}/", session.as_ref().unwrap()))?
         };
         match *cmd {
             WebDriverCommand::NewSession(..) => unreachable!(),
@@ -585,6 +586,13 @@ impl Client {
         if let Some(ref s) = *self.0.ua.borrow() {
             req.headers_mut()
                 .set(hyper::header::UserAgent::new(s.to_owned()));
+        }
+        // because https://github.com/hyperium/hyper/pull/727
+        if !url.username().is_empty() || url.password().is_some() {
+            req.headers_mut().set(hyper::header::Authorization(hyper::header::Basic{
+                username: url.username().to_string(),
+                password: url.password().map(|pwd| pwd.to_string()),
+            }));
         }
         if let Some(ref body) = body {
             req.headers_mut().set(hyper::header::ContentType::json());
