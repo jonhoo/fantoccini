@@ -479,6 +479,11 @@ impl Client {
         future::Either::A(f)
     }
 
+    /// Get the session ID assigned by the WebDriver server to this client.
+    pub fn session_id(&self) -> String {
+        self.0.session.borrow().as_ref().unwrap().to_string()
+    }
+
     fn dup(&self) -> Self {
         Client(Rc::clone(&self.0))
     }
@@ -1743,10 +1748,41 @@ mod tests {
                     )
                 }
             };
+
             let c = core.run(c).expect("failed to construct test client");
+            let session_id = c.session_id();
             let x = core.run($f(&c));
             if let Some(fin) = c.close() {
                 core.run(fin).expect("failed to close test session");
+            }
+
+            if let Ok(username) = env::var("SAUCE_USERNAME") {
+                let tell_sauce = hyper::Client::configure()
+                    .connector(hyper_tls::HttpsConnector::new(1, &core.handle()).unwrap())
+                    .build(&core.handle());
+                let mut req = hyper::Request::new(
+                    hyper::Method::Put,
+                    format!("https://saucelabs.com/rest/v1/jonhoo/jobs/{}", session_id)
+                        .parse()
+                        .unwrap(),
+                );
+
+                req.headers_mut()
+                    .set(hyper::header::Authorization(hyper::header::Basic {
+                        username: username,
+                        password: env::var("SAUCE_ACCESS_KEY").ok(),
+                    }));
+
+                let body = format!(
+                    r#"{{"name": "{}", "passed": {}}}"#,
+                    stringify!($f),
+                    if x.is_ok() { "true" } else { "false" }
+                );
+                req.headers_mut().set(hyper::header::ContentType::json());
+                req.headers_mut()
+                    .set(hyper::header::ContentLength(body.len() as u64));
+                req.set_body(body.clone());
+                core.run(tell_sauce.request(req)).ok();
             }
             x.expect("test produced unexpected error response");
         }};
