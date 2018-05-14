@@ -1755,17 +1755,18 @@ mod tests {
                 let tell_sauce = hyper::Client::configure()
                     .connector(hyper_tls::HttpsConnector::new(1, &core.handle()).unwrap())
                     .build(&core.handle());
-                let mut req = hyper::Request::new(
-                    hyper::Method::Put,
-                    format!("https://saucelabs.com/rest/v1/fantoccini/jobs/{}", session_id)
-                        .parse()
-                        .unwrap(),
+
+                let url = format!(
+                    "https://saucelabs.com/rest/v1/{}/jobs/{}",
+                    env::var("SAUCE_USERNAME").unwrap(),
+                    session_id
                 );
+                let mut req = hyper::Request::new(hyper::Method::Put, url.parse().unwrap());
 
                 req.headers_mut()
                     .set(hyper::header::Authorization(hyper::header::Basic {
-                        username: env::var("SAUCE_USERNAME").ok(),
-                        password: pwd,
+                        username: env::var("SAUCE_USERNAME").unwrap(),
+                        password: Some(pwd),
                     }));
 
                 let body = format!(
