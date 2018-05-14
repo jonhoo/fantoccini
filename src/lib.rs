@@ -1685,9 +1685,9 @@ mod tests {
             use std::env;
             let mut core = Core::new().unwrap();
             let h = core.handle();
-            let c = match env::var_os("SAUCE_USERNAME") {
-                Some(username) => {
-                    let pwd = env::var_os("SAUCE_ACCESS_KEY").unwrap();
+            let c = match env::var("SAUCE_ACCESS_KEY").ok() {
+                Some(pwd) => {
+                    let username = env::var("SAUCE_USERNAME").unwrap();
                     let mut cap = webdriver::capabilities::Capabilities::new();
                     match $endpoint {
                         "firefox" => {
@@ -1714,30 +1714,25 @@ mod tests {
                         }
                         _ => {}
                     }
-                    cap.insert(
-                        "username".to_string(),
-                        Json::String(username.to_string_lossy().into_owned()),
-                    );
-                    cap.insert(
-                        "accessKey".to_string(),
-                        Json::String(pwd.to_string_lossy().into_owned()),
-                    );
-                    if let Some(tunnel) = env::var_os("TRAVIS_JOB_NUMBER") {
-                        cap.insert(
-                            "tunnel-identifier".to_string(),
-                            Json::String(tunnel.to_string_lossy().into_owned()),
-                        );
+                    cap.insert("username".to_string(), Json::String(username.clone()));
+                    cap.insert("accessKey".to_string(), Json::String(pwd.clone()));
+                    if let Some(tunnel) = env::var("TRAVIS_JOB_NUMBER").ok() {
+                        cap.insert("tunnel-identifier".to_string(), Json::String(tunnel));
                     }
 
                     Client::with_capabilities(
                         &format!(
                             "http://{}:{}@ondemand.saucelabs.com:80/wd/hub/",
-                            username.to_string_lossy(),
-                            pwd.to_string_lossy()
+                            username, pwd,
                         ),
                         cap,
                         &h,
                     )
+                }
+                None if env::var("TRAVIS").is_ok() => {
+                    // TODO: maybe use the firefox addon as a fallback?
+                    // https://docs.travis-ci.com/user/firefox/
+                    unimplemented!("cannot yet test on travis without Sauce");
                 }
                 None => {
                     // NOTE: can't be ::new because impl Future won't match
@@ -1785,7 +1780,18 @@ mod tests {
                 req.headers_mut()
                     .set(hyper::header::ContentLength(body.len() as u64));
                 req.set_body(body.clone());
-                core.run(tell_sauce.request(req)).ok();
+                match core.run(tell_sauce.request(req)) {
+                    Err(e) => {
+                        eprintln!("failed to tell sauce: {:?}", e);
+                    }
+                    Ok(res) => {
+                        eprintln!(
+                            "told sauce, got: {}",
+                            String::from_utf8(core.run(res.body().concat2()).unwrap().to_vec())
+                                .unwrap()
+                        );
+                    }
+                }
             }
             x.expect("test produced unexpected error response");
         }};
