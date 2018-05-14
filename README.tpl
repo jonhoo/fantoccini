@@ -7,9 +7,11 @@
 
 {{readme}}
 
-## CI testing acknowledgement
+## CI testing
 
 Big thanks to [Sauce Labs][homepage] for providing us with free cross-browser
 testing!
+
+[![Sauce Test Status](https://saucelabs.com/browser-matrix/fantoccini.svg)](https://saucelabs.com/u/fantoccini)
 
 [homepage]: https://saucelabs.com

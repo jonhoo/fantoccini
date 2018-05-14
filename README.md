@@ -148,9 +148,11 @@ c.goto("https://www.wikipedia.org/")
 [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 [`geckodriver`]: https://github.com/mozilla/geckodriver
 
-## CI testing acknowledgement
+## CI testing
 
 Big thanks to [Sauce Labs][homepage] for providing us with free cross-browser
 testing!
+
+[![Sauce Test Status](https://saucelabs.com/browser-matrix/fantoccini.svg)](https://saucelabs.com/u/fantoccini)
 
 [homepage]: https://saucelabs.com
