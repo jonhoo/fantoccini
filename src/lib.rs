@@ -1693,24 +1693,24 @@ mod tests {
                         "firefox" => {
                             cap.insert(
                                 "platform".to_string(),
-                                Json::String("Windows 10".to_string()),
+                                Json::String(env::var("PLATFORM").expect("env PLATFORM not set")),
                             );
                             cap.insert(
                                 "browserName".to_string(),
                                 Json::String("firefox".to_string()),
                             );
-                            cap.insert("version".to_string(), Json::String("60.0".to_string()));
+                            cap.insert("version".to_string(), Json::String("latest".to_string()));
                         }
                         "chrome" => {
                             cap.insert(
                                 "platform".to_string(),
-                                Json::String("Windows 10".to_string()),
+                                Json::String(env::var("PLATFORM").expect("env PLATFORM not set")),
                             );
                             cap.insert(
                                 "browserName".to_string(),
                                 Json::String("chrome".to_string()),
                             );
-                            cap.insert("version".to_string(), Json::String("66.0".to_string()));
+                            cap.insert("version".to_string(), Json::String("latest".to_string()));
                         }
                         _ => {}
                     }
