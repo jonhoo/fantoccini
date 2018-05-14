@@ -1774,8 +1774,11 @@ mod tests {
                     }));
 
                 let body = format!(
-                    r#"{{"name": "{}", "passed": {}}}"#,
+                    r#"{{"name": "{}", "build": "{}", "passed": {}}}"#,
                     stringify!($f),
+                    env::var("TRAVIS_BUILD_NUMBER")
+                        .ok()
+                        .unwrap_or(format!("null")),
                     if x.is_ok() { "true" } else { "false" }
                 );
                 req.headers_mut().set(hyper::header::ContentType::json());
