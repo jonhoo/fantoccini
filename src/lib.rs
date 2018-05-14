@@ -1730,8 +1730,8 @@ mod tests {
                     )
                 }
                 None if env::var("TRAVIS").is_ok() => {
-                    // TODO: maybe use the firefox addon as a fallback?
-                    // https://docs.travis-ci.com/user/firefox/
+                    // TODO: maybe use the chrome/firefox addons as a fallback?
+                    // https://docs.travis-ci.com/user/gui-and-headless-browsers/#Using-xvfb-to-Run-Tests-That-Require-a-GUI
                     unimplemented!("cannot yet test on travis without Sauce");
                 }
                 None => {
@@ -1751,29 +1751,33 @@ mod tests {
                 core.run(fin).expect("failed to close test session");
             }
 
-            if let Ok(username) = env::var("SAUCE_USERNAME") {
+            if let Ok(pwd) = env::var("SAUCE_ACCESS_KEY") {
                 let tell_sauce = hyper::Client::configure()
                     .connector(hyper_tls::HttpsConnector::new(1, &core.handle()).unwrap())
                     .build(&core.handle());
                 let mut req = hyper::Request::new(
                     hyper::Method::Put,
-                    format!("https://saucelabs.com/rest/v1/jonhoo/jobs/{}", session_id)
+                    format!("https://saucelabs.com/rest/v1/fantoccini/jobs/{}", session_id)
                         .parse()
                         .unwrap(),
                 );
 
                 req.headers_mut()
                     .set(hyper::header::Authorization(hyper::header::Basic {
-                        username: username,
-                        password: env::var("SAUCE_ACCESS_KEY").ok(),
+                        username: env::var("SAUCE_USERNAME").ok(),
+                        password: pwd,
                     }));
 
                 let body = format!(
-                    r#"{{"name": "{}", "build": "{}", "passed": {}}}"#,
+                    r#"{{"name": "{}", "build": "{}"{}, "passed": {}}}"#,
                     stringify!($f),
                     env::var("TRAVIS_BUILD_NUMBER")
                         .ok()
                         .unwrap_or(format!("null")),
+                    env::var("TRAVIS_RUST_VERSION")
+                        .map(|v| format!(r#", "tags": ["{}"]"#, v))
+                        .ok()
+                        .unwrap_or(String::new()),
                     if x.is_ok() { "true" } else { "false" }
                 );
                 req.headers_mut().set(hyper::header::ContentType::json());
