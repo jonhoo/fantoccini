@@ -147,3 +147,10 @@ c.goto("https://www.wikipedia.org/")
 [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
 [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 [`geckodriver`]: https://github.com/mozilla/geckodriver
+
+## CI testing acknowledgement
+
+Big thanks to [Sauce Labs][homepage] for providing us with free cross-browser
+testing!
+
+[homepage]: https://saucelabs.com

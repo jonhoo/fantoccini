@@ -6,3 +6,10 @@
 [![Gitter chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fantoccini-rs/Lobby)
 
 {{readme}}
+
+## CI testing acknowledgement
+
+Big thanks to [Sauce Labs][homepage] for providing us with free cross-browser
+testing!
+
+[homepage]: https://saucelabs.com
