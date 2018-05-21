@@ -809,7 +809,7 @@ impl Client {
     ///
     /// This function may be useful in conjunction with `raw_client_for`, as it allows you to close
     /// the automated browser window while doing e.g., a large download.
-    pub fn close(self) -> Option<impl Future<Item = (), Error = hyper::Error>> {
+    pub fn close(&self) -> Option<impl Future<Item = (), Error = hyper::Error>> {
         self.0.shutdown()
     }
 
