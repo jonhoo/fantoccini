@@ -185,6 +185,7 @@
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
 
+extern crate base64;
 extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
@@ -538,6 +539,7 @@ impl Client {
             }
             WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
             WebDriverCommand::GetWindowRect => base.join("window/rect"),
+            WebDriverCommand::TakeScreenshot => base.join("screenshot"),
             _ => unimplemented!(),
         }
     }
@@ -1043,6 +1045,19 @@ impl Client {
     /// Retrieve the currently active URL for this session.
     pub fn current_url(&self) -> impl Future<Item = url::Url, Error = error::CmdError> + 'static {
         self.current_url_().map(|(_, u)| u)
+    }
+
+    /// Get a PNG-encoded screenshot of the current page.
+    pub fn screenshot(&self) -> impl Future<Item = Vec<u8>, Error = error::CmdError> + 'static {
+        self.dup()
+            .issue_wd_cmd(WebDriverCommand::TakeScreenshot)
+            .and_then(|(_, src)| {
+                if let Some(src) = src.as_string() {
+                    return base64::decode(src).map_err(|e| error::CmdError::ImageDecodeError(e));
+                }
+
+                Err(error::CmdError::NotW3C(src))
+            })
     }
 
     /// Get the HTML source for the current page.

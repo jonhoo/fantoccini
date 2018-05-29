@@ -106,6 +106,9 @@ pub enum CmdError {
 
     /// A function was invoked with an invalid argument.
     InvalidArgument(String, String),
+
+    /// Could not decode a base64 image
+    ImageDecodeError(::base64::DecodeError),
 }
 
 impl CmdError {
@@ -142,6 +145,7 @@ impl Error for CmdError {
             CmdError::Json(..) => "webdriver returned incoherent response",
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
+            CmdError::ImageDecodeError(..) => "error decoding image",
         }
     }
 
@@ -152,6 +156,7 @@ impl Error for CmdError {
             CmdError::Failed(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
+            CmdError::ImageDecodeError(ref e) => Some(e),
             CmdError::NotJson(_) | CmdError::NotW3C(_) | CmdError::InvalidArgument(..) => None,
         }
     }
@@ -168,6 +173,7 @@ impl fmt::Display for CmdError {
             CmdError::NotJson(ref e) => write!(f, "{}", e),
             CmdError::Json(ref e) => write!(f, "{}", e),
             CmdError::NotW3C(ref e) => write!(f, "{:?}", e),
+            CmdError::ImageDecodeError(ref e) => write!(f, "{:?}", e),
             CmdError::InvalidArgument(ref arg, ref msg) => {
                 write!(f, "Invalid argument `{}`: {}", arg, msg)
             }
