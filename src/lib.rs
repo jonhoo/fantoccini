@@ -1522,14 +1522,12 @@ impl rustc_serialize::json::ToJson for Element {
 }
 
 impl Form {
-    /// Set the `value` of the given `field` in this form.
-    pub fn set_by_name<'s>(
+    /// Set the `value` of the given `locator` in this form.
+    pub fn set<'s>(
         &self,
-        field: &str,
+        locator: Locator,
         value: &'s str,
     ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
-        let locator = format!("input[name='{}']", field);
-        let locator = Locator::Css(&locator);
         let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator.into());
         let f = Form {
             c: self.c.dup(),
@@ -1560,6 +1558,17 @@ impl Form {
                     Err(error::CmdError::NotW3C(res))
                 }
             })
+    }
+
+    /// Set the `value` of the given `field` in this form.
+    pub fn set_by_name<'s>(
+        &self,
+        field: &str,
+        value: &'s str,
+    ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
+        let locator = format!("input[name='{}']", field);
+        let locator = Locator::Css(&locator);
+        self.set(locator, value)
     }
 
     /// Submit this form using the first available submit button.
