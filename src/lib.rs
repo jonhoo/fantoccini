@@ -1853,6 +1853,25 @@ mod tests {
             })
     }
 
+    fn clicks_inner_by_locator<'a>(
+        c: &'a Client,
+    ) -> impl Future<Item = (), Error = error::CmdError> + 'a {
+        // go to the Wikipedia frontpage this time
+        c.goto("https://www.wikipedia.org/")
+            .and_then(move |_| {
+                // find, fill out, and submit the search form
+                c.form(Locator::Css("#search-form"))
+            })
+            .and_then(|f| f.set(Locator::Css("input[name='search']"), "foobar"))
+            .and_then(|f| f.submit())
+            .and_then(move |_| c.current_url())
+            .and_then(|url| {
+                // we should now have ended up in the rigth place
+                assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+                Ok(())
+            })
+    }
+
     fn clicks_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
         // go to the Wikipedia frontpage this time
         c.goto("https://www.wikipedia.org/")
