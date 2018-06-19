@@ -1522,7 +1522,7 @@ impl rustc_serialize::json::ToJson for Element {
 }
 
 impl Form {
-    /// Set the `value` of the given `locator` in this form.
+    /// Find a form input using the given `locator` and set its value to `value`.
     pub fn set<'s>(
         &self,
         locator: Locator,
@@ -1560,7 +1560,7 @@ impl Form {
             })
     }
 
-    /// Set the `value` of the given `field` in this form.
+    /// Find a form input with the given `name` and set its value to `value`.
     pub fn set_by_name<'s>(
         &self,
         field: &str,
