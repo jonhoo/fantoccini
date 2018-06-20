@@ -1522,14 +1522,12 @@ impl rustc_serialize::json::ToJson for Element {
 }
 
 impl Form {
-    /// Set the `value` of the given `field` in this form.
-    pub fn set_by_name<'s>(
+    /// Find a form input using the given `locator` and set its value to `value`.
+    pub fn set<'s>(
         &self,
-        field: &str,
+        locator: Locator,
         value: &'s str,
     ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
-        let locator = format!("input[name='{}']", field);
-        let locator = Locator::Css(&locator);
         let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator.into());
         let f = Form {
             c: self.c.dup(),
@@ -1560,6 +1558,17 @@ impl Form {
                     Err(error::CmdError::NotW3C(res))
                 }
             })
+    }
+
+    /// Find a form input with the given `name` and set its value to `value`.
+    pub fn set_by_name<'s>(
+        &self,
+        field: &str,
+        value: &'s str,
+    ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
+        let locator = format!("input[name='{}']", field);
+        let locator = Locator::Css(&locator);
+        self.set(locator, value)
     }
 
     /// Submit this form using the first available submit button.
@@ -1840,6 +1849,25 @@ mod tests {
             .and_then(move |_| c.current_url())
             .and_then(|url| {
                 assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+                Ok(())
+            })
+    }
+
+    fn clicks_inner_by_locator<'a>(
+        c: &'a Client,
+    ) -> impl Future<Item = (), Error = error::CmdError> + 'a {
+        // go to the Wikipedia frontpage this time
+        c.goto("https://www.wikipedia.org/")
+            .and_then(move |_| {
+                // find, fill out, and submit the search form
+                c.form(Locator::Css("#search-form"))
+            })
+            .and_then(|f| f.set(Locator::Css("input[name='search']"), "foobar"))
+            .and_then(|f| f.submit())
+            .and_then(move |_| c.current_url())
+            .and_then(|url| {
+                // we should now have ended up in the rigth place
+                assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
                 Ok(())
             })
     }
