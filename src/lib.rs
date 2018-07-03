@@ -516,6 +516,7 @@ impl Client {
             WebDriverCommand::Refresh => base.join("refresh"),
             WebDriverCommand::GetPageSource => base.join("source"),
             WebDriverCommand::FindElement(..) => base.join("element"),
+            WebDriverCommand::FindElements(..) => base.join("elements"),
             WebDriverCommand::GetCookies => base.join("cookie"),
             WebDriverCommand::ExecuteScript(..) if self.0.legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
@@ -527,6 +528,9 @@ impl Client {
             }
             WebDriverCommand::FindElementElement(ref p, _) => {
                 base.join(&format!("element/{}/element", p.id))
+            }
+            WebDriverCommand::FindElementElements(ref p, _) => {
+                base.join(&format!("element/{}/elements", p.id))
             }
             WebDriverCommand::ElementClick(ref we) => {
                 base.join(&format!("element/{}/click", we.id))
@@ -581,7 +585,9 @@ impl Client {
                 method = Method::Post;
             }
             WebDriverCommand::FindElement(ref loc)
-            | WebDriverCommand::FindElementElement(_, ref loc) => {
+            | WebDriverCommand::FindElements(ref loc)
+            | WebDriverCommand::FindElementElement(_, ref loc)
+            | WebDriverCommand::FindElementElements(_, ref loc) => {
                 body = Some(format!("{}", loc.to_json()));
                 method = Method::Post;
             }
@@ -1245,6 +1251,19 @@ impl Client {
         self.by(search.into())
     }
 
+    /// Find elements on the page.
+    pub fn find_all(
+        &self,
+        search: Locator,
+    ) -> impl Future<Item = Vec<Element>, Error = error::CmdError> + 'static {
+        self.dup()
+            .issue_wd_cmd(WebDriverCommand::FindElements(search.into()))
+            .and_then(|(this, res)| {
+                let array = this.parse_lookup_all(res)?;
+                Ok(array.into_iter().map(|e| Element { c: this.dup(), e: e }).collect())
+            })
+    }
+
     /// Wait for the given function to return `true` before proceeding.
     ///
     /// This can be useful to wait for something to appear on the page before interacting with it.
@@ -1375,6 +1394,21 @@ impl Client {
         }
 
         Err(error::CmdError::NotW3C(Json::Object(res)))
+    }
+
+    /// Extract `WebElement`s from a `FindElements` or `FindElementElements` command.
+    fn parse_lookup_all(&self, res: Json) -> Result<Vec<webdriver::common::WebElement>, error::CmdError> {
+        if !res.is_array() {
+            return Err(error::CmdError::NotW3C(res));
+        }
+
+        let mut array = Vec::new();
+        for json in res.into_array().unwrap().into_iter() {
+            let e = self.parse_lookup(json)?;
+            array.push(e);
+        }
+
+        Ok(array)
     }
 
     fn fixup_elements(&self, args: &mut [Json]) {
@@ -1981,6 +2015,17 @@ mod tests {
             })
     }
 
+    fn finds_all_inner<'a>(c: &'a Client) -> impl Future<Item = (), Error = error::CmdError> + 'a {
+        // go to the Wikipedia frontpage this time
+        c.goto("https://en.wikipedia.org/")
+            .and_then(move |_| c.find_all(Locator::Css("#p-interaction li")))
+            .and_then(move |es| future::join_all(es.into_iter().take(4).map(|e| e.text())))
+            .and_then(move |texts| {
+                assert_eq!(texts, ["Help", "About Wikipedia", "Community portal", "Recent changes"]);
+                Ok(())
+            })
+    }
+
     mod chrome {
         use super::*;
 
@@ -2007,6 +2052,10 @@ mod tests {
         #[test]
         fn it_can_get_and_set_window_rect() {
             tester!(window_rect_inner, "chrome")
+        }
+        #[test]
+        fn it_finds_all() {
+            tester!(finds_all_inner, "chrome")
         }
     }
 
@@ -2038,6 +2087,10 @@ mod tests {
         #[ignore]
         fn it_can_get_and_set_window_rect() {
             tester!(window_rect_inner, "firefox")
+        }
+        #[test]
+        fn it_finds_all() {
+            tester!(finds_all_inner, "firefox")
         }
     }
 }
