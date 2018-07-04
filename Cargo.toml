@@ -1,6 +1,6 @@
 [package]
 name = "fantoccini"
-version = "0.9.0"
+version = "0.10.0"
 
 description = "High-level API for programmatically interacting with web pages through WebDriver."
 readme = "README.md"
