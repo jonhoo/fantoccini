@@ -7,7 +7,6 @@ cache: cargo
 env:
   global:
     - SAUCE_USERNAME=fantoccini
-    - secure: zEoXZT/oYTalTVyhWuQejtht7ecMlh0TR4qThbTW0ylwfdfvB1w7qSfVzwEs+Jb47ZDfZ68I7+n5+zOHlvah5BEbUoc+8BbAJ04pv9k5BBERPz4Hh3sEwkCBdOOPaglwozqI3anKKl2S03v1m9sYlReelaglPDMFsO3PJ4E3DJXOk/wOf87NkX4ozh1ols8n8TjwjuVtnShHbgheDmMCHPx3Vnwx59LWh/fjALWF6ri+9LLDtYUftHrcV7T7A7a6pZDi8d9BS6Z069oNVkrm/v/0A75IyQMPlUQ6GS28b+9Tr8rew3BJT32C4BZherfAmR9NFAqUhX1a/ZVNBX3jhzXPJAcu9SyzIypbcVZgD5JuxdWizDjv0agSQ64UGpYCwqkSwmAlasWecMV7o+/mroZdyyi1DwLR6+zxxDSBs071fgLgXYSH7/CsMuUIGZ7j6XGcuAxKH3kwQUiq8UKucrrChE+iywtQgrAqbymy/LCCSbP5DAgaYeCGgHHsMy839M56OGHBGWgd7eDDwbzaOBXIUjOPt4SZ5qrjSunqkA6bFotElr+EkMVFJt2kONsTeEM5o4UJgoYHFtKsPn15oiiLYkUVimxmoAmEWIT+X1gn52yomNf/1A7m+9T2OzLjJYIpdQC9PGsE5dn4DYhC3fWDcQUZcJZMMXmk5yTw3AI=
   matrix:
     - PLATFORM="Windows 10"
     - PLATFORM="Windows 8.1"
