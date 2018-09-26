@@ -190,14 +190,15 @@ extern crate futures;
 extern crate hyper;
 extern crate hyper_tls;
 extern crate rustc_serialize;
-extern crate tokio_core;
+extern crate tokio;
 extern crate url;
+extern crate mime;
 extern crate webdriver;
 
 use futures::{future, Future, Stream};
 use rustc_serialize::json::Json;
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, RwLock};
+use hyper::header::HeaderValue;
 use webdriver::command::WebDriverCommand;
 use webdriver::common::ELEMENT_KEY;
 use webdriver::error::ErrorStatus;
@@ -256,30 +257,29 @@ type Cmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 /// State held by a `Client`
 struct Inner {
     c: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
-    handle: tokio_core::reactor::Handle,
+    handle: tokio::runtime::TaskExecutor,
     wdb: url::Url,
-    session: RefCell<Option<String>>,
+    session: RwLock<Option<String>>,
     legacy: bool,
-    ua: RefCell<Option<String>>,
+    ua: RwLock<Option<String>>,
 }
 
 impl Inner {
     fn shutdown(&self) -> Option<impl Future<Item = (), Error = hyper::Error>> {
-        if self.session.borrow().is_some() {
+        if self.session.read().unwrap().is_some() {
             let url = {
-                let s = self.session.borrow();
+                let s = self.session.read().unwrap();
                 self.wdb
                     .join(&format!("session/{}", s.as_ref().unwrap()))
                     .unwrap()
             };
-            *self.session.borrow_mut() = None;
+            *self.session.write().unwrap() = None;
 
             Some(
                 self.c
-                    .request(hyper::client::Request::new(
-                        Method::Delete,
-                        url.as_ref().parse().unwrap(),
-                    ))
+                    .request(hyper::Request::delete(
+                        url.to_string(),
+                    ).body(hyper::Body::empty()).unwrap())
                     .map(move |_| ()),
             )
         } else {
@@ -298,7 +298,7 @@ impl Drop for Inner {
 }
 
 /// A WebDriver client tied to a single browser session.
-pub struct Client(Rc<Inner>);
+pub struct Client(Arc<Inner>);
 
 /// A single element on the current page.
 pub struct Element {
@@ -318,7 +318,7 @@ impl Client {
         params: webdriver::command::NewSessionParameters,
     ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
         if let webdriver::command::NewSessionParameters::Legacy(..) = params {
-            Rc::get_mut(&mut self.0)
+            Arc::get_mut(&mut self.0)
                 .expect("during legacy init there should be only one Client instance")
                 .legacy = true;
         }
@@ -333,7 +333,7 @@ impl Client {
                     // and https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L200
                     if let Some(session_id) = v.remove("sessionId") {
                         if let Some(session_id) = session_id.as_string() {
-                            *this.0.session.borrow_mut() = Some(session_id.to_string());
+                            *this.0.session.write().unwrap() = Some(session_id.to_string());
                             return Ok(this);
                         }
                         v.insert("sessionId".to_string(), session_id);
@@ -369,7 +369,7 @@ impl Client {
     #[cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
     pub fn new(
         webdriver: &str,
-        handle: &tokio_core::reactor::Handle,
+        handle: tokio::runtime::TaskExecutor,
     ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
         Self::with_capabilities(
             webdriver,
@@ -395,7 +395,7 @@ impl Client {
     pub fn with_capabilities(
         webdriver: &str,
         mut cap: webdriver::capabilities::Capabilities,
-        handle: &tokio_core::reactor::Handle,
+        handle: tokio::runtime::TaskExecutor,
     ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
         // Where is the WebDriver server?
         let wdb = match webdriver.parse::<url::Url>() {
@@ -406,18 +406,18 @@ impl Client {
         };
 
         // We want a tls-enabled client
-        let client = hyper::Client::configure()
-            .connector(hyper_tls::HttpsConnector::new(4, handle).unwrap())
-            .build(handle);
+        let client = hyper::Client::builder()
+            .executor(handle.clone())
+            .build(hyper_tls::HttpsConnector::new(4).unwrap());
 
         // Set up our WebDriver client
-        let c = Client(Rc::new(Inner {
+        let c = Client(Arc::new(Inner {
             c: client.clone(),
-            handle: handle.clone(),
+            handle: handle,
             wdb: wdb.clone(),
-            session: RefCell::new(None),
+            session: RwLock::new(None),
             legacy: false,
-            ua: RefCell::new(None),
+            ua: RwLock::new(None),
         }));
 
         // Required capabilities
@@ -482,16 +482,16 @@ impl Client {
 
     /// Get the session ID assigned by the WebDriver server to this client.
     pub fn session_id(&self) -> String {
-        self.0.session.borrow().as_ref().unwrap().to_string()
+        self.0.session.read().unwrap().as_ref().unwrap().to_string()
     }
 
     fn dup(&self) -> Self {
-        Client(Rc::clone(&self.0))
+        Client(Arc::clone(&self.0))
     }
 
     /// Set the User Agent string to use for all subsequent requests.
     pub fn set_ua<S: Into<String>>(&mut self, ua: S) {
-        *self.0.ua.borrow_mut() = Some(ua.into());
+        *self.0.ua.write().unwrap() = Some(ua.into());
     }
 
     /// Helper for determining what URL endpoint to use for various requests.
@@ -503,7 +503,7 @@ impl Client {
         }
 
         let base = {
-            let session = self.0.session.borrow();
+            let session = self.0.session.read().unwrap();
             self.0
                 .wdb
                 .join(&format!("session/{}/", session.as_ref().unwrap()))?
@@ -567,103 +567,121 @@ impl Client {
             Ok(url) => url,
             Err(e) => return future::Either::B(future::err(error::CmdError::from(e))),
         };
-        let mut method = Method::Get;
+        let mut method = Method::GET;
         let mut body = None;
 
         // but some are special
         match cmd {
             WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
                 body = Some(format!("{}", conf.to_json()));
-                method = Method::Post;
+                method = Method::POST;
             }
             WebDriverCommand::NewSession(command::NewSessionParameters::Legacy(ref conf)) => {
                 body = Some(format!("{}", conf.to_json()));
-                method = Method::Post;
+                method = Method::POST;
             }
             WebDriverCommand::Get(ref params) => {
                 body = Some(format!("{}", params.to_json()));
-                method = Method::Post;
+                method = Method::POST;
             }
             WebDriverCommand::FindElement(ref loc)
             | WebDriverCommand::FindElements(ref loc)
             | WebDriverCommand::FindElementElement(_, ref loc)
             | WebDriverCommand::FindElementElements(_, ref loc) => {
                 body = Some(format!("{}", loc.to_json()));
-                method = Method::Post;
+                method = Method::POST;
             }
             WebDriverCommand::ExecuteScript(ref script) => {
                 body = Some(format!("{}", script.to_json()));
-                method = Method::Post;
+                method = Method::POST;
             }
             WebDriverCommand::ElementSendKeys(_, ref keys) => {
                 body = Some(format!("{}", keys.to_json()));
-                method = Method::Post;
+                method = Method::POST;
             }
             WebDriverCommand::ElementClick(..)
             | WebDriverCommand::GoBack
             | WebDriverCommand::Refresh => {
                 body = Some("{}".to_string());
-                method = Method::Post;
+                method = Method::POST;
             }
             WebDriverCommand::SetWindowRect(ref params) => {
                 body = Some(format!("{}", params.to_json()));
-                method = Method::Post;
+                method = Method::POST;
             }
             _ => {}
         }
 
         // issue the command to the webdriver server
-        let mut req = hyper::client::Request::new(method, url.as_ref().parse().unwrap());
-        if let Some(ref s) = *self.0.ua.borrow() {
-            req.headers_mut()
-                .set(hyper::header::UserAgent::new(s.to_owned()));
+        let mut req = hyper::Request::builder()
+            .uri(url.to_string())
+            .method(method)
+            .body(hyper::Body::empty())
+            .unwrap();
+        if let Some(ref s) = *self.0.ua.read().unwrap() {
+            req.headers_mut().insert(
+                hyper::header::USER_AGENT,
+                HeaderValue::from_str(s).unwrap(),
+            );
         }
         // because https://github.com/hyperium/hyper/pull/727
-        if !url.username().is_empty() || url.password().is_some() {
-            req.headers_mut()
-                .set(hyper::header::Authorization(hyper::header::Basic {
-                    username: url.username().to_string(),
-                    password: url.password().map(|pwd| pwd.to_string()),
-                }));
-        }
+        // TODO
+        // if !url.username().is_empty() || url.password().is_some() {
+        //     req.headers_mut()
+        //         .insert(hyper::header::AUTHORIZATION, 
+        //             hyper::header::BASIC {
+        //                 username: url.username().to_string(),
+        //                 password: url.password().map(|pwd| pwd.to_string()),
+        //             }));
+        // }
         if let Some(ref body) = body {
-            req.headers_mut().set(hyper::header::ContentType::json());
-            req.headers_mut()
-                .set(hyper::header::ContentLength(body.len() as u64));
-            req.set_body(body.clone());
+            req.headers_mut().insert(
+                hyper::header::CONTENT_TYPE,
+                HeaderValue::from_static("application/json"),
+            );
+            req.headers_mut().insert(
+                hyper::header::CONTENT_LENGTH,
+                HeaderValue::from_str(&format!("{}", body.len() as u64)).unwrap(),
+            );
+            *req.body_mut() = hyper::Body::from(body.clone());
         }
 
         let req = self.0.c.request(req);
         let f = req.map_err(error::CmdError::from)
             .and_then(move |res| {
+
                 // keep track of result status (.body() consumes self -- ugh)
                 let status = res.status();
 
                 // check that the server sent us json
                 let ctype = {
-                    let ctype = res.headers()
-                        .get::<hyper::header::ContentType>()
-                        .expect("webdriver response did not have a content type");
-                    (**ctype).clone()
+                    res.headers().get(hyper::header::CONTENT_TYPE)
+                        .expect("webdriver response did not have a content type")
+                        .to_str()
+                        .unwrap()
+                        .to_string()
                 };
 
                 // What did the server send us?
-                res.body()
-                    .concat2()
+                res.into_body()
+                    .fold(vec![], |mut acc, chunk| -> Result<Vec<u8>, hyper::Error> {
+                        acc.extend_from_slice(&chunk);
+                        Ok(acc)
+                    })
+                    .and_then(|v| Ok(String::from_utf8(v).unwrap()))
                     .map(move |body| (self, body, ctype, status))
                     .map_err(|e| -> error::CmdError { e.into() })
             })
             .and_then(|(this, body, ctype, status)| {
-                // Too bad we can't stream into a String :(
-                let body =
-                    String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
-                if ctype.type_() == hyper::mime::APPLICATION && ctype.subtype() == hyper::mime::JSON
+                if let Ok(ctype) = ctype.parse::<mime::Mime>()
                 {
-                    Ok((this, body, status))
-                } else {
-                    // nope, something else...
-                    Err(error::CmdError::NotJson(body))
+                    if ctype.type_() == mime::APPLICATION && ctype.subtype() == mime::JSON
+                    {
+                        return Ok((this, body, status))
+                    }
                 }
+                // nope, something else...
+                Err(error::CmdError::NotJson(body))
             })
             .and_then(move |(this, body, status)| {
                 let is_new_session = if let WebDriverCommand::NewSession(..) = cmd {
@@ -749,7 +767,7 @@ impl Client {
                     use hyper::StatusCode;
                     let error = body["error"].as_string().unwrap();
                     match status {
-                        StatusCode::BadRequest => match error {
+                        StatusCode::BAD_REQUEST => match error {
                             "element click intercepted" => ErrorStatus::ElementClickIntercepted,
                             "element not selectable" => ErrorStatus::ElementNotSelectable,
                             "element not interactable" => ErrorStatus::ElementNotInteractable,
@@ -765,14 +783,14 @@ impl Client {
                             "stale element reference" => ErrorStatus::StaleElementReference,
                             _ => unreachable!(),
                         },
-                        StatusCode::NotFound => match error {
+                        StatusCode::NOT_FOUND => match error {
                             "unknown command" => ErrorStatus::UnknownCommand,
                             "no such cookie" => ErrorStatus::NoSuchCookie,
                             "invalid session id" => ErrorStatus::InvalidSessionId,
                             "no such element" => ErrorStatus::NoSuchElement,
                             _ => unreachable!(),
                         },
-                        StatusCode::InternalServerError => match error {
+                        StatusCode::INTERNAL_SERVER_ERROR => match error {
                             "javascript error" => ErrorStatus::JavascriptError,
                             "move target out of bounds" => ErrorStatus::MoveTargetOutOfBounds,
                             "session not created" => ErrorStatus::SessionNotCreated,
@@ -783,12 +801,12 @@ impl Client {
                             "unsupported operation" => ErrorStatus::UnsupportedOperation,
                             _ => unreachable!(),
                         },
-                        StatusCode::RequestTimeout => match error {
+                        StatusCode::REQUEST_TIMEOUT => match error {
                             "timeout" => ErrorStatus::Timeout,
                             "script timeout" => ErrorStatus::ScriptTimeout,
                             _ => unreachable!(),
                         },
-                        StatusCode::MethodNotAllowed => match error {
+                        StatusCode::METHOD_NOT_ALLOWED => match error {
                             "unknown method" => ErrorStatus::UnknownMethod,
                             _ => unreachable!(),
                         },
@@ -1123,7 +1141,7 @@ impl Client {
         &self,
         method: Method,
         url: &str,
-    ) -> impl Future<Item = hyper::Response, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = hyper::Response<hyper::Body>, Error = error::CmdError> + 'static {
         self.with_raw_client_for(method, url, |_| {})
     }
 
@@ -1137,9 +1155,9 @@ impl Client {
         method: Method,
         url: &str,
         before: F,
-    ) -> impl Future<Item = hyper::Response, Error = error::CmdError> + 'static
+    ) -> impl Future<Item = hyper::Response<hyper::Body>, Error = error::CmdError> + 'static
     where
-        F: FnOnce(&mut hyper::Request) + 'static,
+        F: FnOnce(&mut hyper::Request<hyper::Body>) + 'static,
     {
         let url = url.to_owned();
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
@@ -1200,42 +1218,47 @@ impl Client {
 
                 // now add all the cookies
                 let mut all_ok = true;
-                let mut jar = hyper::header::Cookie::new();
-                for cookie in &cookies {
-                    if !cookie.is_object() {
-                        all_ok = false;
-                        break;
-                    }
+                // let mut jar = hyper::header::Cookie::new();
+                // for cookie in &cookies {
+                //     if !cookie.is_object() {
+                //         all_ok = false;
+                //         break;
+                //     }
 
-                    // https://w3c.github.io/webdriver/webdriver-spec.html#cookies
-                    let cookie = cookie.as_object().unwrap();
-                    if !cookie.contains_key("name") || !cookie.contains_key("value") {
-                        all_ok = false;
-                        break;
-                    }
+                //     // https://w3c.github.io/webdriver/webdriver-spec.html#cookies
+                //     let cookie = cookie.as_object().unwrap();
+                //     if !cookie.contains_key("name") || !cookie.contains_key("value") {
+                //         all_ok = false;
+                //         break;
+                //     }
 
-                    if !cookie["name"].is_string() || !cookie["value"].is_string() {
-                        all_ok = false;
-                        break;
-                    }
+                //     if !cookie["name"].is_string() || !cookie["value"].is_string() {
+                //         all_ok = false;
+                //         break;
+                //     }
 
-                    // Note that since we're sending these cookies, all that matters is the mapping
-                    // from name to value. The other fields only matter when deciding whether to
-                    // include a cookie or not, and the driver has already decided that for us
-                    // (GetCookies is for a particular URL).
-                    jar.append(
-                        cookie["name"].as_string().unwrap().to_owned(),
-                        cookie["value"].as_string().unwrap().to_owned(),
-                    );
-                }
+                //     // Note that since we're sending these cookies, all that matters is the mapping
+                //     // from name to value. The other fields only matter when deciding whether to
+                //     // include a cookie or not, and the driver has already decided that for us
+                //     // (GetCookies is for a particular URL).
+                //     jar.append(
+                //         cookie["name"].as_string().unwrap().to_owned(),
+                //         cookie["value"].as_string().unwrap().to_owned(),
+                //     );
+                // }
 
                 if all_ok {
-                    let mut req =
-                        hyper::client::Request::new(method, url.as_ref().parse().unwrap());
-                    req.headers_mut().set(jar);
-                    if let Some(ref s) = *this.0.ua.borrow() {
-                        req.headers_mut()
-                            .set(hyper::header::UserAgent::new(s.to_owned()));
+                    let mut req = hyper::Request::builder()
+                        .uri(url.to_string())
+                        .method(method)
+                        .body(hyper::Body::empty())
+                        .unwrap();
+                    // req.headers_mut().set(jar);
+                    if let Some(ref s) = *this.0.ua.read().unwrap() {
+                        req.headers_mut().insert(
+                            hyper::header::USER_AGENT,
+                            HeaderValue::from_str(s).unwrap(),
+                        );
                     }
                     before(&mut req);
                     future::Either::A(this.0.c.request(req).map_err(|e| e.into()))
@@ -1821,7 +1844,7 @@ mod tests {
                     env::var("SAUCE_USERNAME").unwrap(),
                     session_id
                 );
-                let mut req = hyper::Request::new(hyper::Method::Put, url.parse().unwrap());
+                let mut req = hyper::Request::put(url.parse().unwrap());
 
                 req.headers_mut()
                     .set(hyper::header::Authorization(hyper::header::Basic {
