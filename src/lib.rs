@@ -1098,6 +1098,8 @@ impl Client {
     /// `args` is available to the script inside the `arguments` array. Since `Element` implements
     /// `ToJson`, you can also provide serialized `Element`s as arguments, and they will correctly
     /// serialize to DOM elements on the other side.
+    /// 
+    /// To retrieve the value of a variable, `return` has to be used. 
     pub fn execute(
         &self,
         script: &str,
