@@ -1,5 +1,5 @@
 use hyper::error as herror;
-use rustc_serialize::json;
+use serde_json;
 use std::error::Error;
 use std::fmt;
 use std::io::Error as IOError;
@@ -16,7 +16,7 @@ pub enum NewSessionError {
     /// The connection to the WebDriver server was lost.
     Lost(IOError),
     /// The server did not give a WebDriver-conforming response.
-    NotW3C(json::Json),
+    NotW3C(serde_json::Value),
     /// The WebDriver server refused to create a new session.
     SessionNotCreated(wderror::WebDriverError),
 }
@@ -91,7 +91,7 @@ pub enum CmdError {
     NotJson(String),
 
     /// The WebDriver server responded to a command with an invalid JSON response.
-    Json(json::ParserError),
+    Json(serde_json::Error),
 
     /// The WebDriver server produced a response that does not conform to the [W3C WebDriver
     /// specification][spec].
@@ -102,7 +102,7 @@ pub enum CmdError {
     /// and does not correctly encode and decode `WebElement` references.
     ///
     /// [spec]: https://www.w3.org/TR/webdriver/
-    NotW3C(json::Json),
+    NotW3C(serde_json::Value),
 
     /// A function was invoked with an invalid argument.
     InvalidArgument(String, String),
@@ -213,8 +213,8 @@ impl From<wderror::WebDriverError> for CmdError {
     }
 }
 
-impl From<json::ParserError> for CmdError {
-    fn from(e: json::ParserError) -> Self {
+impl From<serde_json::Error> for CmdError {
+    fn from(e: serde_json::Error) -> Self {
         CmdError::Json(e)
     }
 }
