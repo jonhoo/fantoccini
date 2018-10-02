@@ -1529,18 +1529,25 @@ mod tests {
             tester!(clicks_inner, "chrome")
         }
         #[test]
+        fn it_clicks_by_locator() {
+            tester!(clicks_inner_by_locator, "chrome")
+        }
+        #[test]
         fn it_can_be_raw() {
             tester!(raw_inner, "chrome")
         }
         #[test]
+        #[ignore]
         fn it_can_get_and_set_window_size() {
             tester!(window_size_inner, "chrome")
         }
         #[test]
+        #[ignore]
         fn it_can_get_and_set_window_position() {
             tester!(window_position_inner, "chrome")
         }
         #[test]
+        #[ignore]
         fn it_can_get_and_set_window_rect() {
             tester!(window_rect_inner, "chrome")
         }
@@ -1562,10 +1569,15 @@ mod tests {
             tester!(clicks_inner, "firefox")
         }
         #[test]
+        fn it_clicks_by_locator() {
+            tester!(clicks_inner_by_locator, "firefox")
+        }
+        #[test]
         fn it_can_be_raw() {
             tester!(raw_inner, "firefox")
         }
         #[test]
+        #[ignore]
         fn it_can_get_and_set_window_size() {
             tester!(window_size_inner, "firefox")
         }
