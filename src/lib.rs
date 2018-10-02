@@ -1360,8 +1360,11 @@ mod tests {
                 );
 
                 let body = format!(
-                    r#"{{"name": "{}", "build": "{}"{}, "passed": {}}}"#,
+                    r#"{{"name": "{} in {}", "build": "{}"{}, "passed": {}}}"#,
                     stringify!($f),
+                    env::var("TRAVIS_JOB_NUMBER")
+                        .ok()
+                        .unwrap_or(format!("unknown job")),
                     env::var("TRAVIS_BUILD_NUMBER")
                         .ok()
                         .unwrap_or(format!("null")),
