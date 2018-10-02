@@ -365,7 +365,7 @@ impl Session {
             // make chrome comply with w3c
             let mut copts = serde_json::Map::new();
             copts.insert("w3c".to_string(), Json::from(true));
-            cap.insert("chromeOptions".to_string(), Json::Object(copts));
+            cap.insert("goog:chromeOptions".to_string(), Json::Object(copts));
 
             let session_config = webdriver::capabilities::SpecNewSessionParameters {
                 alwaysMatch: cap.clone(),
