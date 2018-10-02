@@ -1233,6 +1233,11 @@ impl Form {
                 }
             })
     }
+
+    /// Get back the [`Client`] hosting this `Form`.
+    pub fn client(self) -> Client {
+        self.c
+    }
 }
 
 #[cfg(test)]
