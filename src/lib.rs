@@ -1246,8 +1246,8 @@ mod tests {
 
     macro_rules! tester {
         ($f:ident, $endpoint:expr) => {{
-            use std::env;
-            let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+            use std::{env, thread};
+            use std::sync::{Mutex, Arc};
             let c = match env::var("SAUCE_ACCESS_KEY").ok() {
                 Some(pwd) => {
                     let username = env::var("SAUCE_USERNAME").unwrap();
@@ -1305,9 +1305,36 @@ mod tests {
                 }
             };
 
-            let mut c = rt.block_on(c).expect("failed to construct test client");
-            let session_id = rt.block_on(c.session_id()).unwrap().unwrap();
-            let x = rt.block_on($f(c));
+            // we'll need the session_id from the thread
+            // NOTE: even if it panics, so can't just return it
+            let session_id = Arc::new(Mutex::new(None));
+
+            // run test in its own thread to catch panics
+            let sid = session_id.clone();
+            let success = match thread::spawn(move || {
+                let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+                let mut c = rt.block_on(c).expect("failed to construct test client");
+                *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
+                let x = rt.block_on($f(c));
+                rt.run().unwrap();
+                x
+            }).join() {
+                Ok(Ok(_)) => true,
+                Ok(Err(e)) => {
+                    eprintln!("test future failed to resolve: {:?}", e);
+                    false
+                }
+                Err(e) => {
+                    if let Some(e) = e.downcast_ref::<error::CmdError>() {
+                        eprintln!("test future panicked: {:?}", e);
+                    } else if let Some(e) = e.downcast_ref::<error::NewSessionError>() {
+                        eprintln!("test future panicked: {:?}", e);
+                    } else {
+                        eprintln!("test future panicked; an assertion probably failed");
+                    }
+                    false
+                }
+            };
 
             if let Ok(pwd) = env::var("SAUCE_ACCESS_KEY") {
                 let tell_sauce = hyper::Client::builder()
@@ -1316,7 +1343,7 @@ mod tests {
                 let url = format!(
                     "https://saucelabs.com/rest/v1/{}/jobs/{}",
                     env::var("SAUCE_USERNAME").unwrap(),
-                    session_id
+                    session_id.lock().unwrap().take().unwrap(),
                 );
                 let mut req = hyper::Request::put(url.as_str());
 
@@ -1342,10 +1369,11 @@ mod tests {
                         .map(|v| format!(r#", "tags": ["{}"]"#, v))
                         .ok()
                         .unwrap_or(String::new()),
-                    if x.is_ok() { "true" } else { "false" }
+                    if success { "true" } else { "false" }
                 );
                 req.header(hyper::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref());
                 req.header(hyper::header::CONTENT_LENGTH, body.len());
+                let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
                 match rt.block_on(tell_sauce.request(req.body(body.into()).unwrap())) {
                     Err(e) => {
                         eprintln!("failed to tell sauce: {:?}", e);
@@ -1358,10 +1386,10 @@ mod tests {
                         );
                     }
                 }
+                rt.run().unwrap();
             }
 
-            rt.run().unwrap();
-            x.expect("test produced unexpected error response");
+            assert!(success);
         }};
     }
 
