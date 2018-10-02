@@ -88,7 +88,10 @@ impl Client {
 
 enum Ongoing {
     None,
-    Shutdown(hyper::client::ResponseFuture),
+    Shutdown {
+        ack: Option<Ack>,
+        fut: hyper::client::ResponseFuture,
+    },
     WebDriver {
         ack: Ack,
         fut: Box<Future<Item = Json, Error = error::CmdError> + Send>,
@@ -119,10 +122,14 @@ impl Ongoing {
     fn poll(&mut self, try_extract_session: bool) -> Result<Async<OngoingResult>, ()> {
         let rt = match mem::replace(self, Ongoing::None) {
             Ongoing::None => OngoingResult::Continue,
-            Ongoing::Shutdown(mut f) => {
-                if let Ok(Async::NotReady) = f.poll() {
-                    mem::replace(self, Ongoing::Shutdown(f));
+            Ongoing::Shutdown { mut fut, ack } => {
+                if let Ok(Async::NotReady) = fut.poll() {
+                    mem::replace(self, Ongoing::Shutdown { fut, ack });
                     return Ok(Async::NotReady);
+                }
+
+                if let Some(ack) = ack {
+                    let _ = ack.send(Ok(Json::Null));
                 }
                 OngoingResult::Break
             }
@@ -227,7 +234,7 @@ impl Future for Session {
                     }
                     Cmd::Shutdown => {
                         // explicit client shutdown
-                        self.shutdown();
+                        self.shutdown(Some(ack));
                     }
                     Cmd::WebDriver(request) => {
                         // looks like the client setup is falling back to legacy params
@@ -246,7 +253,7 @@ impl Future for Session {
                 };
             } else {
                 // we're shutting down!
-                self.shutdown();
+                self.shutdown(None);
             }
         }
 
@@ -255,20 +262,21 @@ impl Future for Session {
 }
 
 impl Session {
-    fn shutdown(&mut self) {
+    fn shutdown(&mut self, ack: Option<Ack>) {
         let url = {
             self.wdb
                 .join(&format!("session/{}", self.session.as_ref().unwrap()))
                 .unwrap()
         };
 
-        self.ongoing = Ongoing::Shutdown(
-            self.c.request(
+        self.ongoing = Ongoing::Shutdown {
+            ack,
+            fut: self.c.request(
                 hyper::Request::delete(url.as_str())
                     .body(hyper::Body::empty())
                     .unwrap(),
             ),
-        );
+        };
     }
 
     fn map_handshake_response(
