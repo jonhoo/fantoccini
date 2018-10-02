@@ -593,8 +593,8 @@ impl Client {
     /// `args` is available to the script inside the `arguments` array. Since `Element` implements
     /// `ToJson`, you can also provide serialized `Element`s as arguments, and they will correctly
     /// serialize to DOM elements on the other side.
-    /// 
-    /// To retrieve the value of a variable, `return` has to be used in the JavaScript code. 
+    ///
+    /// To retrieve the value of a variable, `return` has to be used in the JavaScript code.
     pub fn execute(
         &mut self,
         script: &str,
@@ -669,11 +669,13 @@ impl Client {
                 this.issue(WebDriverCommand::GetCookies)
                     .then(move |cookies| {
                         match cookies {
-                            Ok(cookies) => if cookies.is_array() {
-                                future::ok((this, url, cookies))
-                            } else {
-                                future::err(error::CmdError::NotW3C(cookies))
-                            },
+                            Ok(cookies) => {
+                                if cookies.is_array() {
+                                    future::ok((this, url, cookies))
+                                } else {
+                                    future::err(error::CmdError::NotW3C(cookies))
+                                }
+                            }
                             Err(e) => {
                                 // TODO: go back before we return
                                 // can't get a handle to this here though :(
