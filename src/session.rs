@@ -540,9 +540,11 @@ impl Session {
                     ref required,
                 },
             )) => {
-                // XXX: WebDriver currently serializes legacy configurations incorrectlu
+                // XXX: WebDriver currently serializes legacy configurations incorrectly
                 // it serializes desiredCapabilities simply as `desired`, which is wrong.
-                // fix that...
+                // see https://bugzilla.mozilla.org/show_bug.cgi?id=1494617
+                // fixed in https://hg.mozilla.org/releases/mozilla-beta/rev/0ea62e993c85
+                // but not yet released, so fix that...
                 body = Some(format!(
                     r#"{{"desiredCapabilities": {}, "requiredCapabilities": {}}}"#,
                     serde_json::to_string(desired).unwrap(),
