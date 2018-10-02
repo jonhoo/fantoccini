@@ -624,11 +624,7 @@ impl Session {
                 let ctype = res
                     .headers()
                     .get(hyper::header::CONTENT_TYPE)
-                    .expect("webdriver response did not have a content type")
-                    .to_str()
-                    .unwrap()
-                    .parse::<mime::Mime>()
-                    .unwrap();
+                    .and_then(|ctype| ctype.to_str().ok()?.parse::<mime::Mime>().ok());
 
                 // What did the server send us?
                 res.into_body()
@@ -640,13 +636,19 @@ impl Session {
                 // Too bad we can't stream into a String :(
                 let body =
                     String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
-                if ctype.type_() == mime::APPLICATION_JSON.type_()
-                    && ctype.subtype() == mime::APPLICATION_JSON.subtype()
-                {
-                    Ok((body, status))
+
+                if let Some(ctype) = ctype {
+                    if ctype.type_() == mime::APPLICATION_JSON.type_()
+                        && ctype.subtype() == mime::APPLICATION_JSON.subtype()
+                    {
+                        Ok((body, status))
+                    } else {
+                        // nope, something else...
+                        Err(error::CmdError::NotJson(body))
+                    }
                 } else {
-                    // nope, something else...
-                    Err(error::CmdError::NotJson(body))
+                    // WebDriver host sent us something weird...
+                    return Err(error::CmdError::NotJson(body));
                 }
             })
             .and_then(move |(body, status)| {
