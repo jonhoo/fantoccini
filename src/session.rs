@@ -534,8 +534,20 @@ impl Session {
 
                 method = Method::POST;
             }
-            WebDriverCommand::NewSession(command::NewSessionParameters::Legacy(ref conf)) => {
-                body = Some(serde_json::to_string(conf).unwrap());
+            WebDriverCommand::NewSession(command::NewSessionParameters::Legacy(
+                webdriver::capabilities::LegacyNewSessionParameters {
+                    ref desired,
+                    ref required,
+                },
+            )) => {
+                // XXX: WebDriver currently serializes legacy configurations incorrectlu
+                // it serializes desiredCapabilities simply as `desired`, which is wrong.
+                // fix that...
+                body = Some(format!(
+                    r#"{{"desiredCapabilities": {}, "requiredCapabilities": {}}}"#,
+                    serde_json::to_string(desired).unwrap(),
+                    serde_json::to_string(required).unwrap()
+                ));
                 method = Method::POST;
             }
             WebDriverCommand::Get(ref params) => {
