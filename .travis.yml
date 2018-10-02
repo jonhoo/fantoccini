@@ -16,7 +16,7 @@ addons:
   sauce_connect: true
 script:
  - cargo build --verbose
- - cargo test --verbose -- --test-threads=2
+ - cargo test --verbose -- --test-threads=1
 matrix:
   allow_failures:
   - rust: nightly

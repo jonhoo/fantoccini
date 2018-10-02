@@ -1386,7 +1386,6 @@ mod tests {
                         );
                     }
                 }
-                rt.run().unwrap();
             }
 
             assert!(success);
