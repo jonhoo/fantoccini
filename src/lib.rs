@@ -179,7 +179,7 @@ extern crate webdriver;
 use http::HttpTryFrom;
 use serde_json::Value as Json;
 use tokio::prelude::*;
-use webdriver::command::WebDriverCommand;
+use webdriver::command::{SendKeysParameters, WebDriverCommand};
 use webdriver::common::ELEMENT_KEY;
 use webdriver::error::WebDriverError;
 
@@ -1011,6 +1011,18 @@ impl Element {
             if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
                 // geckodriver returns {} :(
                 Ok(c)
+            } else {
+                Err(error::CmdError::NotW3C(r))
+            }
+        })
+    }
+
+    /// Simulate the user sending keys to an element.
+    pub fn send_keys(&mut self, text: &str) -> impl Future<Item = (), Error = error::CmdError> + 'static {
+        let cmd = WebDriverCommand::ElementSendKeys(self.e.clone(), SendKeysParameters{text: text.to_owned()});
+        self.c.issue(cmd).and_then(move |r| {
+            if r.is_null() {
+                Ok(())
             } else {
                 Err(error::CmdError::NotW3C(r))
             }
