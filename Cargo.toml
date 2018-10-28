@@ -20,7 +20,7 @@ license = "MIT/Apache-2.0"
 travis-ci = { repository = "jonhoo/fantoccini" }
 
 [dependencies]
-webdriver = "0.37.0"
+webdriver = "0.38.0"
 url = "1.5.0"
 serde = "1.0"
 serde_json = "1.0"
