@@ -369,7 +369,7 @@ impl Session {
 
             let session_config = webdriver::capabilities::SpecNewSessionParameters {
                 alwaysMatch: cap.clone(),
-                firstMatch: vec![],
+                firstMatch: vec![webdriver::capabilities::Capabilities::new()],
             };
             let spec = webdriver::command::NewSessionParameters::Spec(session_config);
 
