@@ -398,8 +398,7 @@ impl Session {
                                             s.contains("cannot find dict 'desiredCapabilities'")
                                                 || s.contains("Missing or invalid capabilities")
                                                 || s.contains("Unexpected server error.")
-                                        })
-                                        .unwrap_or(false);
+                                        }).unwrap_or(false);
                                 }
                                 _ => {}
                             }
@@ -430,8 +429,7 @@ impl Session {
                         }
                         e => future::Either::B(future::err(e)),
                     }
-                })
-                .map(move |legacy| Client { tx, legacy })
+                }).map(move |legacy| Client { tx, legacy })
         }))
     }
 
@@ -631,8 +629,7 @@ impl Session {
                     .concat2()
                     .map(move |body| (body, ctype, status))
                     .map_err(|e| -> error::CmdError { e.into() })
-            })
-            .and_then(|(body, ctype, status)| {
+            }).and_then(|(body, ctype, status)| {
                 // Too bad we can't stream into a String :(
                 let body =
                     String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
@@ -650,8 +647,7 @@ impl Session {
                     // WebDriver host sent us something weird...
                     return Err(error::CmdError::NotJson(body));
                 }
-            })
-            .and_then(move |(body, status)| {
+            }).and_then(move |(body, status)| {
                 let is_new_session = if let WebDriverCommand::NewSession(..) = cmd {
                     true
                 } else {

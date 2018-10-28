@@ -1018,8 +1018,16 @@ impl Element {
     }
 
     /// Simulate the user sending keys to an element.
-    pub fn send_keys(&mut self, text: &str) -> impl Future<Item = (), Error = error::CmdError> + 'static {
-        let cmd = WebDriverCommand::ElementSendKeys(self.e.clone(), SendKeysParameters{text: text.to_owned()});
+    pub fn send_keys(
+        &mut self,
+        text: &str,
+    ) -> impl Future<Item = (), Error = error::CmdError> + 'static {
+        let cmd = WebDriverCommand::ElementSendKeys(
+            self.e.clone(),
+            SendKeysParameters {
+                text: text.to_owned(),
+            },
+        );
         self.c.issue(cmd).and_then(move |r| {
             if r.is_null() {
                 Ok(())
