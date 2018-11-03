@@ -319,7 +319,7 @@ impl Session {
     pub(crate) fn with_capabilities(
         webdriver: &str,
         mut cap: webdriver::capabilities::Capabilities,
-    ) -> impl Future<Item = Client, Error = error::NewSessionError> + 'static {
+    ) -> impl Future<Item = Client, Error = error::NewSessionError> {
         // Where is the WebDriver server?
         let wdb = match webdriver.parse::<url::Url>() {
             Ok(wdb) => wdb,
