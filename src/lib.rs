@@ -716,13 +716,13 @@ impl Client {
                     // from name to value. The other fields only matter when deciding whether to
                     // include a cookie or not, and the driver has already decided that for us
                     // (GetCookies is for a particular URL).
-                    jar.push(format!(
-                        "{}",
+                    jar.push(
                         cookie::Cookie::new(
                             cookie["name"].as_str().unwrap().to_owned(),
                             cookie["value"].as_str().unwrap().to_owned(),
                         ).encoded()
-                    ));
+                        .to_string(),
+                    );
                 }
 
                 if all_ok {
