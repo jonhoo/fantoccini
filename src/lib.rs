@@ -265,7 +265,7 @@ impl Client {
     #[cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
     pub fn new(
         webdriver: &str,
-    ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
+    ) -> impl Future<Item = Self, Error = error::NewSessionError> {
         Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new())
     }
 
@@ -286,7 +286,7 @@ impl Client {
     pub fn with_capabilities(
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
-    ) -> impl Future<Item = Self, Error = error::NewSessionError> + 'static {
+    ) -> impl Future<Item = Self, Error = error::NewSessionError> {
         Session::with_capabilities(webdriver, cap)
     }
 
@@ -341,7 +341,7 @@ impl Client {
         y: i32,
         width: i32,
         height: i32,
-    ) -> impl Future<Item = (), Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = (), Error = error::CmdError> {
         if x < 0 {
             return future::Either::A(future::err(error::CmdError::InvalidArgument(
                 stringify!(x).into(),
@@ -383,7 +383,7 @@ impl Client {
     /// Gets the x, y, width, and height properties of the current window.
     pub fn get_window_rect(
         &mut self,
-    ) -> impl Future<Item = (u64, u64, u64, u64), Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = (u64, u64, u64, u64), Error = error::CmdError> {
         self.issue(WebDriverCommand::GetWindowRect)
             .and_then(|v| match v {
                 Json::Object(mut obj) => {
@@ -420,7 +420,7 @@ impl Client {
         &mut self,
         width: i32,
         height: i32,
-    ) -> impl Future<Item = (), Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = (), Error = error::CmdError> {
         if width < 0 {
             return future::Either::A(future::err(error::CmdError::InvalidArgument(
                 stringify!(width).into(),
@@ -448,7 +448,7 @@ impl Client {
     /// Gets the width and height of the current window.
     pub fn get_window_size(
         &mut self,
-    ) -> impl Future<Item = (u64, u64), Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = (u64, u64), Error = error::CmdError> {
         self.issue(WebDriverCommand::GetWindowRect)
             .and_then(|v| match v {
                 Json::Object(mut obj) => {
@@ -475,7 +475,7 @@ impl Client {
         &mut self,
         x: i32,
         y: i32,
-    ) -> impl Future<Item = (), Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = (), Error = error::CmdError> {
         if x < 0 {
             return future::Either::A(future::err(error::CmdError::InvalidArgument(
                 stringify!(x).into(),
@@ -503,7 +503,7 @@ impl Client {
     /// Gets the x and y top-left coordinate of the current window.
     pub fn get_window_position(
         &mut self,
-    ) -> impl Future<Item = (u64, u64), Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = (u64, u64), Error = error::CmdError> {
         self.issue(WebDriverCommand::GetWindowRect)
             .and_then(|v| match v {
                 Json::Object(mut obj) => {
@@ -527,7 +527,7 @@ impl Client {
     pub fn goto(
         mut self,
         url: &str,
-    ) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = Self, Error = error::CmdError> {
         let url = url.to_owned();
         self.current_url_()
             .and_then(move |base| Ok(base.join(&url)?))
@@ -538,7 +538,7 @@ impl Client {
             })
     }
 
-    fn current_url_(&mut self) -> impl Future<Item = url::Url, Error = error::CmdError> + 'static {
+    fn current_url_(&mut self) -> impl Future<Item = url::Url, Error = error::CmdError> {
         self.issue(WebDriverCommand::GetCurrentUrl).and_then(|url| {
             if let Some(url) = url.as_str() {
                 return Ok(url.parse()?);
@@ -551,12 +551,12 @@ impl Client {
     /// Retrieve the currently active URL for this session.
     pub fn current_url(
         &mut self,
-    ) -> impl Future<Item = url::Url, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = url::Url, Error = error::CmdError> {
         self.current_url_()
     }
 
     /// Get a PNG-encoded screenshot of the current page.
-    pub fn screenshot(&mut self) -> impl Future<Item = Vec<u8>, Error = error::CmdError> + 'static {
+    pub fn screenshot(&mut self) -> impl Future<Item = Vec<u8>, Error = error::CmdError> {
         self.issue(WebDriverCommand::TakeScreenshot)
             .and_then(|src| {
                 if let Some(src) = src.as_str() {
@@ -568,7 +568,7 @@ impl Client {
     }
 
     /// Get the HTML source for the current page.
-    pub fn source(&mut self) -> impl Future<Item = String, Error = error::CmdError> + 'static {
+    pub fn source(&mut self) -> impl Future<Item = String, Error = error::CmdError> {
         self.issue(WebDriverCommand::GetPageSource).and_then(|src| {
             if let Some(src) = src.as_str() {
                 return Ok(src.to_string());
@@ -579,12 +579,12 @@ impl Client {
     }
 
     /// Go back to the previous page.
-    pub fn back(&mut self) -> impl Future<Item = (), Error = error::CmdError> + 'static {
+    pub fn back(&mut self) -> impl Future<Item = (), Error = error::CmdError> {
         self.issue(WebDriverCommand::GoBack).map(|_| ())
     }
 
     /// Refresh the current previous page.
-    pub fn refresh(&mut self) -> impl Future<Item = (), Error = error::CmdError> + 'static {
+    pub fn refresh(&mut self) -> impl Future<Item = (), Error = error::CmdError> {
         self.issue(WebDriverCommand::Refresh).map(|_| ())
     }
 
@@ -599,7 +599,7 @@ impl Client {
         &mut self,
         script: &str,
         mut args: Vec<Json>,
-    ) -> impl Future<Item = Json, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = Json, Error = error::CmdError> {
         self.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: script.to_string(),
@@ -616,7 +616,7 @@ impl Client {
         self,
         method: Method,
         url: &str,
-    ) -> impl Future<Item = hyper::Response<hyper::Body>, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = hyper::Response<hyper::Body>, Error = error::CmdError> {
         self.with_raw_client_for(method, url, |mut req| {
             req.body(hyper::Body::empty()).unwrap()
         })
@@ -634,7 +634,7 @@ impl Client {
         before: F,
     ) -> impl Future<Item = hyper::Response<hyper::Body>, Error = error::CmdError>
     where
-        F: FnOnce(http::request::Builder) -> hyper::Request<hyper::Body> + 'static,
+        F: FnOnce(http::request::Builder) -> hyper::Request<hyper::Body>,
     {
         let url = url.to_owned();
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
@@ -716,13 +716,13 @@ impl Client {
                     // from name to value. The other fields only matter when deciding whether to
                     // include a cookie or not, and the driver has already decided that for us
                     // (GetCookies is for a particular URL).
-                    jar.push(format!(
-                        "{}",
+                    jar.push(
                         cookie::Cookie::new(
                             cookie["name"].as_str().unwrap().to_owned(),
                             cookie["value"].as_str().unwrap().to_owned(),
                         ).encoded()
-                    ));
+                        .to_string(),
+                    );
                 }
 
                 if all_ok {
@@ -946,7 +946,7 @@ impl Element {
     pub fn attr(
         &mut self,
         attribute: &str,
-    ) -> impl Future<Item = Option<String>, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = Option<String>, Error = error::CmdError> {
         let cmd = WebDriverCommand::GetElementAttribute(self.e.clone(), attribute.to_string());
         self.c.issue(cmd).and_then(|v| match v {
             Json::String(v) => Ok(Some(v)),
@@ -963,7 +963,7 @@ impl Element {
     pub fn prop(
         &mut self,
         prop: &str,
-    ) -> impl Future<Item = Option<String>, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = Option<String>, Error = error::CmdError> {
         let cmd = WebDriverCommand::GetElementProperty(self.e.clone(), prop.to_string());
         self.c.issue(cmd).and_then(|v| match v {
             Json::String(v) => Ok(Some(v)),
@@ -973,7 +973,7 @@ impl Element {
     }
 
     /// Retrieve the text contents of this elment.
-    pub fn text(&mut self) -> impl Future<Item = String, Error = error::CmdError> + 'static {
+    pub fn text(&mut self) -> impl Future<Item = String, Error = error::CmdError> {
         let cmd = WebDriverCommand::GetElementText(self.e.clone());
         self.c.issue(cmd).and_then(|v| match v {
             Json::String(v) => Ok(v),
@@ -995,7 +995,7 @@ impl Element {
     pub fn html(
         &mut self,
         inner: bool,
-    ) -> impl Future<Item = String, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = String, Error = error::CmdError> {
         let prop = if inner { "innerHTML" } else { "outerHTML" };
         self.prop(prop).map(|v| v.unwrap())
     }
@@ -1003,7 +1003,7 @@ impl Element {
     /// Simulate the user clicking on this element.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub fn click(self) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
+    pub fn click(self) -> impl Future<Item = Client, Error = error::CmdError> {
         let e = self.e;
         let mut c = self.c;
         let cmd = WebDriverCommand::ElementClick(e);
@@ -1021,7 +1021,7 @@ impl Element {
     pub fn send_keys(
         &mut self,
         text: &str,
-    ) -> impl Future<Item = (), Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = (), Error = error::CmdError> {
         let cmd = WebDriverCommand::ElementSendKeys(
             self.e.clone(),
             SendKeysParameters {
@@ -1046,7 +1046,7 @@ impl Element {
     /// click interaction.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub fn follow(self) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
+    pub fn follow(self) -> impl Future<Item = Client, Error = error::CmdError> {
         let e = self.e;
         let mut c = self.c;
         let cmd = WebDriverCommand::GetElementAttribute(e, "href".to_string());
@@ -1089,21 +1089,22 @@ impl Element {
 
 impl Form {
     /// Find a form input using the given `locator` and set its value to `value`.
-    pub fn set<'s>(
+    pub fn set(
         &mut self,
         locator: Locator,
-        value: &'s str,
-    ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
+        value: &str,
+    ) -> impl Future<Item = Self, Error = error::CmdError> {
         let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator.into());
         let f = self.f.clone();
         let this = self.c.clone();
+        let value = Json::from(value);
         self.c
             .issue(locator)
             .and_then(move |res| {
                 let f = this.parse_lookup(res);
                 f.map(move |f| (this, f))
             }).and_then(move |(mut this, field)| {
-                let mut args = vec![via_json!(&field), Json::from(value)];
+                let mut args = vec![via_json!(&field), value];
                 this.fixup_elements(&mut args);
                 let cmd = webdriver::command::JavascriptCommandParameters {
                     script: "arguments[0].value = arguments[1]".to_string(),
@@ -1125,8 +1126,8 @@ impl Form {
     pub fn set_by_name<'s>(
         &mut self,
         field: &str,
-        value: &'s str,
-    ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
+        value: &str,
+    ) -> impl Future<Item = Self, Error = error::CmdError> {
         let locator = format!("input[name='{}']", field);
         let locator = Locator::Css(&locator);
         self.set(locator, value)
@@ -1145,7 +1146,7 @@ impl Form {
     pub fn submit_with(
         self,
         button: Locator,
-    ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = Client, Error = error::CmdError> {
         let f = self.f;
         let mut c = self.c;
         let locator = WebDriverCommand::FindElementElement(f, button.into());
@@ -1172,7 +1173,7 @@ impl Form {
     pub fn submit_using(
         self,
         button_label: &str,
-    ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = Client, Error = error::CmdError> {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
         let btn = format!(
             "input[type=submit][value=\"{}\" i],\
@@ -1192,7 +1193,7 @@ impl Form {
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
     pub fn submit_direct(
         mut self,
-    ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = Client, Error = error::CmdError> {
         let mut args = vec![via_json!(&self.f)];
         self.c.fixup_elements(&mut args);
         // some sites are silly, and name their submit button "submit". this ends up overwriting
@@ -1227,7 +1228,7 @@ impl Form {
         self,
         field: &str,
         value: &str,
-    ) -> impl Future<Item = Client, Error = error::CmdError> + 'static {
+    ) -> impl Future<Item = Client, Error = error::CmdError> {
         let mut args = vec![via_json!(&self.f), Json::from(field), Json::from(value)];
         self.c.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
