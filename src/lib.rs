@@ -1089,21 +1089,22 @@ impl Element {
 
 impl Form {
     /// Find a form input using the given `locator` and set its value to `value`.
-    pub fn set<'s>(
+    pub fn set(
         &mut self,
         locator: Locator,
-        value: &'s str,
-    ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
+        value: &str,
+    ) -> impl Future<Item = Self, Error = error::CmdError> + 'static {
         let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator.into());
         let f = self.f.clone();
         let this = self.c.clone();
+        let value = Json::from(value);
         self.c
             .issue(locator)
             .and_then(move |res| {
                 let f = this.parse_lookup(res);
                 f.map(move |f| (this, f))
             }).and_then(move |(mut this, field)| {
-                let mut args = vec![via_json!(&field), Json::from(value)];
+                let mut args = vec![via_json!(&field), value];
                 this.fixup_elements(&mut args);
                 let cmd = webdriver::command::JavascriptCommandParameters {
                     script: "arguments[0].value = arguments[1]".to_string(),
@@ -1125,8 +1126,8 @@ impl Form {
     pub fn set_by_name<'s>(
         &mut self,
         field: &str,
-        value: &'s str,
-    ) -> impl Future<Item = Self, Error = error::CmdError> + 's {
+        value: &str,
+    ) -> impl Future<Item = Self, Error = error::CmdError> {
         let locator = format!("input[name='{}']", field);
         let locator = Locator::Css(&locator);
         self.set(locator, value)
