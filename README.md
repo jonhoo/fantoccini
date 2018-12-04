@@ -35,44 +35,39 @@ Let's start out clicking around on Wikipedia:
 ```rust
 use fantoccini::{Client, Locator};
 use futures::future::Future;
-let mut core = tokio_core::reactor::Core::new().unwrap();
-let c = Client::new("http://localhost:4444", &core.handle());
-let c = core.run(c).unwrap();
+let c = Client::new("http://localhost:4444");
 
-{
-    // we want to have a reference to c so we can use it in the and_thens below
-    let c = &c;
-
-    // now let's set up the sequence of steps we want the browser to take
-    // first, go to the Wikipedia page for Foobar
-    let f = c.goto("https://en.wikipedia.org/wiki/Foobar")
-        .and_then(move |_| c.current_url())
-        .and_then(move |url| {
+// let's set up the sequence of steps we want the browser to take
+tokio::run(
+    c
+        .map_err(|e| {
+            unimplemented!("failed to connect to WebDriver: {:?}", e)
+        })
+        .and_then(|c| {
+            // first, go to the Wikipedia page for Foobar
+            c.goto("https://en.wikipedia.org/wiki/Foobar")
+        })
+        .and_then(|mut c| c.current_url().map(move |url| (c, url)))
+        .and_then(|(mut c, url)| {
             assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
             // click "Foo (disambiguation)"
             c.find(Locator::Css(".mw-disambig"))
         })
         .and_then(|e| e.click())
-        .and_then(move |_| {
+        .and_then(|mut c| {
             // click "Foo Lake"
             c.find(Locator::LinkText("Foo Lake"))
         })
         .and_then(|e| e.click())
-        .and_then(move |_| c.current_url())
+        .and_then(|mut c| c.current_url())
         .and_then(|url| {
             assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
             Ok(())
-        });
-
-    // and set the browser off to do those things
-    core.run(f).unwrap();
-}
-
-// drop the client to delete the browser session
-if let Some(fin) = c.close() {
-    // and wait for cleanup to finish
-    core.run(fin).unwrap();
-}
+        })
+        .map_err(|e| {
+            panic!("a WebDriver command failed: {:?}", e);
+        })
+);
 ```
 
 How did we get to the Foobar page in the first place? We did a search!
@@ -82,11 +77,11 @@ Let's make the program do that for us instead:
 // -- snip wrapper code --
 // go to the Wikipedia frontpage this time
 c.goto("https://www.wikipedia.org/")
-    .and_then(move |_| {
+    .and_then(|mut c| {
         // find the search form
         c.form(Locator::Css("#search-form"))
     })
-    .and_then(|f| {
+    .and_then(|mut f| {
         // fill it out
         f.set_by_name("search", "foobar")
     })
@@ -95,7 +90,7 @@ c.goto("https://www.wikipedia.org/")
         f.submit()
     })
     // we should now have ended up in the rigth place
-    .and_then(move |_| c.current_url())
+    .and_then(|mut c| c.current_url())
     .and_then(|url| {
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
         Ok(())
@@ -109,22 +104,22 @@ What if we want to download a raw file? Fantoccini has you covered:
 // -- snip wrapper code --
 // go back to the frontpage
 c.goto("https://www.wikipedia.org/")
-    .and_then(move |_| {
+    .and_then(|mut c| {
         // find the source for the Wikipedia globe
         c.find(Locator::Css("img.central-featured-logo"))
     })
-    .and_then(|img| {
+    .and_then(|mut img| {
         img.attr("src")
-            .map(|src| src.expect("image should have a src"))
+            .map(move |src| (img, src.expect("image should have a src")))
     })
-    .and_then(move |src| {
+    .and_then(move |(img, src)| {
         // now build a raw HTTP client request (which also has all current cookies)
-        c.raw_client_for(fantoccini::Method::Get, &src)
+        img.client().raw_client_for(fantoccini::Method::GET, &src)
     })
     .and_then(|raw| {
         use futures::Stream;
         // we then read out the image bytes
-        raw.body().map_err(fantoccini::error::CmdError::from).fold(
+        raw.into_body().map_err(fantoccini::error::CmdError::from).fold(
             Vec::new(),
             |mut pixels, chunk| {
                 pixels.extend(&*chunk);
