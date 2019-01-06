@@ -263,9 +263,7 @@ impl Client {
     ///
     /// Calls `with_capabilities` with an empty capabilities list.
     #[cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
-    pub fn new(
-        webdriver: &str,
-    ) -> impl Future<Item = Self, Error = error::NewSessionError> {
+    pub fn new(webdriver: &str) -> impl Future<Item = Self, Error = error::NewSessionError> {
         Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new())
     }
 
@@ -446,9 +444,7 @@ impl Client {
     }
 
     /// Gets the width and height of the current window.
-    pub fn get_window_size(
-        &mut self,
-    ) -> impl Future<Item = (u64, u64), Error = error::CmdError> {
+    pub fn get_window_size(&mut self) -> impl Future<Item = (u64, u64), Error = error::CmdError> {
         self.issue(WebDriverCommand::GetWindowRect)
             .and_then(|v| match v {
                 Json::Object(mut obj) => {
@@ -524,17 +520,15 @@ impl Client {
     }
 
     /// Navigate directly to the given URL.
-    pub fn goto(
-        mut self,
-        url: &str,
-    ) -> impl Future<Item = Self, Error = error::CmdError> {
+    pub fn goto(mut self, url: &str) -> impl Future<Item = Self, Error = error::CmdError> {
         let url = url.to_owned();
         self.current_url_()
             .and_then(move |base| Ok(base.join(&url)?))
             .and_then(move |url| {
                 self.issue(WebDriverCommand::Get(webdriver::command::GetParameters {
                     url: url.into_string(),
-                })).map(move |_| self)
+                }))
+                .map(move |_| self)
             })
     }
 
@@ -549,9 +543,7 @@ impl Client {
     }
 
     /// Retrieve the currently active URL for this session.
-    pub fn current_url(
-        &mut self,
-    ) -> impl Future<Item = url::Url, Error = error::CmdError> {
+    pub fn current_url(&mut self) -> impl Future<Item = url::Url, Error = error::CmdError> {
         self.current_url_()
     }
 
@@ -658,14 +650,17 @@ impl Client {
                     .join(&url)
                     .map(|url| url)
                     .map_err(|e| e.into())
-            }).and_then(|url| {
+            })
+            .and_then(|url| {
                 url.clone()
                     .join("/please_give_me_your_cookies")
                     .map(move |cookie_url| (url, cookie_url))
                     .map_err(|e| e.into())
-            }).and_then(move |(url, cookie_url)| {
+            })
+            .and_then(move |(url, cookie_url)| {
                 self.goto(cookie_url.as_str()).map(move |this| (this, url))
-            }).and_then(|(mut this, url)| {
+            })
+            .and_then(|(mut this, url)| {
                 this.issue(WebDriverCommand::GetCookies)
                     .then(move |cookies| {
                         match cookies {
@@ -687,10 +682,12 @@ impl Client {
                             }
                         }
                     })
-            }).and_then(|(mut this, url, cookies)| this.back().map(move |_| (this, url, cookies)))
+            })
+            .and_then(|(mut this, url, cookies)| this.back().map(move |_| (this, url, cookies)))
             .and_then(move |(mut this, url, cookies)| {
                 this.get_ua().map(move |ua| (this, url, cookies, ua))
-            }).and_then(|(mut this, url, cookies, ua)| {
+            })
+            .and_then(|(mut this, url, cookies, ua)| {
                 // now add all the cookies
                 let mut all_ok = true;
                 let mut jar = Vec::new();
@@ -720,7 +717,8 @@ impl Client {
                         cookie::Cookie::new(
                             cookie["name"].as_str().unwrap().to_owned(),
                             cookie["value"].as_str().unwrap().to_owned(),
-                        ).encoded()
+                        )
+                        .encoded()
                         .to_string(),
                     );
                 }
@@ -770,7 +768,8 @@ impl Client {
                     .map(move |e| Element {
                         c: this.clone(),
                         e: e,
-                    }).collect())
+                    })
+                    .collect())
             })
     }
 
@@ -814,7 +813,8 @@ impl Client {
             this.by(webdriver::command::LocatorParameters {
                 using: s.using.clone(),
                 value: s.value.clone(),
-            }).map(futures::future::Loop::Break)
+            })
+            .map(futures::future::Loop::Break)
             .or_else(move |e| {
                 if let error::CmdError::NoSuchElement(_) = e {
                     Ok(futures::future::Loop::Continue(this))
@@ -837,7 +837,8 @@ impl Client {
         match current {
             Some(current) => future::Either::A(future::ok(current)),
             None => future::Either::B(self.current_url_()),
-        }.and_then(move |current| {
+        }
+        .and_then(move |current| {
             self.wait_for(move |c| {
                 // TODO: get rid of this clone
                 let current = current.clone();
@@ -992,10 +993,7 @@ impl Element {
     ///
     /// With `inner = true`, `<hr />` would be returned. With `inner = false`,
     /// `<div id="foo"><hr /></div>` would be returned instead.
-    pub fn html(
-        &mut self,
-        inner: bool,
-    ) -> impl Future<Item = String, Error = error::CmdError> {
+    pub fn html(&mut self, inner: bool) -> impl Future<Item = String, Error = error::CmdError> {
         let prop = if inner { "innerHTML" } else { "outerHTML" };
         self.prop(prop).map(|v| v.unwrap())
     }
@@ -1018,10 +1016,7 @@ impl Element {
     }
 
     /// Simulate the user sending keys to an element.
-    pub fn send_keys(
-        &mut self,
-        text: &str,
-    ) -> impl Future<Item = (), Error = error::CmdError> {
+    pub fn send_keys(&mut self, text: &str) -> impl Future<Item = (), Error = error::CmdError> {
         let cmd = WebDriverCommand::ElementSendKeys(
             self.e.clone(),
             SendKeysParameters {
@@ -1061,10 +1056,12 @@ impl Element {
                     Err(error::CmdError::Standard(e))
                 }
                 v => Err(error::CmdError::NotW3C(v)),
-            }).and_then(move |href| {
+            })
+            .and_then(move |href| {
                 c.current_url_()
                     .and_then(move |url| Ok((c, url.join(&href)?)))
-            }).and_then(|(this, href)| this.goto(href.as_str()))
+            })
+            .and_then(|(this, href)| this.goto(href.as_str()))
     }
 
     /// Find and click an `option` child element by its `value` attribute.
@@ -1103,7 +1100,8 @@ impl Form {
             .and_then(move |res| {
                 let f = this.parse_lookup(res);
                 f.map(move |f| (this, f))
-            }).and_then(move |(mut this, field)| {
+            })
+            .and_then(move |(mut this, field)| {
                 let mut args = vec![via_json!(&field), value];
                 this.fixup_elements(&mut args);
                 let cmd = webdriver::command::JavascriptCommandParameters {
@@ -1113,7 +1111,8 @@ impl Form {
 
                 this.issue(WebDriverCommand::ExecuteScript(cmd))
                     .map(move |r| (this, r))
-            }).and_then(move |(this, res)| {
+            })
+            .and_then(move |(this, res)| {
                 if res.is_null() {
                     Ok(Form { c: this, f: f })
                 } else {
@@ -1154,10 +1153,12 @@ impl Form {
             .and_then(move |res| {
                 let s = c.parse_lookup(res);
                 s.map(move |s| (c, s))
-            }).and_then(move |(mut this, submit)| {
+            })
+            .and_then(move |(mut this, submit)| {
                 this.issue(WebDriverCommand::ElementClick(submit))
                     .map(move |r| (this, r))
-            }).and_then(move |(this, res)| {
+            })
+            .and_then(move |(this, res)| {
                 if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
                     // geckodriver returns {} :(
                     Ok(this)
@@ -1191,9 +1192,7 @@ impl Form {
     ///
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
-    pub fn submit_direct(
-        mut self,
-    ) -> impl Future<Item = Client, Error = error::CmdError> {
+    pub fn submit_direct(mut self) -> impl Future<Item = Client, Error = error::CmdError> {
         let mut args = vec![via_json!(&self.f)];
         self.c.fixup_elements(&mut args);
         // some sites are silly, and name their submit button "submit". this ends up overwriting
@@ -1425,15 +1424,18 @@ mod tests {
                 assert_eq!(text, "History and etymology");
                 let mut c = e.client();
                 c.current_url().map(move |r| (c, r))
-            }).and_then(|(mut c, url)| {
+            })
+            .and_then(|(mut c, url)| {
                 assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
                 // click "Foo (disambiguation)"
                 c.find(Locator::Css(".mw-disambig"))
-            }).and_then(|e| e.click())
+            })
+            .and_then(|e| e.click())
             .and_then(|mut c| {
                 // click "Foo Lake"
                 c.find(Locator::LinkText("Foo Lake"))
-            }).and_then(|e| e.click())
+            })
+            .and_then(|e| e.click())
             .and_then(|mut c| c.current_url())
             .and_then(|url| {
                 assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
@@ -1447,7 +1449,8 @@ mod tests {
             .and_then(|mut c| {
                 // find, fill out, and submit the search form
                 c.form(Locator::Css("#search-form"))
-            }).and_then(|mut f| f.set(Locator::Css("input[name='search']"), "foobar"))
+            })
+            .and_then(|mut f| f.set(Locator::Css("input[name='search']"), "foobar"))
             .and_then(|f| f.submit())
             .and_then(|mut c| c.current_url())
             .and_then(|url| {
@@ -1463,7 +1466,8 @@ mod tests {
             .and_then(|mut c| {
                 // find, fill out, and submit the search form
                 c.form(Locator::Css("#search-form"))
-            }).and_then(|mut f| f.set_by_name("search", "foobar"))
+            })
+            .and_then(|mut f| f.set_by_name("search", "foobar"))
             .and_then(|f| f.submit())
             .and_then(|mut c| c.current_url())
             .and_then(|url| {
@@ -1479,13 +1483,16 @@ mod tests {
             .and_then(|mut c| {
                 // find the source for the Wikipedia globe
                 c.find(Locator::Css("img.central-featured-logo"))
-            }).and_then(|mut img| {
+            })
+            .and_then(|mut img| {
                 img.attr("src")
                     .map(move |src| (img, src.expect("image should have a src")))
-            }).and_then(move |(img, src)| {
+            })
+            .and_then(move |(img, src)| {
                 // now build a raw HTTP client request (which also has all current cookies)
                 img.client().raw_client_for(Method::GET, &src)
-            }).and_then(|raw| {
+            })
+            .and_then(|raw| {
                 // we then read out the image bytes
                 raw.into_body().map_err(error::CmdError::from).fold(
                     Vec::new(),
@@ -1494,7 +1501,8 @@ mod tests {
                         future::ok::<Vec<u8>, error::CmdError>(pixels)
                     },
                 )
-            }).and_then(|pixels| {
+            })
+            .and_then(|pixels| {
                 // and voilla, we now have the bytes for the Wikipedia logo!
                 assert!(pixels.len() > 0);
                 println!("Wikipedia logo is {}b", pixels.len());
@@ -1533,20 +1541,24 @@ mod tests {
             .inspect(|&(_, (x, y))| {
                 assert_eq!(x, 0);
                 assert_eq!(y, 0);
-            }).and_then(|(mut c, _)| c.get_window_size().map(move |r| (c, r)))
+            })
+            .and_then(|(mut c, _)| c.get_window_size().map(move |r| (c, r)))
             .inspect(|&(_, (width, height))| {
                 assert_eq!(width, 500);
                 assert_eq!(height, 400);
-            }).and_then(|(mut c, _)| c.set_window_rect(1, 2, 600, 300).map(move |_| c))
+            })
+            .and_then(|(mut c, _)| c.set_window_rect(1, 2, 600, 300).map(move |_| c))
             .and_then(|mut c| c.get_window_position().map(move |r| (c, r)))
             .inspect(|&(_, (x, y))| {
                 assert_eq!(x, 1);
                 assert_eq!(y, 2);
-            }).and_then(move |(mut c, _)| c.get_window_size())
+            })
+            .and_then(move |(mut c, _)| c.get_window_size())
             .inspect(|&(width, height)| {
                 assert_eq!(width, 600);
                 assert_eq!(height, 300);
-            }).map(|_| ())
+            })
+            .map(|_| ())
     }
 
     fn finds_all_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {

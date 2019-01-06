@@ -63,12 +63,14 @@ impl Client {
             .unbounded_send(Task {
                 request: cmd,
                 ack: tx,
-            }).map_err(|_| {
+            })
+            .map_err(|_| {
                 error::CmdError::Lost(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "WebDriver session has been closed",
                 ))
-            }).into_future()
+            })
+            .into_future()
             .and_then(move |_| {
                 rx.then(|r| {
                     r.unwrap_or_else(|_| {
@@ -398,7 +400,8 @@ impl Session {
                                             s.contains("cannot find dict 'desiredCapabilities'")
                                                 || s.contains("Missing or invalid capabilities")
                                                 || s.contains("Unexpected server error.")
-                                        }).unwrap_or(false);
+                                        })
+                                        .unwrap_or(false);
                                 }
                                 _ => {}
                             }
@@ -429,7 +432,8 @@ impl Session {
                         }
                         e => future::Either::B(future::err(e)),
                     }
-                }).map(move |legacy| Client { tx, legacy })
+                })
+                .map(move |legacy| Client { tx, legacy })
         }))
     }
 
@@ -615,7 +619,8 @@ impl Session {
                     .concat2()
                     .map(move |body| (body, ctype, status))
                     .map_err(|e| -> error::CmdError { e.into() })
-            }).and_then(|(body, ctype, status)| {
+            })
+            .and_then(|(body, ctype, status)| {
                 // Too bad we can't stream into a String :(
                 let body =
                     String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
@@ -633,7 +638,8 @@ impl Session {
                     // WebDriver host sent us something weird...
                     return Err(error::CmdError::NotJson(body));
                 }
-            }).and_then(move |(body, status)| {
+            })
+            .and_then(move |(body, status)| {
                 let is_new_session = if let WebDriverCommand::NewSession(..) = cmd {
                     true
                 } else {
