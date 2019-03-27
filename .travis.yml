@@ -4,16 +4,25 @@ rust:
  - beta
  - nightly
 cache: cargo
-env:
-  global:
-    - SAUCE_USERNAME=fantoccini
-  matrix:
-    - PLATFORM="Windows 10"
-    - PLATFORM="Windows 8.1"
-    - PLATFORM="macOS 10.13"
-    - PLATFORM="macOS 10.12"
+dist: xenial
 addons:
-  sauce_connect: true
+  apt:
+    packages:
+    - firefox
+    - chromium-browser
+    - chromium-chromedriver
+# XXX: https://packages.ubuntu.com/bionic/firefoxdriver
+before_install:
+ - wget https://github.com/mozilla/geckodriver/releases/download/v0.24.0/geckodriver-v0.24.0-linux64.tar.gz
+ - mkdir geckodriver
+ - tar -xzf geckodriver-v0.24.0-linux64.tar.gz -C geckodriver
+ - export PATH=$PATH:$PWD/geckodriver
+before_script:
+ - chromedriver --verbose > chromedriver.log 2>&1 &
+ - geckodriver -v > geckodriver.log 2>&1 &
+after_failure:
+ - cat chromedriver.log
+ - cat geckodriver.log
 script:
  - cargo build --verbose
  - cargo test --verbose -- --test-threads=1

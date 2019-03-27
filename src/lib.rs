@@ -1267,63 +1267,23 @@ mod tests {
 
     macro_rules! tester {
         ($f:ident, $endpoint:expr) => {{
-            use std::{env, thread};
-            use std::sync::{Mutex, Arc};
-            let c = match env::var("SAUCE_ACCESS_KEY").ok() {
-                Some(pwd) => {
-                    let username = env::var("SAUCE_USERNAME").unwrap();
-                    let mut cap = webdriver::capabilities::Capabilities::new();
-                    match $endpoint {
-                        "firefox" => {
-                            cap.insert(
-                                "platform".to_string(),
-                                Json::String(env::var("PLATFORM").expect("env PLATFORM not set")),
-                            );
-                            cap.insert(
-                                "browserName".to_string(),
-                                Json::String("firefox".to_string()),
-                            );
-                            cap.insert("version".to_string(), Json::String("latest".to_string()));
-                        }
-                        "chrome" => {
-                            cap.insert(
-                                "platform".to_string(),
-                                Json::String(env::var("PLATFORM").expect("env PLATFORM not set")),
-                            );
-                            cap.insert(
-                                "browserName".to_string(),
-                                Json::String("chrome".to_string()),
-                            );
-                            cap.insert("version".to_string(), Json::String("latest".to_string()));
-                        }
-                        _ => {}
-                    }
-                    cap.insert("username".to_string(), Json::String(username.clone()));
-                    cap.insert("accessKey".to_string(), Json::String(pwd.clone()));
-                    if let Some(tunnel) = env::var("TRAVIS_JOB_NUMBER").ok() {
-                        cap.insert("tunnel-identifier".to_string(), Json::String(tunnel));
-                    }
+            use std::sync::{Arc, Mutex};
+            use std::thread;
+            let c = match $endpoint {
+                "firefox" => {
+                    let mut caps = serde_json::map::Map::new();
+                    let opts = serde_json::json!({ "args": ["--headless"] });
+                    caps.insert("moz:firefoxOptions".to_string(), opts.clone());
+                    Client::with_capabilities("http://localhost:4444", caps)
+                },
+                "chrome" => {
+                    let mut caps = serde_json::map::Map::new();
+                    let opts = serde_json::json!({ "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"] });
+                    caps.insert("goog:chromeOptions".to_string(), opts.clone());
 
-                    Client::with_capabilities(
-                        &format!(
-                            "http://{}:{}@ondemand.saucelabs.com:80/wd/hub/",
-                            username, pwd,
-                        ),
-                        cap,
-                    )
-                }
-                None if env::var("TRAVIS").is_ok() => {
-                    // TODO: maybe use the chrome/firefox addons as a fallback?
-                    // https://docs.travis-ci.com/user/gui-and-headless-browsers/#Using-xvfb-to-Run-Tests-That-Require-a-GUI
-                    unimplemented!("cannot yet test on travis without Sauce");
-                }
-                None => {
-                    // NOTE: can't be ::new because impl Future won't match
-                    Client::with_capabilities(
-                        "http://localhost:4444",
-                        webdriver::capabilities::Capabilities::new(),
-                    )
-                }
+                    Client::with_capabilities("http://localhost:9515", caps)
+                },
+                browser => unimplemented!("unsupported browser backend {}", browser),
             };
 
             // we'll need the session_id from the thread
@@ -1339,7 +1299,9 @@ mod tests {
                 let x = rt.block_on($f(c));
                 rt.run().unwrap();
                 x
-            }).join() {
+            })
+            .join()
+            {
                 Ok(Ok(_)) => true,
                 Ok(Err(e)) => {
                     eprintln!("test future failed to resolve: {:?}", e);
@@ -1356,61 +1318,6 @@ mod tests {
                     false
                 }
             };
-
-            if let Ok(pwd) = env::var("SAUCE_ACCESS_KEY") {
-                let tell_sauce = hyper::Client::builder()
-                    .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new(4).unwrap());
-
-                let url = format!(
-                    "https://saucelabs.com/rest/v1/{}/jobs/{}",
-                    env::var("SAUCE_USERNAME").unwrap(),
-                    session_id.lock().unwrap().take().unwrap(),
-                );
-                let mut req = hyper::Request::put(url.as_str());
-
-                req.header(
-                    hyper::header::AUTHORIZATION,
-                    format!(
-                        "Basic {}",
-                        base64::encode(&format!(
-                            "{}:{}",
-                            env::var("SAUCE_USERNAME").unwrap(),
-                            pwd,
-                        ))
-                    ),
-                );
-
-                let body = format!(
-                    r#"{{"name": "{} in {}", "build": "{}"{}, "passed": {}}}"#,
-                    stringify!($f),
-                    env::var("TRAVIS_JOB_NUMBER")
-                        .ok()
-                        .unwrap_or(format!("unknown job")),
-                    env::var("TRAVIS_BUILD_NUMBER")
-                        .ok()
-                        .unwrap_or(format!("null")),
-                    env::var("TRAVIS_RUST_VERSION")
-                        .map(|v| format!(r#", "tags": ["{}"]"#, v))
-                        .ok()
-                        .unwrap_or(String::new()),
-                    if success { "true" } else { "false" }
-                );
-                req.header(hyper::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref());
-                req.header(hyper::header::CONTENT_LENGTH, body.len());
-                let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-                match rt.block_on(tell_sauce.request(req.body(body.into()).unwrap())) {
-                    Err(e) => {
-                        eprintln!("failed to tell sauce: {:?}", e);
-                    }
-                    Ok(res) => {
-                        eprintln!(
-                            "told sauce, got: {}",
-                            String::from_utf8(rt.block_on(res.into_body().concat2()).unwrap().to_vec())
-                                .unwrap()
-                        );
-                    }
-                }
-            }
 
             assert!(success);
         }};
