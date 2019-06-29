@@ -96,7 +96,7 @@ enum Ongoing {
     },
     WebDriver {
         ack: Ack,
-        fut: Box<Future<Item = Json, Error = error::CmdError> + Send>,
+        fut: Box<dyn Future<Item = Json, Error = error::CmdError> + Send>,
     },
     Raw {
         ack: Ack,
