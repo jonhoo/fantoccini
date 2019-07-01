@@ -32,7 +32,7 @@ impl Error for NewSessionError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         match *self {
             NewSessionError::BadWebdriverUrl(ref e) => Some(e),
             NewSessionError::Failed(ref e) => Some(e),
@@ -149,7 +149,7 @@ impl Error for CmdError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         match *self {
             CmdError::Standard(ref e) | CmdError::NoSuchElement(ref e) => Some(e),
             CmdError::BadUrl(ref e) => Some(e),
