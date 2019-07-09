@@ -32,6 +32,7 @@ pub(crate) enum Cmd {
     SetUA(String),
     GetSessionId,
     Shutdown,
+    Persist,
     GetUA,
     Raw {
         req: hyper::Request<hyper::Body>,
@@ -90,6 +91,7 @@ impl Client {
 
 enum Ongoing {
     None,
+    Break,
     Shutdown {
         ack: Option<Ack>,
         fut: hyper::client::ResponseFuture,
@@ -124,6 +126,7 @@ impl Ongoing {
     fn poll(&mut self, try_extract_session: bool) -> Result<Async<OngoingResult>, ()> {
         let rt = match mem::replace(self, Ongoing::None) {
             Ongoing::None => OngoingResult::Continue,
+            Ongoing::Break => OngoingResult::Break,
             Ongoing::Shutdown { mut fut, ack } => {
                 if let Ok(Async::NotReady) = fut.poll() {
                     mem::replace(self, Ongoing::Shutdown { fut, ack });
@@ -189,6 +192,7 @@ pub(crate) struct Session {
     session: Option<String>,
     legacy: bool,
     ua: Option<String>,
+    persist: bool,
 }
 
 impl Future for Session {
@@ -234,6 +238,10 @@ impl Future for Session {
                             fut: self.c.request(req),
                         };
                     }
+                    Cmd::Persist => {
+                        self.persist = true;
+                        let _ = ack.send(Ok(Json::Null));
+                    }
                     Cmd::Shutdown => {
                         // explicit client shutdown
                         self.shutdown(Some(ack));
@@ -255,7 +263,11 @@ impl Future for Session {
                 };
             } else {
                 // we're shutting down!
-                self.shutdown(None);
+                if self.persist {
+                    self.ongoing = Ongoing::Break;
+                } else {
+                    self.shutdown(None);
+                }
             }
         }
 
@@ -350,6 +362,7 @@ impl Session {
                 session: None,
                 legacy: false,
                 ua: None,
+                persist: false,
             });
 
             // now that the session is running, let's do the handshake

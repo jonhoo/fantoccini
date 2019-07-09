@@ -315,7 +315,7 @@ impl Client {
         })
     }
 
-    /// Terminate the connection to the webservice.
+    /// Terminate the WebDriver session.
     ///
     /// Normally, a shutdown of the WebDriver connection will be initiated when the last clone of a
     /// `Client` is dropped. Specifically, the shutdown request will be issued using the tokio
@@ -329,6 +329,20 @@ impl Client {
     /// the automated browser window while doing e.g., a large download.
     pub fn close(&mut self) -> impl Future<Item = (), Error = error::CmdError> {
         self.issue(Cmd::Shutdown).map(|_| ())
+    }
+
+    /// Mark this client's session as persistent.
+    ///
+    /// After all instances of a `Client` have been dropped, we normally shut down the WebDriver
+    /// session, which also closes the associated browser window or tab. By calling this method,
+    /// the shutdown command will _not_ be sent to this client's session, meaning its window or tab
+    /// will remain open.
+    ///
+    /// Note that an explicit call to [`Client::close`] will still terminate the session.
+    ///
+    /// This function is safe to call multiple times.
+    pub fn persist(&mut self) -> impl Future<Item = (), Error = error::CmdError> {
+        self.issue(Cmd::Persist).map(|_| ())
     }
 
     /// Sets the x, y, width, and height properties of the current window.
@@ -1498,6 +1512,11 @@ mod tests {
             })
     }
 
+    fn persist_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+        c.goto("https://en.wikipedia.org/")
+            .and_then(|mut c| c.persist())
+    }
+
     mod chrome {
         use super::*;
 
@@ -1535,6 +1554,11 @@ mod tests {
         #[test]
         fn it_finds_all() {
             tester!(finds_all_inner, "chrome")
+        }
+        #[test]
+        #[ignore]
+        fn it_persists() {
+            tester!(persist_inner, "chrome")
         }
     }
 
@@ -1575,6 +1599,11 @@ mod tests {
         #[test]
         fn it_finds_all() {
             tester!(finds_all_inner, "firefox")
+        }
+        #[test]
+        #[ignore]
+        fn it_persists() {
+            tester!(persist_inner, "firefox")
         }
     }
 }
