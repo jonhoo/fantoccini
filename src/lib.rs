@@ -1030,6 +1030,21 @@ impl Element {
         })
     }
 
+    /// Clear the contents of this element and then return that element
+    pub fn clear(self) -> impl Future<Item = Element, Error = error::CmdError> {
+        let e = self.e;
+        let mut c = self.c;
+        let cmd = WebDriverCommand::ElementClear(e);
+        c.issue(cmd).and_then(move |r| {
+            if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
+                // geckodriver returns {} :(
+                Ok(c)
+            } else {
+                Err(error::CmdError::NotW3C(r))
+            }
+        })
+    }
+
     /// Simulate the user sending keys to an element.
     pub fn send_keys(&mut self, text: &str) -> impl Future<Item = (), Error = error::CmdError> {
         let cmd = WebDriverCommand::ElementSendKeys(
