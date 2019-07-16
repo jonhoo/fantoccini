@@ -1424,6 +1424,33 @@ mod tests {
             })
     }
 
+    fn send_keys_and_clear_input_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+        // go to the Wikipedia frontpage this time
+        c.goto("https://www.wikipedia.org/")
+            .and_then(|c: Client| {
+                // find, fill out, and submit the search form
+                c.wait_for_find(Locator::Id("searchInput"))
+            })
+            .and_then(|mut e| e.send_keys("foobar").map(|_| e))
+            .and_then(|mut e: Element| {
+                e.prop("value").map(|o| (e, o.expect("input should have value prop")))
+            })
+            .and_then(|(e, v)| {
+                eprintln!("{}", v);
+                assert_eq!(v.as_str(), "foobar");
+                e.clear()
+            })
+            .and_then(|mut c: Client| c.find(Locator::Id("searchInput")))
+            .and_then(|mut e| {
+                e.prop("value")
+                    .map(move |o| o.expect("input should have value prop"))
+            })
+            .and_then(|v| {
+                assert_eq!(v.as_str(), "");
+                Ok(())
+            })
+    }
+
     fn raw_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
         // go back to the frontpage
         c.goto("https://www.wikipedia.org/")
@@ -1548,6 +1575,10 @@ mod tests {
             tester!(clicks_inner_by_locator, "chrome")
         }
         #[test]
+        fn it_sends_keys_and_clear_input() {
+            tester!(send_keys_and_clear_input_inner, "chrome")
+        }
+        #[test]
         fn it_can_be_raw() {
             tester!(raw_inner, "chrome")
         }
@@ -1591,6 +1622,10 @@ mod tests {
         #[test]
         fn it_clicks_by_locator() {
             tester!(clicks_inner_by_locator, "firefox")
+        }
+        #[test]
+        fn it_sends_keys_and_clear_input() {
+            tester!(send_keys_and_clear_input_inner, "firefox")
         }
         #[test]
         fn it_can_be_raw() {
