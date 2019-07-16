@@ -1031,7 +1031,7 @@ impl Element {
     }
 
     /// Clear the contents of this element and then return that element
-    pub fn clear(self) -> impl Future<Item = Element, Error = error::CmdError> {
+    pub fn clear(self) -> impl Future<Item = Client, Error = error::CmdError> {
         let e = self.e;
         let mut c = self.c;
         let cmd = WebDriverCommand::ElementClear(e);
