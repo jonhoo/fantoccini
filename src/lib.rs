@@ -1030,15 +1030,13 @@ impl Element {
         })
     }
 
-    /// Clear the contents of this element and then return that element
-    pub fn clear(self) -> impl Future<Item = Client, Error = error::CmdError> {
-        let e = self.e;
-        let mut c = self.c;
-        let cmd = WebDriverCommand::ElementClear(e);
-        c.issue(cmd).and_then(move |r| {
+    /// Clear the value prop of this element
+    pub fn clear(&mut self) -> impl Future<Item = (), Error = error::CmdError> {
+        let cmd = WebDriverCommand::ElementClear(self.e.clone());
+        self.c.issue(cmd).and_then(move |r| {
             if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
                 // geckodriver returns {} :(
-                Ok(c)
+                Ok(())
             } else {
                 Err(error::CmdError::NotW3C(r))
             }
@@ -1313,6 +1311,9 @@ mod tests {
                             if std::path::Path::new("/usr/bin/chromium-browser").exists() {
                                 // on Ubuntu, it's called chromium-browser
                                 "/usr/bin/chromium-browser"
+                            } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
+                                // macOS
+                                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                             } else {
                                 // elsewhere, it's just called chromium
                                 "/usr/bin/chromium"
@@ -1435,12 +1436,11 @@ mod tests {
             .and_then(|mut e: Element| {
                 e.prop("value").map(|o| (e, o.expect("input should have value prop")))
             })
-            .and_then(|(e, v)| {
+            .and_then(|(mut e, v)| {
                 eprintln!("{}", v);
                 assert_eq!(v.as_str(), "foobar");
-                e.clear()
+                e.clear().map(|_|e)
             })
-            .and_then(|mut c: Client| c.find(Locator::Id("searchInput")))
             .and_then(|mut e| {
                 e.prop("value")
                     .map(move |o| o.expect("input should have value prop"))
