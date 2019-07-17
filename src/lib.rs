@@ -163,20 +163,6 @@
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
 
-extern crate base64;
-#[macro_use]
-extern crate futures;
-extern crate cookie;
-extern crate http;
-extern crate hyper;
-extern crate hyper_tls;
-extern crate mime;
-extern crate serde;
-extern crate serde_json;
-extern crate tokio;
-extern crate url;
-extern crate webdriver;
-
 use http::HttpTryFrom;
 use serde_json::Value as Json;
 use tokio::prelude::*;
@@ -197,7 +183,7 @@ pub mod error;
 
 /// The long-running session future we spawn for multiplexing onto a running WebDriver instance.
 mod session;
-use session::{Cmd, Session};
+use crate::session::{Cmd, Session};
 
 /// An element locator.
 ///
@@ -242,7 +228,7 @@ impl<'a> Into<webdriver::command::LocatorParameters> for Locator<'a> {
     }
 }
 
-pub use session::Client;
+pub use crate::session::Client;
 
 /// A single element on the current page.
 #[derive(Clone)]

@@ -1,5 +1,4 @@
 use hyper::error as herror;
-use serde_json;
 use std::error::Error;
 use std::fmt;
 use std::io::Error as IOError;
