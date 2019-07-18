@@ -38,7 +38,7 @@
 //!     let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!
 //!     // first, go to the Wikipedia page for Foobar
-//!     let mut c = c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
+//!     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
 //!     let url = c.current_url().await?;
 //!     assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 //!
@@ -68,11 +68,11 @@
 //! # let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go to the Wikipedia frontpage this time
-//! let mut c = c.goto("https://www.wikipedia.org/").await?;
+//! c.goto("https://www.wikipedia.org/").await?;
 //! // find the search form, fill it out, and submit it
-//! let mut c = c.form(Locator::Css("#search-form")).await?
-//!              .set_by_name("search", "foobar").await?
-//!              .submit().await?;
+//! c.form(Locator::Css("#search-form")).await?
+//!  .set_by_name("search", "foobar").await?
+//!  .submit().await?;
 //!
 //! // we should now have ended up in the rigth place
 //! let url = c.current_url().await?;
@@ -96,7 +96,7 @@
 //! # let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go back to the frontpage
-//! let mut c = c.goto("https://www.wikipedia.org/").await?;
+//! c.goto("https://www.wikipedia.org/").await?;
 //! // find the source for the Wikipedia globe
 //! let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
 //! let src = img.attr("src").await?.expect("image should have a src");
@@ -485,18 +485,19 @@ impl Client {
     }
 
     /// Navigate directly to the given URL.
-    pub fn goto(mut self, url: &str) -> impl Future<Output = Result<Self, error::CmdError>> {
+    pub fn goto(&mut self, url: &str) -> impl Future<Output = Result<(), error::CmdError>> {
         let url = url.to_owned();
+        let mut this = self.clone();
         self.current_url_()
             .map(move |base| Ok(base?.join(&url)?))
             .and_then(move |url| {
                 async move {
-                    let _ = self
+                    let _ = this
                         .issue(WebDriverCommand::Get(webdriver::command::GetParameters {
                             url: url.into_string(),
                         }))
                         .await?;
-                    Ok(self)
+                    Ok(())
                 }
             })
     }
@@ -591,7 +592,7 @@ impl Client {
     /// Before the HTTP request is issued, the given `before` closure will be called with a handle
     /// to the `Request` about to be sent.
     pub fn with_raw_client_for<F>(
-        self,
+        mut self,
         method: Method,
         url: &str,
         before: F,
@@ -615,20 +616,19 @@ impl Client {
         // Imagine if a cookie is set with path=/download/some_identifier. How do we get that
         // cookie without triggering a request for the (large) file? I don't know. Hence: TODO.
         async move {
-            let mut this = self;
-            let old_url = this.current_url_().await?;
+            let old_url = self.current_url_().await?;
             let url = old_url.clone().join(&url)?;
             let cookie_url = url.clone().join("/please_give_me_your_cookies")?;
-            this = this.goto(cookie_url.as_str()).await?;
+            self.goto(cookie_url.as_str()).await?;
 
             // TODO: go back before we return if this call errors:
-            let cookies = this.issue(WebDriverCommand::GetCookies).await?;
+            let cookies = self.issue(WebDriverCommand::GetCookies).await?;
             if !cookies.is_array() {
                 // NOTE: this clone should _really_ not be necessary
                 Err(error::CmdError::NotW3C(cookies.clone()))?;
             }
-            this.back().await?;
-            let ua = this.get_ua().await?;
+            self.back().await?;
+            let ua = self.get_ua().await?;
 
             // now add all the cookies
             let mut all_ok = true;
@@ -679,7 +679,7 @@ impl Client {
             }
             let req = before(req);
             let (tx, rx) = oneshot::channel();
-            this.issue(Cmd::Raw { req, rsp: tx }).await?;
+            self.issue(Cmd::Raw { req, rsp: tx }).await?;
             match rx.await {
                 Ok(Ok(r)) => Ok(r),
                 Ok(Err(e)) => Err(e.into()),
@@ -1004,7 +1004,8 @@ impl Element {
 
             let url = c.current_url_().await?;
             let href = url.join(&href)?;
-            c.goto(href.as_str()).await
+            c.goto(href.as_str()).await?;
+            Ok(c)
         }
     }
 
@@ -1273,21 +1274,20 @@ mod tests {
         }};
     }
 
-    async fn works_inner(c: Client) -> Result<(), error::CmdError> {
+    async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
         // go to the Wikipedia page for Foobar
-        let mut c = c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
+        c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
         let mut e = c.find(Locator::Id("History_and_etymology")).await?;
         let text = e.text().await?;
         assert_eq!(text, "History and etymology");
-        let mut c = e.client();
         let url = c.current_url().await?;
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 
         // click "Foo (disambiguation)"
-        let mut c = c.find(Locator::Css(".mw-disambig")).await?.click().await?;
+        c.find(Locator::Css(".mw-disambig")).await?.click().await?;
 
         // click "Foo Lake"
-        let mut c = c.find(Locator::LinkText("Foo Lake")).await?.click().await?;
+        c.find(Locator::LinkText("Foo Lake")).await?.click().await?;
 
         let url = c.current_url().await?;
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
@@ -1295,43 +1295,43 @@ mod tests {
         c.close().await
     }
 
-    async fn clicks_inner_by_locator(c: Client) -> Result<(), error::CmdError> {
+    async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
         // go to the Wikipedia frontpage this time
-        let mut c = c.goto("https://www.wikipedia.org/").await?;
+        c.goto("https://www.wikipedia.org/").await?;
 
         // find, fill out, and submit the search form
         let mut f = c.form(Locator::Css("#search-form")).await?;
         let f = f
             .set(Locator::Css("input[name='search']"), "foobar")
             .await?;
-        let mut c = f.submit().await?;
-        let url = c.current_url().await?;
+        f.submit().await?;
 
         // we should now have ended up in the rigth place
+        let url = c.current_url().await?;
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 
         c.close().await
     }
 
-    async fn clicks_inner(c: Client) -> Result<(), error::CmdError> {
+    async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
         // go to the Wikipedia frontpage this time
-        let mut c = c.goto("https://www.wikipedia.org/").await?;
+        c.goto("https://www.wikipedia.org/").await?;
 
         // find, fill out, and submit the search form
         let mut f = c.form(Locator::Css("#search-form")).await?;
         let f = f.set_by_name("search", "foobar").await?;
-        let mut c = f.submit().await?;
-        let url = c.current_url().await?;
+        f.submit().await?;
 
         // we should now have ended up in the rigth place
+        let url = c.current_url().await?;
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 
         c.close().await
     }
 
-    async fn raw_inner(c: Client) -> Result<(), error::CmdError> {
+    async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
         // go back to the frontpage
-        let mut c = c.goto("https://www.wikipedia.org/").await?;
+        c.goto("https://www.wikipedia.org/").await?;
 
         // find the source for the Wikipedia globe
         let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
@@ -1354,8 +1354,8 @@ mod tests {
         c.close().await
     }
 
-    async fn window_size_inner(c: Client) -> Result<(), error::CmdError> {
-        let mut c = c.goto("https://www.wikipedia.org/").await?;
+    async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
+        c.goto("https://www.wikipedia.org/").await?;
         c.set_window_size(500, 400).await?;
         let (width, height) = c.get_window_size().await?;
         assert_eq!(width, 500);
@@ -1364,8 +1364,8 @@ mod tests {
         c.close().await
     }
 
-    async fn window_position_inner(c: Client) -> Result<(), error::CmdError> {
-        let mut c = c.goto("https://www.wikipedia.org/").await?;
+    async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
+        c.goto("https://www.wikipedia.org/").await?;
         c.set_window_size(200, 100).await?;
         c.set_window_position(0, 0).await?;
         c.set_window_position(1, 2).await?;
@@ -1376,8 +1376,8 @@ mod tests {
         c.close().await
     }
 
-    async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
-        let mut c = c.goto("https://www.wikipedia.org/").await?;
+    async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
+        c.goto("https://www.wikipedia.org/").await?;
         c.set_window_rect(0, 0, 500, 400).await?;
         let (x, y) = c.get_window_position().await?;
         assert_eq!(x, 0);
@@ -1396,9 +1396,9 @@ mod tests {
         c.close().await
     }
 
-    async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
+    async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
         // go to the Wikipedia frontpage this time
-        let mut c = c.goto("https://en.wikipedia.org/").await?;
+        c.goto("https://en.wikipedia.org/").await?;
         let es = c.find_all(Locator::Css("#p-interaction li")).await?;
         let texts = try_future::try_join_all(es.into_iter().take(4).map(|mut e| e.text())).await?;
         assert_eq!(
@@ -1414,9 +1414,11 @@ mod tests {
         c.close().await
     }
 
-    fn persist_inner(c: Client) -> impl Future<Output = Result<(), error::CmdError>> {
-        c.goto("https://en.wikipedia.org/")
-            .and_then(|mut c| c.persist())
+    async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
+        c.goto("https://en.wikipedia.org/").await?;
+        c.persist().await?;
+
+        c.close().await
     }
 
     mod chrome {
