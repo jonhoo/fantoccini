@@ -1291,7 +1291,8 @@ mod tests {
 
         let url = c.current_url().await?;
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
-        Ok(())
+
+        c.close().await
     }
 
     async fn clicks_inner_by_locator(c: Client) -> Result<(), error::CmdError> {
@@ -1308,7 +1309,8 @@ mod tests {
 
         // we should now have ended up in the rigth place
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-        Ok(())
+
+        c.close().await
     }
 
     async fn clicks_inner(c: Client) -> Result<(), error::CmdError> {
@@ -1323,7 +1325,8 @@ mod tests {
 
         // we should now have ended up in the rigth place
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-        Ok(())
+
+        c.close().await
     }
 
     async fn raw_inner(c: Client) -> Result<(), error::CmdError> {
@@ -1347,7 +1350,8 @@ mod tests {
         // and voilla, we now have the bytes for the Wikipedia logo!
         assert!(pixels.len() > 0);
         println!("Wikipedia logo is {}b", pixels.len());
-        Ok(())
+
+        c.close().await
     }
 
     async fn window_size_inner(c: Client) -> Result<(), error::CmdError> {
@@ -1356,7 +1360,8 @@ mod tests {
         let (width, height) = c.get_window_size().await?;
         assert_eq!(width, 500);
         assert_eq!(height, 400);
-        Ok(())
+
+        c.close().await
     }
 
     async fn window_position_inner(c: Client) -> Result<(), error::CmdError> {
@@ -1367,7 +1372,8 @@ mod tests {
         let (x, y) = c.get_window_position().await?;
         assert_eq!(x, 1);
         assert_eq!(y, 2);
-        Ok(())
+
+        c.close().await
     }
 
     async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
@@ -1386,7 +1392,8 @@ mod tests {
         let (width, height) = c.get_window_size().await?;
         assert_eq!(width, 600);
         assert_eq!(height, 300);
-        Ok(())
+
+        c.close().await
     }
 
     async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
@@ -1403,7 +1410,8 @@ mod tests {
                 "Recent changes"
             ]
         );
-        Ok(())
+
+        c.close().await
     }
 
     fn persist_inner(c: Client) -> impl Future<Output = Result<(), error::CmdError>> {
