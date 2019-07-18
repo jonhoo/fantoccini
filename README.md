@@ -67,8 +67,8 @@ Let's make the program do that for us instead:
 // go to the Wikipedia frontpage this time
 c.goto("https://www.wikipedia.org/").await?;
 // find the search form, fill it out, and submit it
-c.form(Locator::Css("#search-form")).await?
- .set_by_name("search", "foobar").await?
+let mut f = c.form(Locator::Css("#search-form")).await?;
+f.set_by_name("search", "foobar").await?
  .submit().await?;
 
 // we should now have ended up in the rigth place

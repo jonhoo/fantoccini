@@ -70,8 +70,8 @@
 //! // go to the Wikipedia frontpage this time
 //! c.goto("https://www.wikipedia.org/").await?;
 //! // find the search form, fill it out, and submit it
-//! c.form(Locator::Css("#search-form")).await?
-//!  .set_by_name("search", "foobar").await?
+//! let mut f = c.form(Locator::Css("#search-form")).await?;
+//! f.set_by_name("search", "foobar").await?
 //!  .submit().await?;
 //!
 //! // we should now have ended up in the rigth place
@@ -124,7 +124,6 @@
 #![deny(missing_docs)]
 #![feature(async_await)]
 
-use futures_util::TryFutureExt;
 use http::HttpTryFrom;
 use serde_json::Value as Json;
 use tokio::prelude::*;
@@ -1131,6 +1130,7 @@ impl Form {
 mod tests {
     use super::*;
     use futures_util::try_future;
+    use futures_util::TryFutureExt;
     use futures_util::TryStreamExt;
 
     macro_rules! tester {
