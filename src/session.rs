@@ -468,6 +468,9 @@ impl Session {
             WebDriverCommand::ElementClick(ref we) => {
                 base.join(&format!("element/{}/click", we.id))
             }
+            WebDriverCommand::ElementClear(ref we) => {
+                base.join(&format!("element/{}/clear", we.id))
+            }
             WebDriverCommand::GetElementText(ref we) => {
                 base.join(&format!("element/{}/text", we.id))
             }
@@ -555,6 +558,7 @@ impl Session {
                 method = Method::POST;
             }
             WebDriverCommand::ElementClick(..)
+            | WebDriverCommand::ElementClear(..)
             | WebDriverCommand::GoBack
             | WebDriverCommand::Refresh => {
                 body = Some("{}".to_string());

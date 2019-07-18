@@ -909,6 +909,17 @@ impl Element {
         }
     }
 
+    /// Clear the value prop of this element
+    pub async fn clear(&mut self) -> Result<(), error::CmdError> {
+        let cmd = WebDriverCommand::ElementClear(self.e.clone());
+        let r = self.c.issue(cmd).await?;
+        if r.is_null() {
+            Ok(())
+        } else {
+            Err(error::CmdError::NotW3C(r))
+        }
+    }
+
     /// Simulate the user sending keys to an element.
     pub async fn send_keys(&mut self, text: &str) -> Result<(), error::CmdError> {
         let cmd = WebDriverCommand::ElementSendKeys(
@@ -1152,6 +1163,9 @@ mod tests {
                             if std::path::Path::new("/usr/bin/chromium-browser").exists() {
                                 // on Ubuntu, it's called chromium-browser
                                 "/usr/bin/chromium-browser"
+                            } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
+                                // macOS
+                                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
                             } else {
                                 // elsewhere, it's just called chromium
                                 "/usr/bin/chromium"
@@ -1253,6 +1267,34 @@ mod tests {
         let url = c.current_url().await?;
         assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 
+        c.close().await
+    }
+
+    async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::CmdError> {
+        // go to the Wikipedia frontpage this time
+        c.goto("https://www.wikipedia.org/").await?;
+
+        // find search input element
+        let mut e = c.wait_for_find(Locator::Id("searchInput")).await?;
+        e.send_keys("foobar").await?;
+        assert_eq!(
+            e.prop("value")
+                .await?
+                .expect("input should have value prop")
+                .as_str(),
+            "foobar"
+        );
+
+        e.clear().await?;
+        assert_eq!(
+            e.prop("value")
+                .await?
+                .expect("input should have value prop")
+                .as_str(),
+            ""
+        );
+
+        let mut c = e.client();
         c.close().await
     }
 
@@ -1369,6 +1411,10 @@ mod tests {
             tester!(clicks_inner_by_locator, "chrome")
         }
         #[test]
+        fn it_sends_keys_and_clear_input() {
+            tester!(send_keys_and_clear_input_inner, "chrome")
+        }
+        #[test]
         fn it_can_be_raw() {
             tester!(raw_inner, "chrome")
         }
@@ -1412,6 +1458,10 @@ mod tests {
         #[test]
         fn it_clicks_by_locator() {
             tester!(clicks_inner_by_locator, "firefox")
+        }
+        #[test]
+        fn it_sends_keys_and_clear_input() {
+            tester!(send_keys_and_clear_input_inner, "firefox")
         }
         #[test]
         fn it_can_be_raw() {
