@@ -1,6 +1,6 @@
 [package]
 name = "fantoccini"
-version = "0.11.8"
+version = "0.11.9"
 
 description = "High-level API for programmatically interacting with web pages through WebDriver."
 readme = "README.md"
@@ -21,7 +21,7 @@ travis-ci = { repository = "jonhoo/fantoccini" }
 maintenance = { status = "looking-for-maintainer" }
 
 [dependencies]
-webdriver = "0.38.0"
+webdriver = "0.39.0"
 url = "1.5.0"
 serde = "1.0"
 serde_json = "1.0"
@@ -29,7 +29,7 @@ futures = "0.1.14"
 tokio = "0.1"
 hyper = "0.12"
 hyper-tls = "0.3"
-cookie = { version = "0.11", features = ["percent-encode"] }
-base64 = "0.9.1"
+cookie = { version = "0.12", features = ["percent-encode"] }
+base64 = "0.10"
 mime = "0.3.9"
 http = "0.1"
