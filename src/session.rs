@@ -322,112 +322,110 @@ impl Session {
         }
     }
 
-    pub(crate) fn with_capabilities(
+    pub(crate) async fn with_capabilities(
         webdriver: &str,
         mut cap: webdriver::capabilities::Capabilities,
-    ) -> impl Future<Output = Result<Client, error::NewSessionError>> {
+    ) -> Result<Client, error::NewSessionError> {
         // Where is the WebDriver server?
         let wdb = webdriver.parse::<url::Url>();
 
-        async move {
-            let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
+        let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
 
-            // We want a tls-enabled client
-            let client = hyper::Client::builder()
-                .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new(4).unwrap());
+        // We want a tls-enabled client
+        let client = hyper::Client::builder()
+            .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new(4).unwrap());
 
-            // We're going to need a channel for sending requests to the WebDriver host
-            let (tx, rx) = mpsc::unbounded_channel();
+        // We're going to need a channel for sending requests to the WebDriver host
+        let (tx, rx) = mpsc::unbounded_channel();
 
-            // Set up our WebDriver session.
-            tokio::spawn(Session {
-                rx,
-                ongoing: Ongoing::None,
-                c: client,
-                wdb: wdb,
-                session: None,
-                legacy: false,
-                ua: None,
-                persist: false,
-            });
+        // Set up our WebDriver session.
+        tokio::spawn(Session {
+            rx,
+            ongoing: Ongoing::None,
+            c: client,
+            wdb: wdb,
+            session: None,
+            legacy: false,
+            ua: None,
+            persist: false,
+        });
 
-            // now that the session is running, let's do the handshake
-            let mut client = Client {
-                tx: tx.clone(),
-                legacy: false,
-            };
+        // now that the session is running, let's do the handshake
+        let mut client = Client {
+            tx: tx.clone(),
+            legacy: false,
+        };
 
-            // Create a new session for this client
-            // https://www.w3.org/TR/webdriver/#dfn-new-session
-            // https://www.w3.org/TR/webdriver/#capabilities
-            //  - we want the browser to wait for the page to load
-            cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
+        // Create a new session for this client
+        // https://www.w3.org/TR/webdriver/#dfn-new-session
+        // https://www.w3.org/TR/webdriver/#capabilities
+        //  - we want the browser to wait for the page to load
+        cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
 
-            // make chrome comply with w3c
-            cap.entry("goog:chromeOptions".to_string())
-                .or_insert_with(|| Json::Object(serde_json::Map::new()))
-                .as_object_mut()
-                .expect("goog:chromeOptions wasn't a JSON object")
-                .insert("w3c".to_string(), Json::from(true));
+        // make chrome comply with w3c
+        cap.entry("goog:chromeOptions".to_string())
+            .or_insert_with(|| Json::Object(serde_json::Map::new()))
+            .as_object_mut()
+            .expect("goog:chromeOptions wasn't a JSON object")
+            .insert("w3c".to_string(), Json::from(true));
 
-            let session_config = webdriver::capabilities::SpecNewSessionParameters {
-                alwaysMatch: cap.clone(),
-                firstMatch: vec![webdriver::capabilities::Capabilities::new()],
-            };
-            let spec = webdriver::command::NewSessionParameters::Spec(session_config);
+        let session_config = webdriver::capabilities::SpecNewSessionParameters {
+            alwaysMatch: cap.clone(),
+            firstMatch: vec![webdriver::capabilities::Capabilities::new()],
+        };
+        let spec = webdriver::command::NewSessionParameters::Spec(session_config);
 
-            match client
-                .issue(WebDriverCommand::NewSession(spec))
-                .map(Self::map_handshake_response)
-                .await
-            {
-                Ok(_) => Ok(Client { tx, legacy: false }),
-                Err(error::NewSessionError::NotW3C(json)) => {
-                    // maybe try legacy mode?
-                    let mut legacy = false;
-                    match json {
-                        Json::String(ref err) if err.starts_with("Missing Command Parameter") => {
-                            // ghostdriver
-                            legacy = true;
-                        }
-                        Json::Object(ref err) => {
-                            legacy = err
-                                .get("message")
-                                .and_then(|m| m.as_str())
-                                .map(|s| {
-                                    // chromedriver < 2.29 || chromedriver == 2.29 || saucelabs
-                                    s.contains("cannot find dict 'desiredCapabilities'")
-                                        || s.contains("Missing or invalid capabilities")
-                                        || s.contains("Unexpected server error.")
-                                })
-                                .unwrap_or(false);
-                        }
-                        _ => {}
+        match client
+            .issue(WebDriverCommand::NewSession(spec))
+            .map(Self::map_handshake_response)
+            .await
+        {
+            Ok(_) => Ok(Client { tx, legacy: false }),
+            Err(error::NewSessionError::NotW3C(json)) => {
+                // maybe try legacy mode?
+                let mut legacy = false;
+                match json {
+                    Json::String(ref err) if err.starts_with("Missing Command Parameter") => {
+                        // ghostdriver
+                        legacy = true;
                     }
-
-                    if !legacy {
-                        return Err(error::NewSessionError::NotW3C(json));
+                    Json::Object(ref err) => {
+                        legacy = err
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .map(|s| {
+                                // chromedriver < 2.29 || chromedriver == 2.29 || saucelabs
+                                s.contains("cannot find dict 'desiredCapabilities'")
+                                    || s.contains("Missing or invalid capabilities")
+                                    || s.contains("Unexpected server error.")
+                            })
+                            .unwrap_or(false);
                     }
-
-                    // we're dealing with an implementation that only supports the legacy
-                    // WebDriver protocol:
-                    // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
-                    let session_config = webdriver::capabilities::LegacyNewSessionParameters {
-                        desired: cap,
-                        required: webdriver::capabilities::Capabilities::new(),
-                    };
-                    let spec = webdriver::command::NewSessionParameters::Legacy(session_config);
-
-                    // try again with a legacy client
-                    client
-                        .issue(WebDriverCommand::NewSession(spec))
-                        .map(Self::map_handshake_response)
-                        .await?;
-
-                    Ok(Client { tx, legacy: true })
+                    _ => {}
                 }
-                Err(e) => Err(e),
+
+                if !legacy {
+                    return Err(error::NewSessionError::NotW3C(json));
+                }
+
+                // we're dealing with an implementation that only supports the legacy
+                // WebDriver protocol:
+                // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
+                let session_config = webdriver::capabilities::LegacyNewSessionParameters {
+                    desired: cap,
+                    required: webdriver::capabilities::Capabilities::new(),
+                };
+                let spec = webdriver::command::NewSessionParameters::Legacy(session_config);
+
+                // try again with a legacy client
+                client
+                    .issue(WebDriverCommand::NewSession(spec))
+                    .map(Self::map_handshake_response)
+                    .await?;
+
+                Ok(Client { tx, legacy: true })
             }
+            Err(e) => Err(e),
         }
     }
 
@@ -494,6 +492,9 @@ impl Session {
         &mut self,
         cmd: WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>,
     ) -> impl Future<Output = Result<Json, error::CmdError>> {
+        // TODO: make this an async fn
+        // will take some doing as returned future must be independent of self
+
         use webdriver::command;
 
         // most actions are just get requests with not parameters
