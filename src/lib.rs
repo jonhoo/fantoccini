@@ -1034,8 +1034,7 @@ impl Element {
     pub fn clear(&mut self) -> impl Future<Item = (), Error = error::CmdError> {
         let cmd = WebDriverCommand::ElementClear(self.e.clone());
         self.c.issue(cmd).and_then(move |r| {
-            if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
-                // geckodriver returns {} :(
+            if r.is_null() {
                 Ok(())
             } else {
                 Err(error::CmdError::NotW3C(r))
@@ -1429,7 +1428,7 @@ mod tests {
         // go to the Wikipedia frontpage this time
         c.goto("https://www.wikipedia.org/")
             .and_then(|c: Client| {
-                // find, fill out, and submit the search form
+                // find search input element
                 c.wait_for_find(Locator::Id("searchInput"))
             })
             .and_then(|mut e| e.send_keys("foobar").map(|_| e))
