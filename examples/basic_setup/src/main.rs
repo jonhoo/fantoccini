@@ -5,7 +5,7 @@ use tokio;
 
 fn main() {
     // expects WebDriver instance to be listening at port 4444
-    let client = Client::new("http://localhost:9515");
+    let client = Client::new("http://localhost:4444");
     let get_started_button =
         r#"//a[@class="button button-download ph4 mt0 w-100" and @href="/learn/get-started"]"#;
     let try_without_installing_button =
