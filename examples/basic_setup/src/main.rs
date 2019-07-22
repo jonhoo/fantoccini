@@ -15,7 +15,7 @@ fn main() {
     let rust_lang = client
         .map_err(|error| unimplemented!("failed to connect to WebDriver: {:?}", error))
         .and_then(|client| client.goto("https://www.rust-lang.org/"))
-        // client_wait is only used to see the browsers actions and not to be used
+        // client_wait is an artificial delay only used to see the browsers actions and not necessary
         // in your own code
         .and_then(|client| client_wait(client, 3000))
         .and_then(move |client| client.wait_for_find(Locator::XPath(get_started_button)))
@@ -36,8 +36,6 @@ fn main() {
 }
 
 // helper function to delay the client
-// not to be used in your own code, this is only to allow the user
-// to see the browsers actions during execution
 fn client_wait(client: Client, delay: u64) -> impl Future<Item = Client, Error = CmdError> {
     use std::time::{Duration, Instant};
     use tokio::timer::Delay;
