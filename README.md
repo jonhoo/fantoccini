@@ -137,6 +137,8 @@ c.goto("https://www.wikipedia.org/")
 // -- snip wrapper code --
 ```
 
+For more examples, take a look at the `examples/` directory.
+
 [WebDriver protocol]: https://www.w3.org/TR/webdriver/
 [CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
 [powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
