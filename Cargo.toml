@@ -31,7 +31,7 @@ futures-util-preview = { version = "0.3.0-alpha.17" }
 futures-channel-preview = { version = "0.3.0-alpha.17" }
 tokio = { git = "https://github.com/tokio-rs/tokio.git" }
 hyper = { git = "https://github.com/hyperium/hyper.git" }
-hyper-tls = { git = "https://github.com/95th/hyper-tls.git" }
+hyper-tls = { git = "https://github.com/hyperium/hyper-tls.git" }
 cookie = { version = "0.12", features = ["percent-encode"] }
 base64 = "0.10"
 mime = "0.3.9"
