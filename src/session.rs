@@ -1,5 +1,5 @@
 use crate::error;
-use futures_core::{ready, Future};
+use futures_core::{ready, Future, Poll};
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt, TryStreamExt};
 use serde_json::Value as Json;
@@ -7,7 +7,6 @@ use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::Context;
-use tokio::prelude::*;
 use tokio::sync::{mpsc, oneshot};
 use webdriver::command::WebDriverCommand;
 use webdriver::error::ErrorStatus;
@@ -19,11 +18,12 @@ type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
 #[derive(Clone)]
 pub struct Client {
     tx: mpsc::UnboundedSender<Task>,
-    legacy: bool,
+    is_legacy: bool,
 }
 
 type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Cmd {
     SetUA(String),
@@ -81,7 +81,7 @@ impl Client {
     }
 
     pub(crate) fn is_legacy(&self) -> bool {
-        self.legacy
+        self.is_legacy
     }
 }
 
@@ -179,10 +179,10 @@ impl Ongoing {
 pub(crate) struct Session {
     ongoing: Ongoing,
     rx: mpsc::UnboundedReceiver<Task>,
-    c: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
+    client: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
     wdb: url::Url,
     session: Option<String>,
-    legacy: bool,
+    is_legacy: bool,
     ua: Option<String>,
     persist: bool,
 }
@@ -225,9 +225,9 @@ impl Future for Session {
                     }
                     Cmd::Raw { req, rsp } => {
                         self.ongoing = Ongoing::Raw {
-                            ack: ack,
+                            ack,
                             ret: rsp,
-                            fut: self.c.request(req),
+                            fut: self.client.request(req),
                         };
                     }
                     Cmd::Persist => {
@@ -245,7 +245,7 @@ impl Future for Session {
                             webdriver::command::NewSessionParameters::Legacy(..),
                         ) = request
                         {
-                            self.legacy = true;
+                            self.is_legacy = true;
                         }
                         self.ongoing = Ongoing::WebDriver {
                             ack,
@@ -277,7 +277,7 @@ impl Session {
 
         self.ongoing = Ongoing::Shutdown {
             ack,
-            fut: self.c.request(
+            fut: self.client.request(
                 hyper::Request::delete(url.as_str())
                     .body(hyper::Body::empty())
                     .unwrap(),
@@ -342,10 +342,10 @@ impl Session {
         tokio::spawn(Session {
             rx,
             ongoing: Ongoing::None,
-            c: client,
+            client,
             wdb: wdb,
             session: None,
-            legacy: false,
+            is_legacy: false,
             ua: None,
             persist: false,
         });
@@ -353,7 +353,7 @@ impl Session {
         // now that the session is running, let's do the handshake
         let mut client = Client {
             tx: tx.clone(),
-            legacy: false,
+            is_legacy: false,
         };
 
         // Create a new session for this client
@@ -380,7 +380,10 @@ impl Session {
             .map(Self::map_handshake_response)
             .await
         {
-            Ok(_) => Ok(Client { tx, legacy: false }),
+            Ok(_) => Ok(Client {
+                tx,
+                is_legacy: false,
+            }),
             Err(error::NewSessionError::NotW3C(json)) => {
                 // maybe try legacy mode?
                 let mut legacy = false;
@@ -423,7 +426,10 @@ impl Session {
                     .map(Self::map_handshake_response)
                     .await?;
 
-                Ok(Client { tx, legacy: true })
+                Ok(Client {
+                    tx,
+                    is_legacy: true,
+                })
             }
             Err(e) => Err(e),
         }
@@ -451,7 +457,7 @@ impl Session {
             WebDriverCommand::FindElement(..) => base.join("element"),
             WebDriverCommand::FindElements(..) => base.join("elements"),
             WebDriverCommand::GetCookies => base.join("cookie"),
-            WebDriverCommand::ExecuteScript(..) if self.legacy => base.join("execute"),
+            WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
                 base.join(&format!("element/{}/property/{}", we.id, prop))
@@ -595,12 +601,12 @@ impl Session {
         let req = if let Some(body) = body.take() {
             req.header(hyper::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref());
             req.header(hyper::header::CONTENT_LENGTH, body.len());
-            self.c.request(req.body(body.into()).unwrap())
+            self.client.request(req.body(body.into()).unwrap())
         } else {
-            self.c.request(req.body(hyper::Body::empty()).unwrap())
+            self.client.request(req.body(hyper::Body::empty()).unwrap())
         };
 
-        let legacy = self.legacy;
+        let legacy = self.is_legacy;
         let f = req
             .map_err(error::CmdError::from)
             .and_then(move |res| {
@@ -740,14 +746,20 @@ impl Session {
                             "no such frame" => ErrorStatus::NoSuchFrame,
                             "no such window" => ErrorStatus::NoSuchWindow,
                             "stale element reference" => ErrorStatus::StaleElementReference,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for BAD_REQUEST status code",
+                                error
+                            ),
                         },
                         StatusCode::NOT_FOUND => match error {
                             "unknown command" => ErrorStatus::UnknownCommand,
                             "no such cookie" => ErrorStatus::NoSuchCookie,
                             "invalid session id" => ErrorStatus::InvalidSessionId,
                             "no such element" => ErrorStatus::NoSuchElement,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for NOT_FOUND status code",
+                                error
+                            ),
                         },
                         StatusCode::INTERNAL_SERVER_ERROR => match error {
                             "javascript error" => ErrorStatus::JavascriptError,
@@ -758,18 +770,27 @@ impl Session {
                             "unexpected alert open" => ErrorStatus::UnexpectedAlertOpen,
                             "unknown error" => ErrorStatus::UnknownError,
                             "unsupported operation" => ErrorStatus::UnsupportedOperation,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for INTERNAL_SERVER_ERROR status code",
+                                error
+                            ),
                         },
                         StatusCode::REQUEST_TIMEOUT => match error {
                             "timeout" => ErrorStatus::Timeout,
                             "script timeout" => ErrorStatus::ScriptTimeout,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for REQUEST_TIMEOUT status code",
+                                error
+                            ),
                         },
                         StatusCode::METHOD_NOT_ALLOWED => match error {
                             "unknown method" => ErrorStatus::UnknownMethod,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for METHOD_NOT_ALLOWED status code",
+                                error
+                            ),
                         },
-                        _ => unreachable!(),
+                        _ => unreachable!("received unknown status code: {}", status),
                     }
                 };
 

@@ -115,6 +115,8 @@
 //! # }
 //! ```
 //!
+//! For more examples, take a look at the `examples/` directory.
+//!
 //! [WebDriver protocol]: https://www.w3.org/TR/webdriver/
 //! [CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
 //! [powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
@@ -195,15 +197,15 @@ pub use crate::session::Client;
 /// A single element on the current page.
 #[derive(Clone)]
 pub struct Element {
-    c: Client,
-    e: webdriver::common::WebElement,
+    client: Client,
+    element: webdriver::common::WebElement,
 }
 
 /// An HTML form on the current page.
 #[derive(Clone)]
 pub struct Form {
-    c: Client,
-    f: webdriver::common::WebElement,
+    client: Client,
+    form: webdriver::common::WebElement,
 }
 
 impl Client {
@@ -211,7 +213,7 @@ impl Client {
     /// URL.
     ///
     /// Calls `with_capabilities` with an empty capabilities list.
-    #[cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
+    #[allow(clippy::new_ret_no_self)]
     pub async fn new(webdriver: &str) -> Result<Self, error::NewSessionError> {
         Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new()).await
     }
@@ -504,7 +506,7 @@ impl Client {
     pub async fn screenshot(&mut self) -> Result<Vec<u8>, error::CmdError> {
         let src = self.issue(WebDriverCommand::TakeScreenshot).await?;
         if let Some(src) = src.as_str() {
-            base64::decode(src).map_err(|e| error::CmdError::ImageDecodeError(e))
+            base64::decode(src).map_err(error::CmdError::ImageDecodeError)
         } else {
             Err(error::CmdError::NotW3C(src))
         }
@@ -556,7 +558,7 @@ impl Client {
     /// Issue an HTTP request to the given `url` with all the same cookies as the current session.
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
-    pub async fn raw_client_for<'a>(
+    pub async fn raw_client_for(
         self,
         method: Method,
         url: &str,
@@ -681,8 +683,8 @@ impl Client {
         Ok(array
             .into_iter()
             .map(move |e| Element {
-                c: self.clone(),
-                e: e,
+                client: self.clone(),
+                element: e,
             })
             .collect())
     }
@@ -713,7 +715,7 @@ impl Client {
         loop {
             match self
                 .by(webdriver::command::LocatorParameters {
-                    using: s.using.clone(),
+                    using: s.using,
                     value: s.value.clone(),
                 })
                 .await
@@ -757,8 +759,8 @@ impl Client {
         let res = self.issue(WebDriverCommand::FindElement(l)).await?;
         let f = self.parse_lookup(res)?;
         Ok(Form {
-            c: self.clone(),
-            f: f,
+            client: self.clone(),
+            form: f,
         })
     }
 
@@ -771,8 +773,8 @@ impl Client {
         let res = self.issue(WebDriverCommand::FindElement(locator)).await?;
         let e = self.parse_lookup(res)?;
         Ok(Element {
-            c: self.clone(),
-            e: e,
+            client: self.clone(),
+            element: e,
         })
     }
 
@@ -848,8 +850,9 @@ impl Element {
     ///
     /// [attribute]: https://dom.spec.whatwg.org/#concept-attribute
     pub async fn attr(&mut self, attribute: &str) -> Result<Option<String>, error::CmdError> {
-        let cmd = WebDriverCommand::GetElementAttribute(self.e.clone(), attribute.to_string());
-        match self.c.issue(cmd).await? {
+        let cmd =
+            WebDriverCommand::GetElementAttribute(self.element.clone(), attribute.to_string());
+        match self.client.issue(cmd).await? {
             Json::String(v) => Ok(Some(v)),
             Json::Null => Ok(None),
             v => Err(error::CmdError::NotW3C(v)),
@@ -862,8 +865,8 @@ impl Element {
     ///
     /// [property]: https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.1
     pub async fn prop(&mut self, prop: &str) -> Result<Option<String>, error::CmdError> {
-        let cmd = WebDriverCommand::GetElementProperty(self.e.clone(), prop.to_string());
-        match self.c.issue(cmd).await? {
+        let cmd = WebDriverCommand::GetElementProperty(self.element.clone(), prop.to_string());
+        match self.client.issue(cmd).await? {
             Json::String(v) => Ok(Some(v)),
             Json::Null => Ok(None),
             v => Err(error::CmdError::NotW3C(v)),
@@ -872,8 +875,8 @@ impl Element {
 
     /// Retrieve the text contents of this elment.
     pub async fn text(&mut self) -> Result<String, error::CmdError> {
-        let cmd = WebDriverCommand::GetElementText(self.e.clone());
-        match self.c.issue(cmd).await? {
+        let cmd = WebDriverCommand::GetElementText(self.element.clone());
+        match self.client.issue(cmd).await? {
             Json::String(v) => Ok(v),
             v => Err(error::CmdError::NotW3C(v)),
         }
@@ -899,11 +902,11 @@ impl Element {
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
     pub async fn click(mut self) -> Result<Client, error::CmdError> {
-        let cmd = WebDriverCommand::ElementClick(self.e);
-        let r = self.c.issue(cmd).await?;
+        let cmd = WebDriverCommand::ElementClick(self.element);
+        let r = self.client.issue(cmd).await?;
         if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
             // geckodriver returns {} :(
-            Ok(self.c)
+            Ok(self.client)
         } else {
             Err(error::CmdError::NotW3C(r))
         }
@@ -911,8 +914,8 @@ impl Element {
 
     /// Clear the value prop of this element
     pub async fn clear(&mut self) -> Result<(), error::CmdError> {
-        let cmd = WebDriverCommand::ElementClear(self.e.clone());
-        let r = self.c.issue(cmd).await?;
+        let cmd = WebDriverCommand::ElementClear(self.element.clone());
+        let r = self.client.issue(cmd).await?;
         if r.is_null() {
             Ok(())
         } else {
@@ -923,12 +926,12 @@ impl Element {
     /// Simulate the user sending keys to an element.
     pub async fn send_keys(&mut self, text: &str) -> Result<(), error::CmdError> {
         let cmd = WebDriverCommand::ElementSendKeys(
-            self.e.clone(),
+            self.element.clone(),
             SendKeysParameters {
                 text: text.to_owned(),
             },
         );
-        let r = self.c.issue(cmd).await?;
+        let r = self.client.issue(cmd).await?;
         if r.is_null() {
             Ok(())
         } else {
@@ -938,7 +941,7 @@ impl Element {
 
     /// Get back the [`Client`] hosting this `Element`.
     pub fn client(self) -> Client {
-        self.c
+        self.client
     }
 
     /// Follow the `href` target of the element matching the given CSS selector *without* causing a
@@ -946,8 +949,8 @@ impl Element {
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
     pub async fn follow(mut self) -> Result<Client, error::CmdError> {
-        let cmd = WebDriverCommand::GetElementAttribute(self.e, "href".to_string());
-        let href = self.c.issue(cmd).await?;
+        let cmd = WebDriverCommand::GetElementAttribute(self.element, "href".to_string());
+        let href = self.client.issue(cmd).await?;
         let href = match href {
             Json::String(v) => v,
             Json::Null => {
@@ -960,10 +963,10 @@ impl Element {
             v => Err(error::CmdError::NotW3C(v))?,
         };
 
-        let url = self.c.current_url_().await?;
+        let url = self.client.current_url_().await?;
         let href = url.join(&href)?;
-        self.c.goto(href.as_str()).await?;
-        Ok(self.c)
+        self.client.goto(href.as_str()).await?;
+        Ok(self.client)
     }
 
     /// Find and click an `option` child element by its `value` attribute.
@@ -974,11 +977,11 @@ impl Element {
             value: locator,
         };
 
-        let cmd = WebDriverCommand::FindElementElement(self.e, locator);
-        let v = self.c.issue(cmd).await?;
+        let cmd = WebDriverCommand::FindElementElement(self.element, locator);
+        let v = self.client.issue(cmd).await?;
         Element {
-            e: self.c.parse_lookup(v)?,
-            c: self.c,
+            element: self.client.parse_lookup(v)?,
+            client: self.client,
         }
         .click()
         .await
@@ -992,23 +995,26 @@ impl Form {
         locator: Locator<'_>,
         value: &str,
     ) -> Result<Self, error::CmdError> {
-        let locator = WebDriverCommand::FindElementElement(self.f.clone(), locator.into());
+        let locator = WebDriverCommand::FindElementElement(self.form.clone(), locator.into());
         let value = Json::from(value);
 
-        let res = self.c.issue(locator).await?;
-        let field = self.c.parse_lookup(res)?;
+        let res = self.client.issue(locator).await?;
+        let field = self.client.parse_lookup(res)?;
         let mut args = vec![via_json!(&field), value];
-        self.c.fixup_elements(&mut args);
+        self.client.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "arguments[0].value = arguments[1]".to_string(),
             args: Some(args),
         };
 
-        let res = self.c.issue(WebDriverCommand::ExecuteScript(cmd)).await?;
+        let res = self
+            .client
+            .issue(WebDriverCommand::ExecuteScript(cmd))
+            .await?;
         if res.is_null() {
             Ok(Form {
-                c: self.c.clone(),
-                f: self.f.clone(),
+                client: self.client.clone(),
+                form: self.form.clone(),
             })
         } else {
             Err(error::CmdError::NotW3C(res))
@@ -1016,11 +1022,7 @@ impl Form {
     }
 
     /// Find a form input with the given `name` and set its value to `value`.
-    pub async fn set_by_name<'s>(
-        &mut self,
-        field: &str,
-        value: &str,
-    ) -> Result<Self, error::CmdError> {
+    pub async fn set_by_name(&mut self, field: &str, value: &str) -> Result<Self, error::CmdError> {
         let locator = format!("input[name='{}']", field);
         let locator = Locator::Css(&locator);
         self.set(locator, value).await
@@ -1038,13 +1040,16 @@ impl Form {
     ///
     /// `false` is returned if a matching button was not found.
     pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client, error::CmdError> {
-        let locator = WebDriverCommand::FindElementElement(self.f, button.into());
-        let res = self.c.issue(locator).await?;
-        let submit = self.c.parse_lookup(res)?;
-        let res = self.c.issue(WebDriverCommand::ElementClick(submit)).await?;
+        let locator = WebDriverCommand::FindElementElement(self.form, button.into());
+        let res = self.client.issue(locator).await?;
+        let submit = self.client.parse_lookup(res)?;
+        let res = self
+            .client
+            .issue(WebDriverCommand::ElementClick(submit))
+            .await?;
         if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
             // geckodriver returns {} :(
-            Ok(self.c)
+            Ok(self.client)
         } else {
             Err(error::CmdError::NotW3C(res))
         }
@@ -1072,8 +1077,8 @@ impl Form {
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
     pub async fn submit_direct(mut self) -> Result<Client, error::CmdError> {
-        let mut args = vec![via_json!(&self.f)];
-        self.c.fixup_elements(&mut args);
+        let mut args = vec![via_json!(&self.form)];
+        self.client.fixup_elements(&mut args);
         // some sites are silly, and name their submit button "submit". this ends up overwriting
         // the "submit" function of the form with a reference to the submit button itself, so we
         // can't call .submit(). we get around this by creating a *new* form, and using *its*
@@ -1084,10 +1089,13 @@ impl Form {
             args: Some(args),
         };
 
-        let res = self.c.issue(WebDriverCommand::ExecuteScript(cmd)).await?;
+        let res = self
+            .client
+            .issue(WebDriverCommand::ExecuteScript(cmd))
+            .await?;
         if res.is_null() || res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
             // geckodriver returns {} :(
-            Ok(self.c)
+            Ok(self.client)
         } else {
             Err(error::CmdError::NotW3C(res))
         }
@@ -1104,8 +1112,8 @@ impl Form {
         field: &str,
         value: &str,
     ) -> Result<Client, error::CmdError> {
-        let mut args = vec![via_json!(&self.f), Json::from(field), Json::from(value)];
-        self.c.fixup_elements(&mut args);
+        let mut args = vec![via_json!(&self.form), Json::from(field), Json::from(value)];
+        self.client.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "\
                      var h = document.createElement('input');\
@@ -1117,12 +1125,15 @@ impl Form {
             args: Some(args),
         };
 
-        let res = self.c.issue(WebDriverCommand::ExecuteScript(cmd)).await?;
+        let res = self
+            .client
+            .issue(WebDriverCommand::ExecuteScript(cmd))
+            .await?;
         if res.is_null() | res.as_object().map(|o| o.is_empty()).unwrap_or(false) {
             // geckodriver returns {} :(
             Form {
-                f: self.f,
-                c: self.c,
+                form: self.form,
+                client: self.client,
             }
             .submit_direct()
             .await
@@ -1133,363 +1144,6 @@ impl Form {
 
     /// Get back the [`Client`] hosting this `Form`.
     pub fn client(self) -> Client {
-        self.c
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use futures_util::try_future;
-    use futures_util::TryFutureExt;
-    use futures_util::TryStreamExt;
-
-    macro_rules! tester {
-        ($f:ident, $endpoint:expr) => {{
-            use std::sync::{Arc, Mutex};
-            use std::thread;
-            let c = match $endpoint {
-                "firefox" => {
-                    let mut caps = serde_json::map::Map::new();
-                    let opts = serde_json::json!({ "args": ["--headless"] });
-                    caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-                    Client::with_capabilities("http://localhost:4444", caps)
-                },
-                "chrome" => {
-                    let mut caps = serde_json::map::Map::new();
-                    let opts = serde_json::json!({
-                        "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
-                        "binary":
-                            if std::path::Path::new("/usr/bin/chromium-browser").exists() {
-                                // on Ubuntu, it's called chromium-browser
-                                "/usr/bin/chromium-browser"
-                            } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
-                                // macOS
-                                "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                            } else {
-                                // elsewhere, it's just called chromium
-                                "/usr/bin/chromium"
-                            }
-                    });
-                    caps.insert("goog:chromeOptions".to_string(), opts.clone());
-
-                    Client::with_capabilities("http://localhost:9515", caps)
-                },
-                browser => unimplemented!("unsupported browser backend {}", browser),
-            };
-
-            // we'll need the session_id from the thread
-            // NOTE: even if it panics, so can't just return it
-            let session_id = Arc::new(Mutex::new(None));
-
-            // run test in its own thread to catch panics
-            let sid = session_id.clone();
-            let success = match thread::spawn(move || {
-                let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
-                let mut c = rt.block_on(c).expect("failed to construct test client");
-                *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
-                let x = rt.block_on($f(c));
-                rt.run().unwrap();
-                x
-            })
-            .join()
-            {
-                Ok(Ok(_)) => true,
-                Ok(Err(e)) => {
-                    eprintln!("test future failed to resolve: {:?}", e);
-                    false
-                }
-                Err(e) => {
-                    if let Some(e) = e.downcast_ref::<error::CmdError>() {
-                        eprintln!("test future panicked: {:?}", e);
-                    } else if let Some(e) = e.downcast_ref::<error::NewSessionError>() {
-                        eprintln!("test future panicked: {:?}", e);
-                    } else {
-                        eprintln!("test future panicked; an assertion probably failed");
-                    }
-                    false
-                }
-            };
-
-            assert!(success);
-        }};
-    }
-
-    async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
-        // go to the Wikipedia page for Foobar
-        c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
-        let mut e = c.find(Locator::Id("History_and_etymology")).await?;
-        let text = e.text().await?;
-        assert_eq!(text, "History and etymology");
-        let url = c.current_url().await?;
-        assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-
-        // click "Foo (disambiguation)"
-        c.find(Locator::Css(".mw-disambig")).await?.click().await?;
-
-        // click "Foo Lake"
-        c.find(Locator::LinkText("Foo Lake")).await?.click().await?;
-
-        let url = c.current_url().await?;
-        assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
-
-        c.close().await
-    }
-
-    async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
-        // go to the Wikipedia frontpage this time
-        c.goto("https://www.wikipedia.org/").await?;
-
-        // find, fill out, and submit the search form
-        let mut f = c.form(Locator::Css("#search-form")).await?;
-        let f = f
-            .set(Locator::Css("input[name='search']"), "foobar")
-            .await?;
-        f.submit().await?;
-
-        // we should now have ended up in the rigth place
-        let url = c.current_url().await?;
-        assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-
-        c.close().await
-    }
-
-    async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
-        // go to the Wikipedia frontpage this time
-        c.goto("https://www.wikipedia.org/").await?;
-
-        // find, fill out, and submit the search form
-        let mut f = c.form(Locator::Css("#search-form")).await?;
-        let f = f.set_by_name("search", "foobar").await?;
-        f.submit().await?;
-
-        // we should now have ended up in the rigth place
-        let url = c.current_url().await?;
-        assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-
-        c.close().await
-    }
-
-    async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::CmdError> {
-        // go to the Wikipedia frontpage this time
-        c.goto("https://www.wikipedia.org/").await?;
-
-        // find search input element
-        let mut e = c.wait_for_find(Locator::Id("searchInput")).await?;
-        e.send_keys("foobar").await?;
-        assert_eq!(
-            e.prop("value")
-                .await?
-                .expect("input should have value prop")
-                .as_str(),
-            "foobar"
-        );
-
-        e.clear().await?;
-        assert_eq!(
-            e.prop("value")
-                .await?
-                .expect("input should have value prop")
-                .as_str(),
-            ""
-        );
-
-        let mut c = e.client();
-        c.close().await
-    }
-
-    async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
-        // go back to the frontpage
-        c.goto("https://www.wikipedia.org/").await?;
-
-        // find the source for the Wikipedia globe
-        let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
-        let src = img.attr("src").await?.expect("image should have a src");
-
-        // now build a raw HTTP client request (which also has all current cookies)
-        let raw = img.client().raw_client_for(Method::GET, &src).await?;
-
-        // we then read out the image bytes
-        let pixels = raw
-            .into_body()
-            .try_concat()
-            .map_err(error::CmdError::from)
-            .await?;
-
-        // and voilla, we now have the bytes for the Wikipedia logo!
-        assert!(pixels.len() > 0);
-        println!("Wikipedia logo is {}b", pixels.len());
-
-        c.close().await
-    }
-
-    async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
-        c.goto("https://www.wikipedia.org/").await?;
-        c.set_window_size(500, 400).await?;
-        let (width, height) = c.get_window_size().await?;
-        assert_eq!(width, 500);
-        assert_eq!(height, 400);
-
-        c.close().await
-    }
-
-    async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
-        c.goto("https://www.wikipedia.org/").await?;
-        c.set_window_size(200, 100).await?;
-        c.set_window_position(0, 0).await?;
-        c.set_window_position(1, 2).await?;
-        let (x, y) = c.get_window_position().await?;
-        assert_eq!(x, 1);
-        assert_eq!(y, 2);
-
-        c.close().await
-    }
-
-    async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
-        c.goto("https://www.wikipedia.org/").await?;
-        c.set_window_rect(0, 0, 500, 400).await?;
-        let (x, y) = c.get_window_position().await?;
-        assert_eq!(x, 0);
-        assert_eq!(y, 0);
-        let (width, height) = c.get_window_size().await?;
-        assert_eq!(width, 500);
-        assert_eq!(height, 400);
-        c.set_window_rect(1, 2, 600, 300).await?;
-        let (x, y) = c.get_window_position().await?;
-        assert_eq!(x, 1);
-        assert_eq!(y, 2);
-        let (width, height) = c.get_window_size().await?;
-        assert_eq!(width, 600);
-        assert_eq!(height, 300);
-
-        c.close().await
-    }
-
-    async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
-        // go to the Wikipedia frontpage this time
-        c.goto("https://en.wikipedia.org/").await?;
-        let es = c.find_all(Locator::Css("#p-interaction li")).await?;
-        let texts = try_future::try_join_all(
-            es.into_iter()
-                .take(4)
-                .map(|mut e| async move { e.text().await }),
-        )
-        .await?;
-        assert_eq!(
-            texts,
-            [
-                "Help",
-                "About Wikipedia",
-                "Community portal",
-                "Recent changes"
-            ]
-        );
-
-        c.close().await
-    }
-
-    async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
-        c.goto("https://en.wikipedia.org/").await?;
-        c.persist().await?;
-
-        c.close().await
-    }
-
-    mod chrome {
-        use super::*;
-
-        #[test]
-        fn it_works() {
-            tester!(works_inner, "chrome")
-        }
-        #[test]
-        fn it_clicks() {
-            tester!(clicks_inner, "chrome")
-        }
-        #[test]
-        fn it_clicks_by_locator() {
-            tester!(clicks_inner_by_locator, "chrome")
-        }
-        #[test]
-        fn it_sends_keys_and_clear_input() {
-            tester!(send_keys_and_clear_input_inner, "chrome")
-        }
-        #[test]
-        fn it_can_be_raw() {
-            tester!(raw_inner, "chrome")
-        }
-        #[test]
-        #[ignore]
-        fn it_can_get_and_set_window_size() {
-            tester!(window_size_inner, "chrome")
-        }
-        #[test]
-        #[ignore]
-        fn it_can_get_and_set_window_position() {
-            tester!(window_position_inner, "chrome")
-        }
-        #[test]
-        #[ignore]
-        fn it_can_get_and_set_window_rect() {
-            tester!(window_rect_inner, "chrome")
-        }
-        #[test]
-        fn it_finds_all() {
-            tester!(finds_all_inner, "chrome")
-        }
-        #[test]
-        #[ignore]
-        fn it_persists() {
-            tester!(persist_inner, "chrome")
-        }
-    }
-
-    mod firefox {
-        use super::*;
-
-        #[test]
-        fn it_works() {
-            tester!(works_inner, "firefox")
-        }
-        #[test]
-        fn it_clicks() {
-            tester!(clicks_inner, "firefox")
-        }
-        #[test]
-        fn it_clicks_by_locator() {
-            tester!(clicks_inner_by_locator, "firefox")
-        }
-        #[test]
-        fn it_sends_keys_and_clear_input() {
-            tester!(send_keys_and_clear_input_inner, "firefox")
-        }
-        #[test]
-        fn it_can_be_raw() {
-            tester!(raw_inner, "firefox")
-        }
-        #[test]
-        #[ignore]
-        fn it_can_get_and_set_window_size() {
-            tester!(window_size_inner, "firefox")
-        }
-        #[test]
-        #[ignore]
-        fn it_can_get_and_set_window_position() {
-            tester!(window_position_inner, "firefox")
-        }
-        #[test]
-        #[ignore]
-        fn it_can_get_and_set_window_rect() {
-            tester!(window_rect_inner, "firefox")
-        }
-        #[test]
-        fn it_finds_all() {
-            tester!(finds_all_inner, "firefox")
-        }
-        #[test]
-        #[ignore]
-        fn it_persists() {
-            tester!(persist_inner, "firefox")
-        }
+        self.client
     }
 }
