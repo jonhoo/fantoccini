@@ -21,17 +21,17 @@ travis-ci = { repository = "jonhoo/fantoccini" }
 maintenance = { status = "looking-for-maintainer" }
 
 [dependencies]
-webdriver = "0.39"
-url = "1.5"
+webdriver = "0.39.0"
+url = "1.5.0"
 serde = "1.0"
 serde_json = "1.0"
-futures = "0.1"
+futures = "0.1.14"
 tokio = "0.1"
 hyper = "0.12"
 hyper-tls = "0.3"
 cookie = { version = "0.12", features = ["percent-encode"] }
 base64 = "0.10"
-mime = "0.3"
+mime = "0.3.9"
 http = "0.1"
 
 [dev-dependencies]
