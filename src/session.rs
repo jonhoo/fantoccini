@@ -187,12 +187,12 @@ impl Ongoing {
 pub(crate) struct Session {
     ongoing: Ongoing,
     rx: futures::sync::mpsc::UnboundedReceiver<Task>,
-    c: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
+    client: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
     wdb: url::Url,
     session: Option<String>,
-    legacy: bool,
+    is_legacy: bool,
     ua: Option<String>,
-    persist: bool,
+    is_persist: bool,
 }
 
 impl Future for Session {
@@ -233,13 +233,13 @@ impl Future for Session {
                     }
                     Cmd::Raw { req, rsp } => {
                         self.ongoing = Ongoing::Raw {
-                            ack: ack,
+                            ack,
                             ret: rsp,
-                            fut: self.c.request(req),
+                            fut: self.client.request(req),
                         };
                     }
                     Cmd::Persist => {
-                        self.persist = true;
+                        self.is_persist = true;
                         let _ = ack.send(Ok(Json::Null));
                     }
                     Cmd::Shutdown => {
@@ -253,7 +253,7 @@ impl Future for Session {
                             webdriver::command::NewSessionParameters::Legacy(..),
                         ) = request
                         {
-                            self.legacy = true;
+                            self.is_legacy = true;
                         }
                         self.ongoing = Ongoing::WebDriver {
                             ack,
@@ -263,7 +263,7 @@ impl Future for Session {
                 };
             } else {
                 // we're shutting down!
-                if self.persist {
+                if self.is_persist {
                     self.ongoing = Ongoing::Break;
                 } else {
                     self.shutdown(None);
@@ -285,7 +285,7 @@ impl Session {
 
         self.ongoing = Ongoing::Shutdown {
             ack,
-            fut: self.c.request(
+            fut: self.client.request(
                 hyper::Request::delete(url.as_str())
                     .body(hyper::Body::empty())
                     .unwrap(),
@@ -357,12 +357,12 @@ impl Session {
             tokio::spawn(Session {
                 rx,
                 ongoing: Ongoing::None,
-                c: client,
-                wdb: wdb,
+                client: client,
+                wdb,
                 session: None,
-                legacy: false,
+                is_legacy: false,
                 ua: None,
-                persist: false,
+                is_persist: false,
             });
 
             // now that the session is running, let's do the handshake
@@ -474,7 +474,7 @@ impl Session {
             WebDriverCommand::FindElement(..) => base.join("element"),
             WebDriverCommand::FindElements(..) => base.join("elements"),
             WebDriverCommand::GetCookies => base.join("cookie"),
-            WebDriverCommand::ExecuteScript(..) if self.legacy => base.join("execute"),
+            WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
                 base.join(&format!("element/{}/property/{}", we.id, prop))
@@ -615,12 +615,12 @@ impl Session {
         let req = if let Some(body) = body.take() {
             req.header(hyper::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref());
             req.header(hyper::header::CONTENT_LENGTH, body.len());
-            self.c.request(req.body(body.into()).unwrap())
+            self.client.request(req.body(body.into()).unwrap())
         } else {
-            self.c.request(req.body(hyper::Body::empty()).unwrap())
+            self.client.request(req.body(hyper::Body::empty()).unwrap())
         };
 
-        let legacy = self.legacy;
+        let legacy = self.is_legacy;
         let f = req
             .map_err(error::CmdError::from)
             .and_then(move |res| {
