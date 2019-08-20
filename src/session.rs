@@ -193,7 +193,7 @@ pub(crate) struct Session {
     session: Option<String>,
     is_legacy: bool,
     ua: Option<String>,
-    is_persist: bool,
+    persist: bool,
 }
 
 impl Future for Session {
@@ -240,7 +240,7 @@ impl Future for Session {
                         };
                     }
                     Cmd::Persist => {
-                        self.is_persist = true;
+                        self.persist = true;
                         let _ = ack.send(Ok(Json::Null));
                     }
                     Cmd::Shutdown => {
@@ -264,7 +264,7 @@ impl Future for Session {
                 };
             } else {
                 // we're shutting down!
-                if self.is_persist {
+                if self.persist {
                     self.ongoing = Ongoing::Break;
                 } else {
                     self.shutdown(None);
@@ -363,7 +363,7 @@ impl Session {
                 session: None,
                 is_legacy: false,
                 ua: None,
-                is_persist: false,
+                persist: false,
             });
 
             // now that the session is running, let's do the handshake

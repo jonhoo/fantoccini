@@ -268,7 +268,7 @@ impl Client {
     /// URL.
     ///
     /// Calls `with_capabilities` with an empty capabilities list.
-    #[cfg_attr(feature = "cargo-clippy", allow(clippy::new_ret_no_self))]
+    #[allow(clippy::new_ret_no_self)]
     pub fn new(webdriver: &str) -> impl Future<Item = Self, Error = error::NewSessionError> {
         Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new())
     }
