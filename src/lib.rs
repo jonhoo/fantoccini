@@ -168,6 +168,9 @@
 extern crate base64;
 #[macro_use]
 extern crate futures;
+#[macro_use]
+#[cfg(test)]
+extern crate serial_test_derive;
 extern crate cookie;
 extern crate http;
 extern crate hyper;
@@ -1585,41 +1588,50 @@ mod tests {
         fn it_works() {
             tester!(works_inner, "chrome")
         }
+
         #[test]
         fn it_clicks() {
             tester!(clicks_inner, "chrome")
         }
+
         #[test]
         fn it_clicks_by_locator() {
             tester!(clicks_inner_by_locator, "chrome")
         }
+
         #[test]
         fn it_sends_keys_and_clear_input() {
             tester!(send_keys_and_clear_input_inner, "chrome")
         }
+
         #[test]
         fn it_can_be_raw() {
             tester!(raw_inner, "chrome")
         }
+
         #[test]
         #[ignore]
         fn it_can_get_and_set_window_size() {
             tester!(window_size_inner, "chrome")
         }
+
         #[test]
         #[ignore]
         fn it_can_get_and_set_window_position() {
             tester!(window_position_inner, "chrome")
         }
+
         #[test]
         #[ignore]
         fn it_can_get_and_set_window_rect() {
             tester!(window_rect_inner, "chrome")
         }
+
         #[test]
         fn it_finds_all() {
             tester!(finds_all_inner, "chrome")
         }
+
         #[test]
         #[ignore]
         fn it_persists() {
@@ -1630,45 +1642,60 @@ mod tests {
     mod firefox {
         use super::*;
 
+        #[serial]
         #[test]
         fn it_works() {
             tester!(works_inner, "firefox")
         }
+
+        #[serial]
         #[test]
         fn it_clicks() {
             tester!(clicks_inner, "firefox")
         }
+
+        #[serial]
         #[test]
         fn it_clicks_by_locator() {
             tester!(clicks_inner_by_locator, "firefox")
         }
+
+        #[serial]
         #[test]
         fn it_sends_keys_and_clear_input() {
             tester!(send_keys_and_clear_input_inner, "firefox")
         }
+
+        #[serial]
         #[test]
         fn it_can_be_raw() {
             tester!(raw_inner, "firefox")
         }
+
         #[test]
         #[ignore]
         fn it_can_get_and_set_window_size() {
             tester!(window_size_inner, "firefox")
         }
+
         #[test]
         #[ignore]
         fn it_can_get_and_set_window_position() {
             tester!(window_position_inner, "firefox")
         }
+
         #[test]
         #[ignore]
         fn it_can_get_and_set_window_rect() {
             tester!(window_rect_inner, "firefox")
         }
+
+        #[serial]
         #[test]
         fn it_finds_all() {
             tester!(finds_all_inner, "firefox")
         }
+
         #[test]
         #[ignore]
         fn it_persists() {

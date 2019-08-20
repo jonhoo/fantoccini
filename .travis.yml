@@ -25,7 +25,7 @@ after_failure:
  - cat geckodriver.log
 script:
  - cargo build --verbose
- - cargo test --verbose -- --test-threads=1
+ - cargo test --verbose
 matrix:
   allow_failures:
   - rust: nightly
