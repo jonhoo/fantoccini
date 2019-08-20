@@ -757,14 +757,20 @@ impl Session {
                             "no such frame" => ErrorStatus::NoSuchFrame,
                             "no such window" => ErrorStatus::NoSuchWindow,
                             "stale element reference" => ErrorStatus::StaleElementReference,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for BAD_REQUEST status code",
+                                error
+                            ),
                         },
                         StatusCode::NOT_FOUND => match error {
                             "unknown command" => ErrorStatus::UnknownCommand,
                             "no such cookie" => ErrorStatus::NoSuchCookie,
                             "invalid session id" => ErrorStatus::InvalidSessionId,
                             "no such element" => ErrorStatus::NoSuchElement,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for NOT_FOUND status code",
+                                error
+                            ),
                         },
                         StatusCode::INTERNAL_SERVER_ERROR => match error {
                             "javascript error" => ErrorStatus::JavascriptError,
@@ -775,18 +781,27 @@ impl Session {
                             "unexpected alert open" => ErrorStatus::UnexpectedAlertOpen,
                             "unknown error" => ErrorStatus::UnknownError,
                             "unsupported operation" => ErrorStatus::UnsupportedOperation,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for INTERNAL_SERVER_ERROR status code",
+                                error
+                            ),
                         },
                         StatusCode::REQUEST_TIMEOUT => match error {
                             "timeout" => ErrorStatus::Timeout,
                             "script timeout" => ErrorStatus::ScriptTimeout,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for REQUEST_TIMEOUT status code",
+                                error
+                            ),
                         },
                         StatusCode::METHOD_NOT_ALLOWED => match error {
                             "unknown method" => ErrorStatus::UnknownMethod,
-                            _ => unreachable!(),
+                            _ => unreachable!(
+                                "received unknown error ({}) for METHOD_NOT_ALLOWED status code",
+                                error
+                            ),
                         },
-                        _ => unreachable!(),
+                        _ => unreachable!("received unknown status code: {}", status),
                     }
                 };
 

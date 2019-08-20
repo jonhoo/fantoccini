@@ -155,7 +155,7 @@
 //! # .map_err(|_| ())); }
 //! ```
 //!
-//! For more examples, take a look at the `examples/` directory. 
+//! For more examples, take a look at the `examples/` directory.
 //!
 //! [WebDriver protocol]: https://www.w3.org/TR/webdriver/
 //! [CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
@@ -1426,7 +1426,9 @@ mod tests {
             })
     }
 
-    fn send_keys_and_clear_input_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+    fn send_keys_and_clear_input_inner(
+        c: Client,
+    ) -> impl Future<Item = (), Error = error::CmdError> {
         // go to the Wikipedia frontpage this time
         c.goto("https://www.wikipedia.org/")
             .and_then(|c: Client| {
@@ -1435,12 +1437,13 @@ mod tests {
             })
             .and_then(|mut e| e.send_keys("foobar").map(|_| e))
             .and_then(|mut e: Element| {
-                e.prop("value").map(|o| (e, o.expect("input should have value prop")))
+                e.prop("value")
+                    .map(|o| (e, o.expect("input should have value prop")))
             })
             .and_then(|(mut e, v)| {
                 eprintln!("{}", v);
                 assert_eq!(v.as_str(), "foobar");
-                e.clear().map(|_|e)
+                e.clear().map(|_| e)
             })
             .and_then(|mut e| {
                 e.prop("value")
