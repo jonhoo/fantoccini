@@ -26,10 +26,10 @@ webdriver = "0.39.0"
 url = "1.5.0"
 serde = "1.0"
 serde_json = "1.0"
-futures-core-preview = { version = "0.3.0-alpha.17" }
-futures-util-preview = { version = "0.3.0-alpha.17" }
-futures-channel-preview = { version = "0.3.0-alpha.17" }
-tokio = { git = "https://github.com/tokio-rs/tokio.git" }
+futures-core-preview = "0.3.0-alpha.18"
+futures-util-preview = "0.3.0-alpha.18"
+futures-channel-preview = "0.3.0-alpha.18"
+tokio = "0.2.0-alpha.2"
 hyper = { git = "https://github.com/hyperium/hyper.git" }
 hyper-tls = { git = "https://github.com/hyperium/hyper-tls.git" }
 cookie = { version = "0.12", features = ["percent-encode"] }
