@@ -268,7 +268,7 @@ impl Client {
     /// URL.
     ///
     /// Calls `with_capabilities` with an empty capabilities list.
-    #[cfg_attr(feature = "cargo-clippy", allow(new_ret_no_self))]
+    #[cfg_attr(feature = "cargo-clippy", allow(clippy::new_ret_no_self))]
     pub fn new(webdriver: &str) -> impl Future<Item = Self, Error = error::NewSessionError> {
         Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new())
     }
@@ -572,7 +572,7 @@ impl Client {
         self.issue(WebDriverCommand::TakeScreenshot)
             .and_then(|src| {
                 if let Some(src) = src.as_str() {
-                    return base64::decode(src).map_err(|e| error::CmdError::ImageDecodeError(e));
+                    return base64::decode(src).map_err(error::CmdError::ImageDecodeError);
                 }
 
                 Err(error::CmdError::NotW3C(src))
@@ -624,7 +624,7 @@ impl Client {
     /// Issue an HTTP request to the given `url` with all the same cookies as the current session.
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
-    pub fn raw_client_for<'a>(
+    pub fn raw_client_for(
         self,
         method: Method,
         url: &str,
@@ -831,7 +831,7 @@ impl Client {
         let s: webdriver::command::LocatorParameters = search.into();
         futures::future::loop_fn(self, move |mut this| {
             this.by(webdriver::command::LocatorParameters {
-                using: s.using.clone(),
+                using: s.using,
                 value: s.value.clone(),
             })
             .map(futures::future::Loop::Break)

@@ -27,6 +27,7 @@ pub struct Client {
 
 type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Cmd {
     SetUA(String),
@@ -357,7 +358,7 @@ impl Session {
             tokio::spawn(Session {
                 rx,
                 ongoing: Ongoing::None,
-                client: client,
+                client,
                 wdb,
                 session: None,
                 is_legacy: false,
@@ -655,7 +656,7 @@ impl Session {
                     }
                 } else {
                     // WebDriver host sent us something weird...
-                    return Err(error::CmdError::NotJson(body));
+                    Err(error::CmdError::NotJson(body))
                 }
             })
             .and_then(move |(body, status)| {
