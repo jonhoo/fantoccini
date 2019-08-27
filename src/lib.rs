@@ -148,6 +148,7 @@ pub mod error;
 /// The long-running session future we spawn for multiplexing onto a running WebDriver instance.
 mod session;
 use crate::session::{Cmd, Session};
+pub mod sync;
 
 /// An element locator.
 ///
