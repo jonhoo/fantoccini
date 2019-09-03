@@ -674,10 +674,41 @@ impl Client {
         self.by(search.into()).await
     }
 
+    /// Find an element on the page, starting from the given element.
+    pub async fn find_from(
+        &mut self,
+        element: Element,
+        search: Locator<'_>,
+    ) -> Result<Element, error::CmdError> {
+        self.by_from(element, search.into()).await
+    }
+
     /// Find elements on the page.
     pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
         let res = self
             .issue(WebDriverCommand::FindElements(search.into()))
+            .await?;
+        let array = self.parse_lookup_all(res)?;
+        Ok(array
+            .into_iter()
+            .map(move |e| Element {
+                client: self.clone(),
+                element: e,
+            })
+            .collect())
+    }
+
+    /// Find elements on the page, starting from the given element.
+    pub async fn find_all_from(
+        &mut self,
+        element: Element,
+        search: Locator<'_>,
+    ) -> Result<Vec<Element>, error::CmdError> {
+        let res = self
+            .issue(WebDriverCommand::FindElementElements(
+                element.element,
+                search.into(),
+            ))
             .await?;
         let array = self.parse_lookup_all(res)?;
         Ok(array
@@ -771,6 +802,21 @@ impl Client {
         locator: webdriver::command::LocatorParameters,
     ) -> Result<Element, error::CmdError> {
         let res = self.issue(WebDriverCommand::FindElement(locator)).await?;
+        let e = self.parse_lookup(res)?;
+        Ok(Element {
+            client: self.clone(),
+            element: e,
+        })
+    }
+
+    async fn by_from(
+        &mut self,
+        elem: Element,
+        locator: webdriver::command::LocatorParameters,
+    ) -> Result<Element, error::CmdError> {
+        let res = self
+            .issue(WebDriverCommand::FindElementElement(elem.element, locator))
+            .await?;
         let e = self.parse_lookup(res)?;
         Ok(Element {
             client: self.clone(),
@@ -896,6 +942,15 @@ impl Element {
     pub async fn html(&mut self, inner: bool) -> Result<String, error::CmdError> {
         let prop = if inner { "innerHTML" } else { "outerHTML" };
         Ok(self.prop(prop).await?.unwrap())
+    }
+
+    /// Find an element on the current page, starting from this element.
+    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+        self.client.find_from(self.clone(), search).await
+    }
+    /// Find elements on the current page, starting from this element.
+    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
+        self.client.find_all_from(self.clone(), search).await
     }
 
     /// Simulate the user clicking on this element.

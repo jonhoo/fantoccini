@@ -333,7 +333,7 @@ impl Session {
 
         // We want a tls-enabled client
         let client = hyper::Client::builder()
-            .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new(4).unwrap());
+            .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new().unwrap());
 
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
