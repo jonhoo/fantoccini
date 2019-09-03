@@ -1,5 +1,3 @@
-#![feature(async_await)]
-
 #[macro_use]
 extern crate serial_test_derive;
 extern crate fantoccini;

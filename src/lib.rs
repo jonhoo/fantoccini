@@ -124,7 +124,6 @@
 //! [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
-#![feature(async_await)]
 
 use http::HttpTryFrom;
 use serde_json::Value as Json;
