@@ -253,6 +253,40 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
+async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
+    // Go to the Wikipedia front page
+    c.goto("https://en.wikipedia.org/").await?;
+    // Get the main sidebar panel
+    let mut panel = c.find(Locator::Css("div#mw-panel")).await?;
+    // Get all the ul elements in the sidebar
+    let mut portals = panel.find_all(Locator::Css("div.portal")).await?;
+
+    let portal_titles = &[
+        // Because GetElementText (used by Element::text()) returns the text
+        // *as rendered*, hidden elements return an empty String.
+        "",
+        "Interaction",
+        "Tools",
+        "In other projects",
+        "Print/export",
+        "Languages",
+    ];
+    // Unless something fundamentally changes, this should work
+    assert_eq!(portals.len(), portal_titles.len());
+
+    for (i, portal) in portals.iter_mut().enumerate() {
+        // Each "portal" has an h3 element.
+        let mut portal_title = portal.find(Locator::Css("h3")).await?;
+        let portal_title = portal_title.text().await?;
+        assert_eq!(portal_title, portal_titles[i]);
+        // And also an <ul>.
+        let list_entries = portal.find_all(Locator::Css("li")).await?;
+        assert!(!list_entries.is_empty());
+    }
+
+    c.close().await
+}
+
 async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.goto("https://en.wikipedia.org/").await?;
     c.persist().await?;
@@ -309,6 +343,11 @@ mod chrome {
     #[test]
     fn it_finds_all() {
         tester!(finds_all_inner, "chrome")
+    }
+
+    #[test]
+    fn it_finds_sub_elements() {
+        tester!(finds_sub_elements, "chrome")
     }
 
     #[test]
@@ -373,6 +412,12 @@ mod firefox {
     #[test]
     fn it_finds_all() {
         tester!(finds_all_inner, "firefox")
+    }
+
+    #[serial]
+    #[test]
+    fn it_finds_sub_elements() {
+        tester!(finds_sub_elements, "firefox")
     }
 
     #[test]
