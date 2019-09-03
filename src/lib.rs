@@ -897,7 +897,7 @@ impl Element {
         Ok(self.prop(prop).await?.unwrap())
     }
 
-    /// Find the first matching child element.
+    /// Find the first matching descendant element.
     pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
         let res = self
             .client
@@ -912,7 +912,7 @@ impl Element {
             element: e,
         })
     }
-    /// Find all matching child elements.
+    /// Find all matching descendant elements.
     pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
         let res = self
             .client
