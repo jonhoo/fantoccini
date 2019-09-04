@@ -124,7 +124,6 @@
 //! [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
-#![feature(async_await)]
 
 use http::HttpTryFrom;
 use serde_json::Value as Json;
@@ -896,6 +895,40 @@ impl Element {
     pub async fn html(&mut self, inner: bool) -> Result<String, error::CmdError> {
         let prop = if inner { "innerHTML" } else { "outerHTML" };
         Ok(self.prop(prop).await?.unwrap())
+    }
+
+    /// Find the first matching descendant element.
+    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+        let res = self
+            .client
+            .issue(WebDriverCommand::FindElementElement(
+                self.element.clone(),
+                search.into(),
+            ))
+            .await?;
+        let e = self.client.parse_lookup(res)?;
+        Ok(Element {
+            client: self.client.clone(),
+            element: e,
+        })
+    }
+    /// Find all matching descendant elements.
+    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
+        let res = self
+            .client
+            .issue(WebDriverCommand::FindElementElements(
+                self.element.clone(),
+                search.into(),
+            ))
+            .await?;
+        let array = self.client.parse_lookup_all(res)?;
+        Ok(array
+            .into_iter()
+            .map(move |e| Element {
+                client: self.client.clone(),
+                element: e,
+            })
+            .collect())
     }
 
     /// Simulate the user clicking on this element.
