@@ -30,8 +30,8 @@ futures-core-preview = "0.3.0-alpha.18"
 futures-util-preview = "0.3.0-alpha.18"
 futures-channel-preview = "0.3.0-alpha.18"
 tokio = "0.2.0-alpha.2"
-hyper = { git = "https://github.com/hyperium/hyper.git" }
-hyper-tls = { git = "https://github.com/hyperium/hyper-tls.git" }
+hyper = "0.13.0-alpha.1"
+hyper-tls = "0.4.0-alpha.1"
 cookie = { version = "0.12", features = ["percent-encode"] }
 base64 = "0.10"
 mime = "0.3.9"
