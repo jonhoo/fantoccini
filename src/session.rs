@@ -460,28 +460,24 @@ impl Session {
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
-                base.join(&format!("element/{}/property/{}", we.id, prop))
+                base.join(&format!("element/{}/property/{}", we.0, prop))
             }
             WebDriverCommand::GetElementAttribute(ref we, ref attr) => {
-                base.join(&format!("element/{}/attribute/{}", we.id, attr))
+                base.join(&format!("element/{}/attribute/{}", we.0, attr))
             }
             WebDriverCommand::FindElementElement(ref p, _) => {
-                base.join(&format!("element/{}/element", p.id))
+                base.join(&format!("element/{}/element", p.0))
             }
             WebDriverCommand::FindElementElements(ref p, _) => {
-                base.join(&format!("element/{}/elements", p.id))
+                base.join(&format!("element/{}/elements", p.0))
             }
-            WebDriverCommand::ElementClick(ref we) => {
-                base.join(&format!("element/{}/click", we.id))
-            }
-            WebDriverCommand::ElementClear(ref we) => {
-                base.join(&format!("element/{}/clear", we.id))
-            }
+            WebDriverCommand::ElementClick(ref we) => base.join(&format!("element/{}/click", we.0)),
+            WebDriverCommand::ElementClear(ref we) => base.join(&format!("element/{}/clear", we.0)),
             WebDriverCommand::GetElementText(ref we) => {
-                base.join(&format!("element/{}/text", we.id))
+                base.join(&format!("element/{}/text", we.0))
             }
             WebDriverCommand::ElementSendKeys(ref we, _) => {
-                base.join(&format!("element/{}/value", we.id))
+                base.join(&format!("element/{}/value", we.0))
             }
             WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
             WebDriverCommand::GetWindowRect => base.join("window/rect"),

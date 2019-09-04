@@ -797,7 +797,7 @@ impl Client {
 
         match res.remove(key) {
             Some(Json::String(wei)) => {
-                return Ok(webdriver::common::WebElement::new(wei));
+                return Ok(webdriver::common::WebElement(wei));
             }
             Some(v) => {
                 res.insert(key.to_string(), v);
