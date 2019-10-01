@@ -1,13 +1,13 @@
 #[macro_use]
 extern crate serial_test_derive;
 extern crate fantoccini;
-extern crate futures;
+extern crate futures_util;
 
-use fantoccini::{error, Client, Element, Locator, Method};
-use futures::{
-    future::{self, Future},
-    Stream as _,
-};
+use fantoccini::{error, Client, Locator, Method};
+
+use futures_util::try_future;
+use futures_util::TryFutureExt;
+use futures_util::TryStreamExt;
 
 macro_rules! tester {
         ($f:ident, $endpoint:expr) => {{
@@ -80,200 +80,218 @@ macro_rules! tester {
         }};
     }
 
-fn works_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia page for Foobar
-    c.goto("https://en.wikipedia.org/wiki/Foobar")
-        .and_then(|mut this| this.find(Locator::Id("History_and_etymology")))
-        .and_then(|mut e| e.text().map(move |r| (e, r)))
-        .and_then(|(e, text)| {
-            assert_eq!(text, "History and etymology");
-            let mut c = e.client();
-            c.current_url().map(move |r| (c, r))
-        })
-        .and_then(|(mut c, url)| {
-            assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-            // click "Foo (disambiguation)"
-            c.find(Locator::Css(".mw-disambig"))
-        })
-        .and_then(|e| e.click())
-        .and_then(|mut c| {
-            // click "Foo Lake"
-            c.find(Locator::LinkText("Foo Lake"))
-        })
-        .and_then(|e| e.click())
-        .and_then(|mut c| c.current_url())
-        .and_then(|url| {
-            assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
-            Ok(())
-        })
+    c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
+    let mut e = c.find(Locator::Id("History_and_etymology")).await?;
+    let text = e.text().await?;
+    assert_eq!(text, "History and etymology");
+    let url = c.current_url().await?;
+    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+
+    // click "Foo (disambiguation)"
+    c.find(Locator::Css(".mw-disambig")).await?.click().await?;
+
+    // click "Foo Lake"
+    c.find(Locator::LinkText("Foo Lake")).await?.click().await?;
+
+    let url = c.current_url().await?;
+    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+
+    c.close().await
 }
 
-fn clicks_inner_by_locator(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
-    c.goto("https://www.wikipedia.org/")
-        .and_then(|mut c| {
-            // find, fill out, and submit the search form
-            c.form(Locator::Css("#search-form"))
-        })
-        .and_then(|mut f| f.set(Locator::Css("input[name='search']"), "foobar"))
-        .and_then(|f| f.submit())
-        .and_then(|mut c| c.current_url())
-        .and_then(|url| {
-            // we should now have ended up in the rigth place
-            assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-            Ok(())
-        })
+    c.goto("https://www.wikipedia.org/").await?;
+
+    // find, fill out, and submit the search form
+    let mut f = c.form(Locator::Css("#search-form")).await?;
+    let f = f
+        .set(Locator::Css("input[name='search']"), "foobar")
+        .await?;
+    f.submit().await?;
+
+    // we should now have ended up in the rigth place
+    let url = c.current_url().await?;
+    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+
+    c.close().await
 }
 
-fn clicks_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
-    c.goto("https://www.wikipedia.org/")
-        .and_then(|mut c| {
-            // find, fill out, and submit the search form
-            c.form(Locator::Css("#search-form"))
-        })
-        .and_then(|mut f| f.set_by_name("search", "foobar"))
-        .and_then(|f| f.submit())
-        .and_then(|mut c| c.current_url())
-        .and_then(|url| {
-            // we should now have ended up in the rigth place
-            assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-            Ok(())
-        })
+    c.goto("https://www.wikipedia.org/").await?;
+
+    // find, fill out, and submit the search form
+    let mut f = c.form(Locator::Css("#search-form")).await?;
+    let f = f.set_by_name("search", "foobar").await?;
+    f.submit().await?;
+
+    // we should now have ended up in the rigth place
+    let url = c.current_url().await?;
+    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+
+    c.close().await
 }
 
-fn send_keys_and_clear_input_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
-    c.goto("https://www.wikipedia.org/")
-        .and_then(|c: Client| {
-            // find search input element
-            c.wait_for_find(Locator::Id("searchInput"))
-        })
-        .and_then(|mut e| e.send_keys("foobar").map(|_| e))
-        .and_then(|mut e: Element| {
-            e.prop("value")
-                .map(|o| (e, o.expect("input should have value prop")))
-        })
-        .and_then(|(mut e, v)| {
-            eprintln!("{}", v);
-            assert_eq!(v.as_str(), "foobar");
-            e.clear().map(|_| e)
-        })
-        .and_then(|mut e| {
-            e.prop("value")
-                .map(move |o| o.expect("input should have value prop"))
-        })
-        .and_then(|v| {
-            assert_eq!(v.as_str(), "");
-            Ok(())
-        })
+    c.goto("https://www.wikipedia.org/").await?;
+
+    // find search input element
+    let mut e = c.wait_for_find(Locator::Id("searchInput")).await?;
+    e.send_keys("foobar").await?;
+    assert_eq!(
+        e.prop("value")
+            .await?
+            .expect("input should have value prop")
+            .as_str(),
+        "foobar"
+    );
+
+    e.clear().await?;
+    assert_eq!(
+        e.prop("value")
+            .await?
+            .expect("input should have value prop")
+            .as_str(),
+        ""
+    );
+
+    let mut c = e.client();
+    c.close().await
 }
 
-fn raw_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go back to the frontpage
-    c.goto("https://www.wikipedia.org/")
-        .and_then(|mut c| {
-            // find the source for the Wikipedia globe
-            c.find(Locator::Css("img.central-featured-logo"))
-        })
-        .and_then(|mut img| {
-            img.attr("src")
-                .map(move |src| (img, src.expect("image should have a src")))
-        })
-        .and_then(move |(img, src)| {
-            // now build a raw HTTP client request (which also has all current cookies)
-            img.client().raw_client_for(Method::GET, &src)
-        })
-        .and_then(|raw| {
-            // we then read out the image bytes
-            raw.into_body()
-                .map_err(error::CmdError::from)
-                .fold(Vec::new(), |mut pixels, chunk| {
-                    pixels.extend(&*chunk);
-                    future::ok::<Vec<u8>, error::CmdError>(pixels)
-                })
-        })
-        .and_then(|pixels| {
-            // and voilla, we now have the bytes for the Wikipedia logo!
-            assert!(pixels.len() > 0);
-            println!("Wikipedia logo is {}b", pixels.len());
-            Ok(())
-        })
+    c.goto("https://www.wikipedia.org/").await?;
+
+    // find the source for the Wikipedia globe
+    let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
+    let src = img.attr("src").await?.expect("image should have a src");
+
+    // now build a raw HTTP client request (which also has all current cookies)
+    let raw = img.client().raw_client_for(Method::GET, &src).await?;
+
+    // we then read out the image bytes
+    let pixels = raw
+        .into_body()
+        .try_concat()
+        .map_err(error::CmdError::from)
+        .await?;
+
+    // and voilla, we now have the bytes for the Wikipedia logo!
+    assert!(pixels.len() > 0);
+    println!("Wikipedia logo is {}b", pixels.len());
+
+    c.close().await
 }
 
-fn window_size_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
-    c.goto("https://www.wikipedia.org/")
-        .and_then(|mut c| c.set_window_size(500, 400).map(move |_| c))
-        .and_then(|mut c| c.get_window_size())
-        .and_then(|(width, height)| {
-            assert_eq!(width, 500);
-            assert_eq!(height, 400);
-            Ok(())
-        })
+async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
+    c.goto("https://www.wikipedia.org/").await?;
+    c.set_window_size(500, 400).await?;
+    let (width, height) = c.get_window_size().await?;
+    assert_eq!(width, 500);
+    assert_eq!(height, 400);
+
+    c.close().await
 }
 
-fn window_position_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
-    c.goto("https://www.wikipedia.org/")
-        .and_then(|mut c| c.set_window_size(200, 100).map(move |_| c))
-        .and_then(|mut c| c.set_window_position(0, 0).map(move |_| c))
-        .and_then(|mut c| c.set_window_position(1, 2).map(move |_| c))
-        .and_then(|mut c| c.get_window_position())
-        .and_then(|(x, y)| {
-            assert_eq!(x, 1);
-            assert_eq!(y, 2);
-            Ok(())
-        })
+async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
+    c.goto("https://www.wikipedia.org/").await?;
+    c.set_window_size(200, 100).await?;
+    c.set_window_position(0, 0).await?;
+    c.set_window_position(1, 2).await?;
+    let (x, y) = c.get_window_position().await?;
+    assert_eq!(x, 1);
+    assert_eq!(y, 2);
+
+    c.close().await
 }
 
-fn window_rect_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
-    c.goto("https://www.wikipedia.org/")
-        .and_then(|mut c| c.set_window_rect(0, 0, 500, 400).map(move |_| c))
-        .and_then(|mut c| c.get_window_position().map(move |r| (c, r)))
-        .inspect(|&(_, (x, y))| {
-            assert_eq!(x, 0);
-            assert_eq!(y, 0);
-        })
-        .and_then(|(mut c, _)| c.get_window_size().map(move |r| (c, r)))
-        .inspect(|&(_, (width, height))| {
-            assert_eq!(width, 500);
-            assert_eq!(height, 400);
-        })
-        .and_then(|(mut c, _)| c.set_window_rect(1, 2, 600, 300).map(move |_| c))
-        .and_then(|mut c| c.get_window_position().map(move |r| (c, r)))
-        .inspect(|&(_, (x, y))| {
-            assert_eq!(x, 1);
-            assert_eq!(y, 2);
-        })
-        .and_then(move |(mut c, _)| c.get_window_size())
-        .inspect(|&(width, height)| {
-            assert_eq!(width, 600);
-            assert_eq!(height, 300);
-        })
-        .map(|_| ())
+async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
+    c.goto("https://www.wikipedia.org/").await?;
+    c.set_window_rect(0, 0, 500, 400).await?;
+    let (x, y) = c.get_window_position().await?;
+    assert_eq!(x, 0);
+    assert_eq!(y, 0);
+    let (width, height) = c.get_window_size().await?;
+    assert_eq!(width, 500);
+    assert_eq!(height, 400);
+    c.set_window_rect(1, 2, 600, 300).await?;
+    let (x, y) = c.get_window_position().await?;
+    assert_eq!(x, 1);
+    assert_eq!(y, 2);
+    let (width, height) = c.get_window_size().await?;
+    assert_eq!(width, 600);
+    assert_eq!(height, 300);
+
+    c.close().await
 }
 
-fn finds_all_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
+async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
-    c.goto("https://en.wikipedia.org/")
-        .and_then(|mut c| c.find_all(Locator::Css("#p-interaction li")))
-        .and_then(|es| future::join_all(es.into_iter().take(4).map(|mut e| e.text())))
-        .and_then(|texts| {
-            assert_eq!(
-                texts,
-                [
-                    "Help",
-                    "About Wikipedia",
-                    "Community portal",
-                    "Recent changes"
-                ]
-            );
-            Ok(())
-        })
+    c.goto("https://en.wikipedia.org/").await?;
+    let es = c.find_all(Locator::Css("#p-interaction li")).await?;
+    let texts = try_future::try_join_all(
+        es.into_iter()
+            .take(4)
+            .map(|mut e| async move { e.text().await }),
+    )
+    .await?;
+    assert_eq!(
+        texts,
+        [
+            "Help",
+            "About Wikipedia",
+            "Community portal",
+            "Recent changes"
+        ]
+    );
+
+    c.close().await
 }
 
-fn persist_inner(c: Client) -> impl Future<Item = (), Error = error::CmdError> {
-    c.goto("https://en.wikipedia.org/")
-        .and_then(|mut c| c.persist())
+async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
+    // Go to the Wikipedia front page
+    c.goto("https://en.wikipedia.org/").await?;
+    // Get the main sidebar panel
+    let mut panel = c.find(Locator::Css("div#mw-panel")).await?;
+    // Get all the ul elements in the sidebar
+    let mut portals = panel.find_all(Locator::Css("div.portal")).await?;
+
+    let portal_titles = &[
+        // Because GetElementText (used by Element::text()) returns the text
+        // *as rendered*, hidden elements return an empty String.
+        "",
+        "Interaction",
+        "Tools",
+        "In other projects",
+        "Print/export",
+        "Languages",
+    ];
+    // Unless something fundamentally changes, this should work
+    assert_eq!(portals.len(), portal_titles.len());
+
+    for (i, portal) in portals.iter_mut().enumerate() {
+        // Each "portal" has an h3 element.
+        let mut portal_title = portal.find(Locator::Css("h3")).await?;
+        let portal_title = portal_title.text().await?;
+        assert_eq!(portal_title, portal_titles[i]);
+        // And also an <ul>.
+        let list_entries = portal.find_all(Locator::Css("li")).await?;
+        assert!(!list_entries.is_empty());
+    }
+
+    c.close().await
+}
+
+async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
+    c.goto("https://en.wikipedia.org/").await?;
+    c.persist().await?;
+
+    c.close().await
 }
 
 mod chrome {
@@ -325,6 +343,11 @@ mod chrome {
     #[test]
     fn it_finds_all() {
         tester!(finds_all_inner, "chrome")
+    }
+
+    #[test]
+    fn it_finds_sub_elements() {
+        tester!(finds_sub_elements, "chrome")
     }
 
     #[test]
@@ -389,6 +412,12 @@ mod firefox {
     #[test]
     fn it_finds_all() {
         tester!(finds_all_inner, "firefox")
+    }
+
+    #[serial]
+    #[test]
+    fn it_finds_sub_elements() {
+        tester!(finds_sub_elements, "firefox")
     }
 
     #[test]

@@ -35,40 +35,28 @@ Let's start out clicking around on Wikipedia:
 
 ```rust
 use fantoccini::{Client, Locator};
-use futures::future::Future;
-let c = Client::new("http://localhost:4444");
 
 // let's set up the sequence of steps we want the browser to take
-tokio::run(
-    c
-        .map_err(|e| {
-            unimplemented!("failed to connect to WebDriver: {:?}", e)
-        })
-        .and_then(|c| {
-            // first, go to the Wikipedia page for Foobar
-            c.goto("https://en.wikipedia.org/wiki/Foobar")
-        })
-        .and_then(|mut c| c.current_url().map(move |url| (c, url)))
-        .and_then(|(mut c, url)| {
-            assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-            // click "Foo (disambiguation)"
-            c.find(Locator::Css(".mw-disambig"))
-        })
-        .and_then(|e| e.click())
-        .and_then(|mut c| {
-            // click "Foo Lake"
-            c.find(Locator::LinkText("Foo Lake"))
-        })
-        .and_then(|e| e.click())
-        .and_then(|mut c| c.current_url())
-        .and_then(|url| {
-            assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
-            Ok(())
-        })
-        .map_err(|e| {
-            panic!("a WebDriver command failed: {:?}", e);
-        })
-);
+#[tokio::main]
+async fn main() -> Result<(), fantoccini::error::CmdError> {
+    let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+
+    // first, go to the Wikipedia page for Foobar
+    c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
+    let url = c.current_url().await?;
+    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+
+    // click "Foo (disambiguation)"
+    c.find(Locator::Css(".mw-disambig")).await?.click().await?;
+
+    // click "Foo Lake"
+    c.find(Locator::LinkText("Foo Lake")).await?.click().await?;
+
+    let url = c.current_url().await?;
+    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+
+    c.close().await
+}
 ```
 
 How did we get to the Foobar page in the first place? We did a search!
@@ -77,25 +65,16 @@ Let's make the program do that for us instead:
 ```rust
 // -- snip wrapper code --
 // go to the Wikipedia frontpage this time
-c.goto("https://www.wikipedia.org/")
-    .and_then(|mut c| {
-        // find the search form
-        c.form(Locator::Css("#search-form"))
-    })
-    .and_then(|mut f| {
-        // fill it out
-        f.set_by_name("search", "foobar")
-    })
-    .and_then(|f| {
-        // and submit it
-        f.submit()
-    })
-    // we should now have ended up in the rigth place
-    .and_then(|mut c| c.current_url())
-    .and_then(|url| {
-        assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
-        Ok(())
-    })
+c.goto("https://www.wikipedia.org/").await?;
+// find the search form, fill it out, and submit it
+let mut f = c.form(Locator::Css("#search-form")).await?;
+f.set_by_name("search", "foobar").await?
+ .submit().await?;
+
+// we should now have ended up in the rigth place
+let url = c.current_url().await?;
+assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+
 // -- snip wrapper code --
 ```
 
@@ -104,36 +83,20 @@ What if we want to download a raw file? Fantoccini has you covered:
 ```rust
 // -- snip wrapper code --
 // go back to the frontpage
-c.goto("https://www.wikipedia.org/")
-    .and_then(|mut c| {
-        // find the source for the Wikipedia globe
-        c.find(Locator::Css("img.central-featured-logo"))
-    })
-    .and_then(|mut img| {
-        img.attr("src")
-            .map(move |src| (img, src.expect("image should have a src")))
-    })
-    .and_then(move |(img, src)| {
-        // now build a raw HTTP client request (which also has all current cookies)
-        img.client().raw_client_for(fantoccini::Method::GET, &src)
-    })
-    .and_then(|raw| {
-        use futures::Stream;
-        // we then read out the image bytes
-        raw.into_body().map_err(fantoccini::error::CmdError::from).fold(
-            Vec::new(),
-            |mut pixels, chunk| {
-                pixels.extend(&*chunk);
-                futures::future::ok::<Vec<u8>, fantoccini::error::CmdError>(pixels)
-            },
-        )
-    })
-    .and_then(|pixels| {
-        // and voilla, we now have the bytes for the Wikipedia logo!
-        assert!(pixels.len() > 0);
-        println!("Wikipedia logo is {}b", pixels.len());
-        Ok(())
-    })
+c.goto("https://www.wikipedia.org/").await?;
+// find the source for the Wikipedia globe
+let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
+let src = img.attr("src").await?.expect("image should have a src");
+// now build a raw HTTP client request (which also has all current cookies)
+let raw = img.client().raw_client_for(fantoccini::Method::GET, &src).await?;
+
+// we then read out the image bytes
+use futures_util::TryStreamExt;
+let pixels = raw.into_body().try_concat().await.map_err(fantoccini::error::CmdError::from)?;
+// and voilla, we now have the bytes for the Wikipedia logo!
+assert!(pixels.len() > 0);
+println!("Wikipedia logo is {}b", pixels.len());
+
 // -- snip wrapper code --
 ```
 

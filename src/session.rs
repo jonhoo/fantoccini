@@ -1,28 +1,24 @@
-use base64;
-use error;
-use futures;
-use hyper;
-use hyper_tls;
-use mime;
-use serde_json;
+use crate::error;
+use futures_core::{ready, Future, Poll};
+use futures_util::future::{self, Either};
+use futures_util::{FutureExt, TryFutureExt, TryStreamExt};
 use serde_json::Value as Json;
 use std::io;
 use std::mem;
-use tokio;
-use tokio::prelude::*;
-use url;
-use webdriver;
+use std::pin::Pin;
+use std::task::Context;
+use tokio::sync::{mpsc, oneshot};
 use webdriver::command::WebDriverCommand;
 use webdriver::error::ErrorStatus;
 use webdriver::error::WebDriverError;
 
-type Ack = futures::sync::oneshot::Sender<Result<Json, error::CmdError>>;
+type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
 
 /// A WebDriver client tied to a single browser session.
 #[derive(Clone)]
 pub struct Client {
-    tx: futures::sync::mpsc::UnboundedSender<Task>,
-    legacy: bool,
+    tx: mpsc::UnboundedSender<Task>,
+    is_legacy: bool,
 }
 
 type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
@@ -37,7 +33,7 @@ pub(crate) enum Cmd {
     GetUA,
     Raw {
         req: hyper::Request<hyper::Body>,
-        rsp: futures::sync::oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
+        rsp: oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
     },
     WebDriver(Wcmd),
 }
@@ -55,38 +51,37 @@ pub(crate) struct Task {
 }
 
 impl Client {
-    pub(crate) fn issue<C>(&mut self, cmd: C) -> impl Future<Item = Json, Error = error::CmdError>
+    pub(crate) fn issue<C>(&mut self, cmd: C) -> impl Future<Output = Result<Json, error::CmdError>>
     where
         C: Into<Cmd>,
     {
-        let (tx, rx) = futures::sync::oneshot::channel();
+        let (tx, rx) = oneshot::channel();
         let cmd = cmd.into();
-        self.tx
-            .unbounded_send(Task {
-                request: cmd,
-                ack: tx,
-            })
-            .map_err(|_| {
-                error::CmdError::Lost(io::Error::new(
+        let r = self.tx.try_send(Task {
+            request: cmd,
+            ack: tx,
+        });
+
+        async move {
+            if let Err(_) = r {
+                return Err(error::CmdError::Lost(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "WebDriver session has been closed",
-                ))
+                )));
+            }
+
+            let r = rx.await;
+            r.unwrap_or_else(|_| {
+                Err(error::CmdError::Lost(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "WebDriver session was closed while waiting",
+                )))
             })
-            .into_future()
-            .and_then(move |_| {
-                rx.then(|r| {
-                    r.unwrap_or_else(|_| {
-                        Err(error::CmdError::Lost(io::Error::new(
-                            io::ErrorKind::BrokenPipe,
-                            "WebDriver session was closed while waiting",
-                        )))
-                    })
-                })
-            })
+        }
     }
 
     pub(crate) fn is_legacy(&self) -> bool {
-        self.legacy
+        self.is_legacy
     }
 }
 
@@ -99,11 +94,11 @@ enum Ongoing {
     },
     WebDriver {
         ack: Ack,
-        fut: Box<dyn Future<Item = Json, Error = error::CmdError> + Send>,
+        fut: Pin<Box<dyn Future<Output = Result<Json, error::CmdError>> + Send>>,
     },
     Raw {
         ack: Ack,
-        ret: futures::sync::oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
+        ret: oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
         fut: hyper::client::ResponseFuture,
     },
 }
@@ -124,14 +119,14 @@ impl Ongoing {
     }
 
     // returns true if outer loop should break
-    fn poll(&mut self, try_extract_session: bool) -> Result<Async<OngoingResult>, ()> {
+    fn poll(&mut self, try_extract_session: bool, cx: &mut Context) -> Poll<OngoingResult> {
         let rt = match mem::replace(self, Ongoing::None) {
             Ongoing::None => OngoingResult::Continue,
             Ongoing::Break => OngoingResult::Break,
             Ongoing::Shutdown { mut fut, ack } => {
-                if let Ok(Async::NotReady) = fut.poll() {
+                if Pin::new(&mut fut).poll(cx).is_pending() {
                     mem::replace(self, Ongoing::Shutdown { fut, ack });
-                    return Ok(Async::NotReady);
+                    return Poll::Pending;
                 }
 
                 if let Some(ack) = ack {
@@ -140,13 +135,11 @@ impl Ongoing {
                 OngoingResult::Break
             }
             Ongoing::WebDriver { mut fut, ack } => {
-                let rsp = match fut.poll() {
-                    Ok(Async::NotReady) => {
-                        mem::replace(self, Ongoing::WebDriver { fut, ack });
-                        return Ok(Async::NotReady);
-                    }
-                    Ok(Async::Ready(v)) => Ok(v),
-                    Err(e) => Err(e),
+                let rsp = if let Poll::Ready(v) = fut.as_mut().poll(cx) {
+                    v
+                } else {
+                    mem::replace(self, Ongoing::WebDriver { fut, ack });
+                    return Poll::Pending;
                 };
                 let mut rt = OngoingResult::Continue;
                 if try_extract_session {
@@ -168,26 +161,24 @@ impl Ongoing {
                 rt
             }
             Ongoing::Raw { mut fut, ack, ret } => {
-                let rt = match fut.poll() {
-                    Ok(Async::NotReady) => {
-                        mem::replace(self, Ongoing::Raw { fut, ack, ret });
-                        return Ok(Async::NotReady);
-                    }
-                    Ok(Async::Ready(v)) => Ok(v),
-                    Err(e) => Err(e),
+                let rt = if let Poll::Ready(v) = Pin::new(&mut fut).poll(cx) {
+                    v
+                } else {
+                    mem::replace(self, Ongoing::Raw { fut, ack, ret });
+                    return Poll::Pending;
                 };
                 let _ = ack.send(Ok(Json::Null));
                 let _ = ret.send(rt);
                 OngoingResult::Continue
             }
         };
-        Ok(Async::Ready(rt))
+        Poll::Ready(rt)
     }
 }
 
 pub(crate) struct Session {
     ongoing: Ongoing,
-    rx: futures::sync::mpsc::UnboundedReceiver<Task>,
+    rx: mpsc::UnboundedReceiver<Task>,
     client: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
     wdb: url::Url,
     session: Option<String>,
@@ -197,13 +188,13 @@ pub(crate) struct Session {
 }
 
 impl Future for Session {
-    type Item = ();
-    type Error = ();
+    type Output = ();
 
-    fn poll(&mut self) -> Result<Async<()>, ()> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
         loop {
             if self.ongoing.is_some() {
-                match try_ready!(self.ongoing.poll(self.session.is_none())) {
+                let has_session = self.session.is_none();
+                match ready!(self.ongoing.poll(has_session, cx)) {
                     OngoingResult::Break => break,
                     OngoingResult::SessionId(sid) => {
                         self.session = Some(sid);
@@ -214,7 +205,7 @@ impl Future for Session {
 
             // if we get here, there can be no ongoing request.
             // queue a new one.
-            if let Some(Task { request, ack }) = try_ready!(self.rx.poll()) {
+            if let Some(Task { request, ack }) = ready!(Pin::new(&mut self.rx).poll_recv(cx)) {
                 // some calls are just local housekeeping calls
                 match request {
                     Cmd::GetSessionId => {
@@ -258,7 +249,7 @@ impl Future for Session {
                         }
                         self.ongoing = Ongoing::WebDriver {
                             ack,
-                            fut: Box::new(self.issue_wd_cmd(request)),
+                            fut: Box::pin(self.issue_wd_cmd(request)),
                         };
                     }
                 };
@@ -272,7 +263,7 @@ impl Future for Session {
             }
         }
 
-        Ok(Async::Ready(()))
+        Poll::Ready(())
     }
 }
 
@@ -331,126 +322,117 @@ impl Session {
         }
     }
 
-    pub(crate) fn with_capabilities(
+    pub(crate) async fn with_capabilities(
         webdriver: &str,
         mut cap: webdriver::capabilities::Capabilities,
-    ) -> impl Future<Item = Client, Error = error::NewSessionError> {
+    ) -> Result<Client, error::NewSessionError> {
         // Where is the WebDriver server?
-        let wdb = match webdriver.parse::<url::Url>() {
-            Ok(wdb) => wdb,
-            Err(e) => {
-                return future::Either::B(future::err(error::NewSessionError::BadWebdriverUrl(e)));
-            }
-        };
+        let wdb = webdriver.parse::<url::Url>();
+
+        let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
 
         // We want a tls-enabled client
         let client = hyper::Client::builder()
-            .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new(4).unwrap());
+            .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new().unwrap());
 
         // We're going to need a channel for sending requests to the WebDriver host
-        let (tx, rx) = futures::sync::mpsc::unbounded();
+        let (tx, rx) = mpsc::unbounded_channel();
 
         // Set up our WebDriver session.
-        // We don't want to call tokio::spawn directly here, because we may not yet be executing
-        // futures. Instead, we'll use a futures::lazy to spin up the Session when the returned
-        // future is first polled, and only then do all the setup.
-        future::Either::A(future::lazy(move || {
-            tokio::spawn(Session {
-                rx,
-                ongoing: Ongoing::None,
-                client,
-                wdb,
-                session: None,
+        tokio::spawn(Session {
+            rx,
+            ongoing: Ongoing::None,
+            client,
+            wdb: wdb,
+            session: None,
+            is_legacy: false,
+            ua: None,
+            persist: false,
+        });
+
+        // now that the session is running, let's do the handshake
+        let mut client = Client {
+            tx: tx.clone(),
+            is_legacy: false,
+        };
+
+        // Create a new session for this client
+        // https://www.w3.org/TR/webdriver/#dfn-new-session
+        // https://www.w3.org/TR/webdriver/#capabilities
+        //  - we want the browser to wait for the page to load
+        cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
+
+        // make chrome comply with w3c
+        cap.entry("goog:chromeOptions".to_string())
+            .or_insert_with(|| Json::Object(serde_json::Map::new()))
+            .as_object_mut()
+            .expect("goog:chromeOptions wasn't a JSON object")
+            .insert("w3c".to_string(), Json::from(true));
+
+        let session_config = webdriver::capabilities::SpecNewSessionParameters {
+            alwaysMatch: cap.clone(),
+            firstMatch: vec![webdriver::capabilities::Capabilities::new()],
+        };
+        let spec = webdriver::command::NewSessionParameters::Spec(session_config);
+
+        match client
+            .issue(WebDriverCommand::NewSession(spec))
+            .map(Self::map_handshake_response)
+            .await
+        {
+            Ok(_) => Ok(Client {
+                tx,
                 is_legacy: false,
-                ua: None,
-                persist: false,
-            });
-
-            // now that the session is running, let's do the handshake
-            let mut client = Client {
-                tx: tx.clone(),
-                legacy: false,
-            };
-
-            // Create a new session for this client
-            // https://www.w3.org/TR/webdriver/#dfn-new-session
-            // https://www.w3.org/TR/webdriver/#capabilities
-            //  - we want the browser to wait for the page to load
-            cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
-
-            // make chrome comply with w3c
-            cap.entry("goog:chromeOptions".to_string())
-                .or_insert_with(|| Json::Object(serde_json::Map::new()))
-                .as_object_mut()
-                .expect("goog:chromeOptions wasn't a JSON object")
-                .insert("w3c".to_string(), Json::from(true));
-
-            let session_config = webdriver::capabilities::SpecNewSessionParameters {
-                alwaysMatch: cap.clone(),
-                firstMatch: vec![webdriver::capabilities::Capabilities::new()],
-            };
-            let spec = webdriver::command::NewSessionParameters::Spec(session_config);
-
-            client
-                .issue(WebDriverCommand::NewSession(spec))
-                .then(Self::map_handshake_response)
-                .map(|_| false)
-                .or_else(move |e| {
-                    // maybe try legacy mode?
-                    match e {
-                        error::NewSessionError::NotW3C(json) => {
-                            let mut legacy = false;
-                            match json {
-                                Json::String(ref err)
-                                    if err.starts_with("Missing Command Parameter") =>
-                                {
-                                    // ghostdriver
-                                    legacy = true;
-                                }
-                                Json::Object(ref err) => {
-                                    legacy = err
-                                        .get("message")
-                                        .and_then(|m| m.as_str())
-                                        .map(|s| {
-                                            // chromedriver < 2.29 || chromedriver == 2.29 || saucelabs
-                                            s.contains("cannot find dict 'desiredCapabilities'")
-                                                || s.contains("Missing or invalid capabilities")
-                                                || s.contains("Unexpected server error.")
-                                        })
-                                        .unwrap_or(false);
-                                }
-                                _ => {}
-                            }
-
-                            if legacy {
-                                // we're dealing with an implementation that only supports the legacy
-                                // WebDriver protocol:
-                                // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
-                                let session_config =
-                                    webdriver::capabilities::LegacyNewSessionParameters {
-                                        desired: cap,
-                                        required: webdriver::capabilities::Capabilities::new(),
-                                    };
-                                let spec = webdriver::command::NewSessionParameters::Legacy(
-                                    session_config,
-                                );
-
-                                // try again with a legacy client
-                                future::Either::A(
-                                    client
-                                        .issue(WebDriverCommand::NewSession(spec))
-                                        .then(Self::map_handshake_response)
-                                        .map(|_| true),
-                                )
-                            } else {
-                                future::Either::B(future::err(error::NewSessionError::NotW3C(json)))
-                            }
-                        }
-                        e => future::Either::B(future::err(e)),
+            }),
+            Err(error::NewSessionError::NotW3C(json)) => {
+                // maybe try legacy mode?
+                let mut legacy = false;
+                match json {
+                    Json::String(ref err) if err.starts_with("Missing Command Parameter") => {
+                        // ghostdriver
+                        legacy = true;
                     }
+                    Json::Object(ref err) => {
+                        legacy = err
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .map(|s| {
+                                // chromedriver < 2.29 || chromedriver == 2.29 || saucelabs
+                                s.contains("cannot find dict 'desiredCapabilities'")
+                                    || s.contains("Missing or invalid capabilities")
+                                    || s.contains("Unexpected server error.")
+                            })
+                            .unwrap_or(false);
+                    }
+                    _ => {}
+                }
+
+                if !legacy {
+                    return Err(error::NewSessionError::NotW3C(json));
+                }
+
+                // we're dealing with an implementation that only supports the legacy
+                // WebDriver protocol:
+                // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
+                let session_config = webdriver::capabilities::LegacyNewSessionParameters {
+                    desired: cap,
+                    required: webdriver::capabilities::Capabilities::new(),
+                };
+                let spec = webdriver::command::NewSessionParameters::Legacy(session_config);
+
+                // try again with a legacy client
+                client
+                    .issue(WebDriverCommand::NewSession(spec))
+                    .map(Self::map_handshake_response)
+                    .await?;
+
+                Ok(Client {
+                    tx,
+                    is_legacy: true,
                 })
-                .map(move |legacy| Client { tx, legacy })
-        }))
+            }
+            Err(e) => Err(e),
+        }
     }
 
     /// Helper for determining what URL endpoint to use for various requests.
@@ -478,28 +460,24 @@ impl Session {
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
-                base.join(&format!("element/{}/property/{}", we.id, prop))
+                base.join(&format!("element/{}/property/{}", we.0, prop))
             }
             WebDriverCommand::GetElementAttribute(ref we, ref attr) => {
-                base.join(&format!("element/{}/attribute/{}", we.id, attr))
+                base.join(&format!("element/{}/attribute/{}", we.0, attr))
             }
             WebDriverCommand::FindElementElement(ref p, _) => {
-                base.join(&format!("element/{}/element", p.id))
+                base.join(&format!("element/{}/element", p.0))
             }
             WebDriverCommand::FindElementElements(ref p, _) => {
-                base.join(&format!("element/{}/elements", p.id))
+                base.join(&format!("element/{}/elements", p.0))
             }
-            WebDriverCommand::ElementClick(ref we) => {
-                base.join(&format!("element/{}/click", we.id))
-            }
-            WebDriverCommand::ElementClear(ref we) => {
-                base.join(&format!("element/{}/clear", we.id))
-            }
+            WebDriverCommand::ElementClick(ref we) => base.join(&format!("element/{}/click", we.0)),
+            WebDriverCommand::ElementClear(ref we) => base.join(&format!("element/{}/clear", we.0)),
             WebDriverCommand::GetElementText(ref we) => {
-                base.join(&format!("element/{}/text", we.id))
+                base.join(&format!("element/{}/text", we.0))
             }
             WebDriverCommand::ElementSendKeys(ref we, _) => {
-                base.join(&format!("element/{}/value", we.id))
+                base.join(&format!("element/{}/value", we.0))
             }
             WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
             WebDriverCommand::GetWindowRect => base.join("window/rect"),
@@ -518,13 +496,16 @@ impl Session {
     fn issue_wd_cmd(
         &mut self,
         cmd: WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>,
-    ) -> impl Future<Item = Json, Error = error::CmdError> {
+    ) -> impl Future<Output = Result<Json, error::CmdError>> {
+        // TODO: make this an async fn
+        // will take some doing as returned future must be independent of self
+
         use webdriver::command;
 
         // most actions are just get requests with not parameters
         let url = match self.endpoint_for(&cmd) {
             Ok(url) => url,
-            Err(e) => return future::Either::B(future::err(error::CmdError::from(e))),
+            Err(e) => return Either::Right(future::err(error::CmdError::from(e))),
         };
         use hyper::Method;
         let mut method = Method::GET;
@@ -636,11 +617,13 @@ impl Session {
 
                 // What did the server send us?
                 res.into_body()
-                    .concat2()
-                    .map(move |body| (body, ctype, status))
+                    .try_concat()
+                    .map_ok(move |body| (body, ctype, status))
                     .map_err(|e| -> error::CmdError { e.into() })
             })
-            .and_then(|(body, ctype, status)| {
+            .map(|r| {
+                let (body, ctype, status) = r?;
+
                 // Too bad we can't stream into a String :(
                 let body =
                     String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
@@ -659,7 +642,8 @@ impl Session {
                     Err(error::CmdError::NotJson(body))
                 }
             })
-            .and_then(move |(body, status)| {
+            .map(move |r| {
+                let (body, status) = r?;
                 let is_new_session = if let WebDriverCommand::NewSession(..) = cmd {
                     true
                 } else {
@@ -810,6 +794,6 @@ impl Session {
                 Err(error::CmdError::from(WebDriverError::new(es, message)))
             });
 
-        future::Either::A(f)
+        Either::Left(f)
     }
 }
