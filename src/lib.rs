@@ -27,7 +27,6 @@
 //! Let's start out clicking around on Wikipedia:
 //!
 //! ```no_run
-//! # #![feature(async_await)]
 //! # extern crate tokio;
 //! # extern crate fantoccini;
 //! use fantoccini::{Client, Locator};
@@ -59,7 +58,6 @@
 //! Let's make the program do that for us instead:
 //!
 //! ```no_run
-//! # #![feature(async_await)]
 //! # extern crate tokio;
 //! # extern crate fantoccini;
 //! # use fantoccini::{Client, Locator};
@@ -86,7 +84,6 @@
 //! What if we want to download a raw file? Fantoccini has you covered:
 //!
 //! ```no_run
-//! # #![feature(async_await)]
 //! # extern crate tokio;
 //! # extern crate futures_util;
 //! # extern crate fantoccini;
