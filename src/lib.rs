@@ -487,6 +487,7 @@ impl Client {
     async fn current_url_(&mut self) -> Result<url::Url, error::CmdError> {
         let url = self.issue(WebDriverCommand::GetCurrentUrl).await?;
         if let Some(url) = url.as_str() {
+            let url = if url.is_empty() { "about:blank" } else { url };
             Ok(url.parse()?)
         } else {
             Err(error::CmdError::NotW3C(url))
