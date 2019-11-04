@@ -707,7 +707,7 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for_find(mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
         let s: webdriver::command::LocatorParameters = search.into();
         loop {
             match self
