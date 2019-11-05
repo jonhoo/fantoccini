@@ -556,7 +556,7 @@ impl Client {
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
     pub async fn raw_client_for(
-        self,
+        &mut self,
         method: Method,
         url: &str,
     ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
@@ -572,7 +572,7 @@ impl Client {
     /// Before the HTTP request is issued, the given `before` closure will be called with a handle
     /// to the `Request` about to be sent.
     pub async fn with_raw_client_for<F>(
-        mut self,
+        &mut self,
         method: Method,
         url: &str,
         before: F,
