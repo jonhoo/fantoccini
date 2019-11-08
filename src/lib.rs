@@ -692,12 +692,12 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for<F, FF>(mut self, mut is_ready: F) -> Result<Self, error::CmdError>
+    pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<&mut Self, error::CmdError>
     where
         F: FnMut(&mut Client) -> FF,
         FF: Future<Output = Result<bool, error::CmdError>>,
     {
-        while !is_ready(&mut self).await? {}
+        while !is_ready(self).await? {}
         Ok(self)
     }
 
@@ -730,9 +730,9 @@ impl Client {
     /// this introduces a race condition: the browser could finish navigating *before* we call
     /// `current_url()`, which would lead to an eternal wait.
     pub async fn wait_for_navigation(
-        mut self,
+        &mut self,
         current: Option<url::Url>,
-    ) -> Result<Self, error::CmdError> {
+    ) -> Result<&mut Self, error::CmdError> {
         let current = match current {
             Some(current) => current,
             None => self.current_url_().await?,
