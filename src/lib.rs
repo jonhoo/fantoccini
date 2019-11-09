@@ -692,13 +692,13 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<&mut Self, error::CmdError>
+    pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
     where
         F: FnMut(&mut Client) -> FF,
         FF: Future<Output = Result<bool, error::CmdError>>,
     {
         while !is_ready(self).await? {}
-        Ok(self)
+        Ok(())
     }
 
     /// Wait for the given element to be present on the page.
@@ -732,7 +732,7 @@ impl Client {
     pub async fn wait_for_navigation(
         &mut self,
         current: Option<url::Url>,
-    ) -> Result<&mut Self, error::CmdError> {
+    ) -> Result<(), error::CmdError> {
         let current = match current {
             Some(current) => current,
             None => self.current_url_().await?,
@@ -743,7 +743,9 @@ impl Client {
             let current = current.clone();
             // TODO: and this one too
             let mut c = c.clone();
-            async move { Ok(c.current_url().await? == current) }
+            async move {
+                Ok(c.current_url().await? != current)
+            }
         })
         .await
     }
