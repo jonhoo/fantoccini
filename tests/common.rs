@@ -8,6 +8,8 @@ use fantoccini::{error, Client, Locator, Method};
 use futures_util::try_future;
 use futures_util::TryFutureExt;
 use futures_util::TryStreamExt;
+use std::time::Duration;
+use url::Url;
 
 macro_rules! tester {
         ($f:ident, $endpoint:expr) => {{
@@ -294,6 +296,34 @@ async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
+async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
+    c.wait_for(move |_| {
+        std::thread::sleep(Duration::from_secs(4));
+        async move { Ok(true) }
+    }).await?;
+
+    c.close().await
+}
+
+async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> {
+    c.goto("https://en.wikipedia.org/").await?;
+
+    // pulled from https://en.wikipedia.org/wiki/Category:Redirects_to_names_with_title
+    let starting_url = Url::parse("https://en.wikipedia.org/wiki/Michael_Dunlop_Young")?;
+
+    c.goto(starting_url.as_str()).await?;
+
+    let wait_for = c.wait_for_navigation(Some(starting_url)).await;
+
+    assert!(wait_for.is_ok());
+
+    let final_url = c.current_url().await?;
+
+    assert_eq!(final_url.as_str(), "https://en.wikipedia.org/wiki/Michael_Young,_Baron_Young_of_Dartington");
+
+    c.close().await
+}
+
 mod chrome {
     use super::*;
 
@@ -354,6 +384,18 @@ mod chrome {
     #[ignore]
     fn it_persists() {
         tester!(persist_inner, "chrome")
+    }
+
+    #[serial]
+    #[test]
+    fn it_simple_waits() {
+        tester!(simple_wait_test, "chrome")
+    }
+
+    #[serial]
+    #[test]
+    fn it_waits_for_navigation() {
+        tester!(wait_for_navigation_test, "chrome")
     }
 }
 
@@ -424,5 +466,17 @@ mod firefox {
     #[ignore]
     fn it_persists() {
         tester!(persist_inner, "firefox")
+    }
+
+    #[serial]
+    #[test]
+    fn it_simple_waits() {
+        tester!(simple_wait_test, "firefox")
+    }
+
+    #[serial]
+    #[test]
+    fn it_waits_for_navigation() {
+        tester!(wait_for_navigation_test, "firefox")
     }
 }
