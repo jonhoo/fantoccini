@@ -556,7 +556,7 @@ impl Client {
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
     pub async fn raw_client_for(
-        self,
+        &mut self,
         method: Method,
         url: &str,
     ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
@@ -572,7 +572,7 @@ impl Client {
     /// Before the HTTP request is issued, the given `before` closure will be called with a handle
     /// to the `Request` about to be sent.
     pub async fn with_raw_client_for<F>(
-        mut self,
+        &mut self,
         method: Method,
         url: &str,
         before: F,
@@ -692,13 +692,13 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for<F, FF>(mut self, mut is_ready: F) -> Result<Self, error::CmdError>
+    pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
     where
         F: FnMut(&mut Client) -> FF,
         FF: Future<Output = Result<bool, error::CmdError>>,
     {
-        while !is_ready(&mut self).await? {}
-        Ok(self)
+        while !is_ready(self).await? {}
+        Ok(())
     }
 
     /// Wait for the given element to be present on the page.
@@ -707,7 +707,7 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for_find(mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
         let s: webdriver::command::LocatorParameters = search.into();
         loop {
             match self
@@ -730,9 +730,9 @@ impl Client {
     /// this introduces a race condition: the browser could finish navigating *before* we call
     /// `current_url()`, which would lead to an eternal wait.
     pub async fn wait_for_navigation(
-        mut self,
+        &mut self,
         current: Option<url::Url>,
-    ) -> Result<Self, error::CmdError> {
+    ) -> Result<(), error::CmdError> {
         let current = match current {
             Some(current) => current,
             None => self.current_url_().await?,
@@ -743,7 +743,7 @@ impl Client {
             let current = current.clone();
             // TODO: and this one too
             let mut c = c.clone();
-            async move { Ok(c.current_url().await? == current) }
+            async move { Ok(c.current_url().await? != current) }
         })
         .await
     }
