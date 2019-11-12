@@ -743,9 +743,7 @@ impl Client {
             let current = current.clone();
             // TODO: and this one too
             let mut c = c.clone();
-            async move {
-                Ok(c.current_url().await? != current)
-            }
+            async move { Ok(c.current_url().await? != current) }
         })
         .await
     }

@@ -300,16 +300,19 @@ async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
         async move { Ok(true) }
-    }).await?;
+    })
+    .await?;
 
     c.close().await
 }
 
 async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> {
-    c.goto("https://en.wikipedia.org/").await?;
+    let mut path = std::env::current_dir().unwrap();
+    path.push("tests/redirect_test.html");
 
-    // pulled from https://en.wikipedia.org/wiki/Category:Redirects_to_names_with_title
-    let starting_url = Url::parse("https://en.wikipedia.org/wiki/Michael_Dunlop_Young")?;
+    let path_string = format!("file://{}", path.to_str().unwrap());
+    let file_url_str = path_string.as_str();
+    let starting_url = Url::parse(file_url_str)?;
 
     c.goto(starting_url.as_str()).await?;
 
@@ -319,7 +322,7 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
 
     let final_url = c.current_url().await?;
 
-    assert_eq!(final_url.as_str(), "https://en.wikipedia.org/wiki/Michael_Young,_Baron_Young_of_Dartington");
+    assert_eq!(final_url.as_str(), "https://www.wikipedia.org/");
 
     c.close().await
 }
