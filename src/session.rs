@@ -463,6 +463,12 @@ impl Session {
             WebDriverCommand::GetCookies => base.join("cookie"),
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
+            WebDriverCommand::IsDisplayed(ref we) => {
+                base.join(&format!("element/{}/displayed", we.0))
+            },
+            WebDriverCommand::IsEnabled(ref we) => {
+                base.join(&format!("element/{}/enabled", we.0))
+            },
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
                 base.join(&format!("element/{}/property/{}", we.0, prop))
             }
@@ -782,6 +788,7 @@ impl Session {
                             "invalid session id" => ErrorStatus::InvalidSessionId,
                             "no such element" => ErrorStatus::NoSuchElement,
                             "no such window" => ErrorStatus::NoSuchWindow,
+                            "stale element reference" => ErrorStatus::StaleElementReference,
                             _ => unreachable!(
                                 "received unknown error ({}) for NOT_FOUND status code",
                                 error

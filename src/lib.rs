@@ -1012,6 +1012,7 @@ impl Element {
             element: e,
         })
     }
+
     /// Find all matching descendant elements.
     pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
         let res = self
@@ -1133,6 +1134,41 @@ impl Element {
             .issue(WebDriverCommand::SwitchToFrame(params))
             .await?;
         Ok(client)
+    }
+
+    /// Check element for displayed
+    pub async fn displayed(&self) -> Result<bool, error::CmdError> {
+        let cmd = WebDriverCommand::IsDisplayed(self.element.clone());
+        let v = self.client.clone().issue(cmd).await?;
+        match v {
+            Json::Bool(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Determine if an element is currently enabled
+    pub async fn enabled(&self) -> Result<bool, error::CmdError> {
+        let cmd = WebDriverCommand::IsEnabled(self.element.clone());
+        let v = self.client.clone().issue(cmd).await?;
+        match v {
+            Json::Bool(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Wait for the given function to return `true` before proceeding.
+    ///
+    /// This can be useful to wait for something to appear on the page before interacting with it.
+    /// While this currently just spins and yields, it may be more efficient than this in the
+    /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
+    /// the page.
+    pub async fn wait_for<F, FF>(mut self, mut is_ready: F) -> Result<Self, error::CmdError>
+        where
+            F: FnMut(&mut Element) -> FF,
+            FF: Future<Output = Result<bool, error::CmdError>>,
+    {
+        while !is_ready(&mut self).await? {}
+        Ok(self)
     }
 }
 
