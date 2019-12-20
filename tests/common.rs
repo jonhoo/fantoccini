@@ -51,7 +51,7 @@ macro_rules! tester {
             // run test in its own thread to catch panics
             let sid = session_id.clone();
             let success = match thread::spawn(move || {
-                let mut rt = tokio::runtime::Builder::new().basic_scheduler().build().unwrap();
+                let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
                 let mut c = rt.block_on(c).expect("failed to construct test client");
                 *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
                 let x = rt.block_on($f(c));
