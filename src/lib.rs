@@ -102,7 +102,7 @@
 //!
 //! // we then read out the image bytes
 //! use futures_util::TryStreamExt;
-//! let pixels = raw.into_body().try_concat().await.map_err(fantoccini::error::CmdError::from)?;
+//! let pixels = hyper::body::to_bytes(raw.into_body()).await.map_err(fantoccini::error::CmdError::from)?;
 //! // and voilla, we now have the bytes for the Wikipedia logo!
 //! assert!(pixels.len() > 0);
 //! println!("Wikipedia logo is {}b", pixels.len());
@@ -122,9 +122,9 @@
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
 
-use http::HttpTryFrom;
 use serde_json::Value as Json;
-use tokio::prelude::*;
+use std::convert::TryFrom;
+use std::future::Future;
 use tokio::sync::oneshot;
 use webdriver::command::{SendKeysParameters, WebDriverCommand};
 use webdriver::common::ELEMENT_KEY;
@@ -560,10 +560,8 @@ impl Client {
         method: Method,
         url: &str,
     ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
-        self.with_raw_client_for(method, url, |mut req| {
-            req.body(hyper::Body::empty()).unwrap()
-        })
-        .await
+        self.with_raw_client_for(method, url, |req| req.body(hyper::Body::empty()).unwrap())
+            .await
     }
 
     /// Build and issue an HTTP request to the given `url` with all the same cookies as the current
@@ -650,11 +648,12 @@ impl Client {
         }
 
         let mut req = hyper::Request::builder();
-        req.method(method)
+        req = req
+            .method(method)
             .uri(http::Uri::try_from(url.as_str()).unwrap());
-        req.header(hyper::header::COOKIE, jar.join("; "));
+        req = req.header(hyper::header::COOKIE, jar.join("; "));
         if let Some(s) = ua {
-            req.header(hyper::header::USER_AGENT, s);
+            req = req.header(hyper::header::USER_AGENT, s);
         }
         let req = before(req);
         let (tx, rx) = oneshot::channel();

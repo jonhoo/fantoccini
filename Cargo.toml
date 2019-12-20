@@ -1,6 +1,6 @@
 [package]
 name = "fantoccini"
-version = "0.12.0-alpha.4"
+version = "0.12.0"
 edition = "2018"
 
 description = "High-level API for programmatically interacting with web pages through WebDriver."
@@ -26,17 +26,17 @@ webdriver = "0.40.0"
 url = "2.0.0"
 serde = "1.0"
 serde_json = "1.0"
-futures-core-preview = "=0.3.0-alpha.19"
-futures-util-preview = "=0.3.0-alpha.19"
-futures-channel-preview = "=0.3.0-alpha.19"
-tokio = "=0.2.0-alpha.6"
-hyper = { version = "=0.13.0-alpha.4", features = [ "unstable-stream" ] }
-hyper-tls = "=0.4.0-alpha.4"
+futures-core = "0.3.0"
+futures-util = "0.3.0"
+tokio = { version = "0.2.0", features = [ "sync" ] }
+hyper = { version = "0.13.0", features = [ "stream" ] }
+hyper-tls = "0.4.0"
 cookie = { version = "0.12", features = ["percent-encode"] }
-base64 = "0.10"
+base64 = "0.11"
 mime = "0.3.9"
-http = "0.1"
+http = "0.2"
 
 [dev-dependencies]
-serial_test = "0.2"
-serial_test_derive = "0.2"
+tokio = { version = "0.2.0", features = [ "full" ] }
+serial_test = "0.3"
+serial_test_derive = "0.3"
