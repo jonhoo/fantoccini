@@ -5,9 +5,8 @@ extern crate futures_util;
 
 use fantoccini::{error, Client, Locator, Method};
 
-use futures_util::try_future;
+use futures_util::future;
 use futures_util::TryFutureExt;
-use futures_util::TryStreamExt;
 use std::time::Duration;
 use url::Url;
 
@@ -52,11 +51,11 @@ macro_rules! tester {
             // run test in its own thread to catch panics
             let sid = session_id.clone();
             let success = match thread::spawn(move || {
-                let mut rt = tokio::runtime::current_thread::Runtime::new().unwrap();
+                let mut rt = tokio::runtime::Builder::new().basic_scheduler().build().unwrap();
                 let mut c = rt.block_on(c).expect("failed to construct test client");
                 *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
                 let x = rt.block_on($f(c));
-                rt.run().unwrap();
+                drop(rt);
                 x
             })
             .join()
@@ -177,9 +176,7 @@ async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
     let raw = img.client().raw_client_for(Method::GET, &src).await?;
 
     // we then read out the image bytes
-    let pixels = raw
-        .into_body()
-        .try_concat()
+    let pixels = hyper::body::to_bytes(raw.into_body())
         .map_err(error::CmdError::from)
         .await?;
 
@@ -236,7 +233,7 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://en.wikipedia.org/").await?;
     let es = c.find_all(Locator::Css("#p-interaction li")).await?;
-    let texts = try_future::try_join_all(
+    let texts = future::try_join_all(
         es.into_iter()
             .take(4)
             .map(|mut e| async move { e.text().await }),

@@ -1,12 +1,14 @@
 use crate::error;
-use futures_core::{ready, Future, Poll};
+use futures_core::ready;
 use futures_util::future::{self, Either};
-use futures_util::{FutureExt, TryFutureExt, TryStreamExt};
+use futures_util::{FutureExt, TryFutureExt};
 use serde_json::Value as Json;
+use std::future::Future;
 use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::Context;
+use std::task::Poll;
 use tokio::sync::{mpsc, oneshot};
 use webdriver::command::WebDriverCommand;
 use webdriver::error::ErrorStatus;
@@ -57,7 +59,7 @@ impl Client {
     {
         let (tx, rx) = oneshot::channel();
         let cmd = cmd.into();
-        let r = self.tx.try_send(Task {
+        let r = self.tx.send(Task {
             request: cmd,
             ack: tx,
         });
@@ -332,8 +334,8 @@ impl Session {
         let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
 
         // We want a tls-enabled client
-        let client = hyper::Client::builder()
-            .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new().unwrap());
+        let client =
+            hyper::Client::builder().build::<_, hyper::Body>(hyper_tls::HttpsConnector::new());
 
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
@@ -575,13 +577,13 @@ impl Session {
 
         // issue the command to the webdriver server
         let mut req = hyper::Request::builder();
-        req.method(method).uri(url.as_str());
+        req = req.method(method).uri(url.as_str());
         if let Some(ref s) = self.ua {
-            req.header(hyper::header::USER_AGENT, s.to_owned());
+            req = req.header(hyper::header::USER_AGENT, s.to_owned());
         }
         // because https://github.com/hyperium/hyper/pull/727
         if !url.username().is_empty() || url.password().is_some() {
-            req.header(
+            req = req.header(
                 hyper::header::AUTHORIZATION,
                 format!(
                     "Basic {}",
@@ -595,8 +597,8 @@ impl Session {
         }
 
         let req = if let Some(body) = body.take() {
-            req.header(hyper::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref());
-            req.header(hyper::header::CONTENT_LENGTH, body.len());
+            req = req.header(hyper::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref());
+            req = req.header(hyper::header::CONTENT_LENGTH, body.len());
             self.client.request(req.body(body.into()).unwrap())
         } else {
             self.client.request(req.body(hyper::Body::empty()).unwrap())
@@ -616,8 +618,7 @@ impl Session {
                     .and_then(|ctype| ctype.to_str().ok()?.parse::<mime::Mime>().ok());
 
                 // What did the server send us?
-                res.into_body()
-                    .try_concat()
+                hyper::body::to_bytes(res.into_body())
                     .map_ok(move |body| (body, ctype, status))
                     .map_err(|e| -> error::CmdError { e.into() })
             })
