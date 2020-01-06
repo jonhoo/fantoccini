@@ -1,0 +1,12 @@
+[package]
+name = "async_await"
+version = "0.1.0"
+authors = [""]
+edition = "2018"
+
+[dependencies]
+fantoccini = "0.12.0"
+
+[dependencies.tokio]
+version = "0.2.6"
+features = ["macros"] # Needed for #[tokio::main]
