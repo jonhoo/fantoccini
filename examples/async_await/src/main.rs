@@ -3,7 +3,7 @@ use fantoccini::{Client, Locator};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Connect to webdriver instance that is listening on port 9515
+    // Connect to webdriver instance that is listening on port 4444
     let mut c = Client::new("http://localhost:4444").await?;
 
     // Go to wikipedia page
