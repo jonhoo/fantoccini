@@ -574,6 +574,13 @@ impl Session {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST;
             }
+            WebDriverCommand::SwitchToFrame(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST
+            }
+            WebDriverCommand::SwitchToParentFrame => {
+                method = Method::POST
+            }
             _ => {}
         }
 
