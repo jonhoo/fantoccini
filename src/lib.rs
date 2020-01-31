@@ -674,7 +674,6 @@ impl Client {
         Ok(self)
     }
 
-
     /// Switches to the parent of the frame the client is currently contained within.
     pub async fn parent_frame(mut self) -> Result<Client, error::CmdError> {
         self.issue(WebDriverCommand::SwitchToParentFrame).await?;

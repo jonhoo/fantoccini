@@ -484,6 +484,8 @@ impl Session {
             WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
             WebDriverCommand::GetWindowRect => base.join("window/rect"),
             WebDriverCommand::TakeScreenshot => base.join("screenshot"),
+            WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
+            WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
             WebDriverCommand::GetWindowHandle => base.join("window"),
             WebDriverCommand::GetWindowHandles => base.join("window/handles"),
             WebDriverCommand::NewWindow(..)=> base.join("window/new"),
