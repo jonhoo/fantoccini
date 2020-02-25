@@ -31,12 +31,12 @@ futures-util = "0.3.0"
 tokio = { version = "0.2.0", features = [ "sync" ] }
 hyper = { version = "0.13.0", features = [ "stream" ] }
 hyper-tls = "0.4.0"
-cookie = { version = "0.12", features = ["percent-encode"] }
+cookie = { version = "0.13", features = ["percent-encode"] }
 base64 = "0.11"
 mime = "0.3.9"
 http = "0.2"
 
 [dev-dependencies]
 tokio = { version = "0.2.0", features = [ "full" ] }
-serial_test = "0.3"
-serial_test_derive = "0.3"
+serial_test = "0.4"
+serial_test_derive = "0.4"
