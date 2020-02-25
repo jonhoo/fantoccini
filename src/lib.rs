@@ -126,8 +126,8 @@ use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
 use tokio::sync::oneshot;
-use webdriver::command::{SendKeysParameters, WebDriverCommand, SwitchToFrameParameters};
-use webdriver::common::{ELEMENT_KEY, FrameId};
+use webdriver::command::{SendKeysParameters, SwitchToFrameParameters, WebDriverCommand};
+use webdriver::common::{FrameId, ELEMENT_KEY};
 use webdriver::error::WebDriverError;
 
 macro_rules! via_json {
@@ -668,7 +668,7 @@ impl Client {
     /// Switches to the frame specified at the index.
     pub async fn frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
         let params = SwitchToFrameParameters {
-            id: index.map(FrameId::Short)
+            id: index.map(FrameId::Short),
         };
         self.issue(WebDriverCommand::SwitchToFrame(params)).await?;
         Ok(self)
@@ -1035,12 +1035,15 @@ impl Element {
     /// Switches to the frame contained within the element.
     pub async fn frame(self) -> Result<Client, error::CmdError> {
         let Self {
-            mut client, element
+            mut client,
+            element,
         } = self;
         let params = SwitchToFrameParameters {
-            id: Some(FrameId::Element(element))
+            id: Some(FrameId::Element(element)),
         };
-        client.issue(WebDriverCommand::SwitchToFrame(params)).await?;
+        client
+            .issue(WebDriverCommand::SwitchToFrame(params))
+            .await?;
         Ok(client)
     }
 }
