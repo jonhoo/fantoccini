@@ -313,7 +313,9 @@ impl Session {
                 Err(error::NewSessionError::NotW3C(Json::String(v)))
             }
             Err(error::CmdError::Standard(
-                e @ WebDriverError {
+                e
+                @
+                WebDriverError {
                     error: ErrorStatus::SessionNotCreated,
                     ..
                 },
@@ -578,9 +580,7 @@ impl Session {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST
             }
-            WebDriverCommand::SwitchToParentFrame => {
-                method = Method::POST
-            }
+            WebDriverCommand::SwitchToParentFrame => method = Method::POST,
             _ => {}
         }
 
