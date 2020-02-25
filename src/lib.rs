@@ -121,6 +121,7 @@
 //! [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
+#![warn(missing_debug_implementations, rust_2018_idioms)]
 
 use serde_json::Value as Json;
 use std::convert::TryFrom;
@@ -191,14 +192,14 @@ impl<'a> Into<webdriver::command::LocatorParameters> for Locator<'a> {
 pub use crate::session::Client;
 
 /// A single element on the current page.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Element {
     client: Client,
     element: webdriver::common::WebElement,
 }
 
 /// An HTML form on the current page.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Form {
     client: Client,
     form: webdriver::common::WebElement,

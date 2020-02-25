@@ -17,7 +17,7 @@ use webdriver::error::WebDriverError;
 type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
 
 /// A WebDriver client tied to a single browser session.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Client {
     tx: mpsc::UnboundedSender<Task>,
     is_legacy: bool,
@@ -121,7 +121,7 @@ impl Ongoing {
     }
 
     // returns true if outer loop should break
-    fn poll(&mut self, try_extract_session: bool, cx: &mut Context) -> Poll<OngoingResult> {
+    fn poll(&mut self, try_extract_session: bool, cx: &mut Context<'_>) -> Poll<OngoingResult> {
         let rt = match mem::replace(self, Ongoing::None) {
             Ongoing::None => OngoingResult::Continue,
             Ongoing::Break => OngoingResult::Break,
@@ -192,7 +192,7 @@ pub(crate) struct Session {
 impl Future for Session {
     type Output = ();
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context) -> Poll<Self::Output> {
+    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             if self.ongoing.is_some() {
                 let has_session = self.session.is_none();

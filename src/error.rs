@@ -43,8 +43,8 @@ impl Error for NewSessionError {
 }
 
 impl fmt::Display for NewSessionError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: ", self.description())?;
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: ", self)?;
         match *self {
             NewSessionError::BadWebdriverUrl(ref e) => write!(f, "{}", e),
             NewSessionError::Failed(ref e) => write!(f, "{}", e),
@@ -162,8 +162,8 @@ impl Error for CmdError {
 }
 
 impl fmt::Display for CmdError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}: ", self.description())?;
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}: ", self)?;
         match *self {
             CmdError::Standard(ref e) | CmdError::NoSuchElement(ref e) => write!(f, "{}", e),
             CmdError::BadUrl(ref e) => write!(f, "{}", e),
