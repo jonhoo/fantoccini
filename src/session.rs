@@ -484,6 +484,8 @@ impl Session {
             WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
             WebDriverCommand::GetWindowRect => base.join("window/rect"),
             WebDriverCommand::TakeScreenshot => base.join("screenshot"),
+            WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
+            WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
             _ => unimplemented!(),
         }
     }
@@ -571,6 +573,13 @@ impl Session {
             WebDriverCommand::SetWindowRect(ref params) => {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST;
+            }
+            WebDriverCommand::SwitchToFrame(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST
+            }
+            WebDriverCommand::SwitchToParentFrame => {
+                method = Method::POST
             }
             _ => {}
         }

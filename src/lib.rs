@@ -126,8 +126,8 @@ use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
 use tokio::sync::oneshot;
-use webdriver::command::{SendKeysParameters, WebDriverCommand};
-use webdriver::common::ELEMENT_KEY;
+use webdriver::command::{SendKeysParameters, WebDriverCommand, SwitchToFrameParameters};
+use webdriver::common::{ELEMENT_KEY, FrameId};
 use webdriver::error::WebDriverError;
 
 macro_rules! via_json {
@@ -665,6 +665,21 @@ impl Client {
         }
     }
 
+    /// Switches to the frame specified at the index.
+    pub async fn frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
+        let params = SwitchToFrameParameters {
+            id: index.map(FrameId::Short)
+        };
+        self.issue(WebDriverCommand::SwitchToFrame(params)).await?;
+        Ok(self)
+    }
+
+    /// Switches to the parent of the frame the client is currently contained within.
+    pub async fn parent_frame(mut self) -> Result<Client, error::CmdError> {
+        self.issue(WebDriverCommand::SwitchToParentFrame).await?;
+        Ok(self)
+    }
+
     /// Find an element on the page.
     pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
         self.by(search.into()).await
@@ -1015,6 +1030,18 @@ impl Element {
         }
         .click()
         .await
+    }
+
+    /// Switches to the frame contained within the element.
+    pub async fn frame(self) -> Result<Client, error::CmdError> {
+        let Self {
+            mut client, element
+        } = self;
+        let params = SwitchToFrameParameters {
+            id: Some(FrameId::Element(element))
+        };
+        client.issue(WebDriverCommand::SwitchToFrame(params)).await?;
+        Ok(client)
     }
 }
 
