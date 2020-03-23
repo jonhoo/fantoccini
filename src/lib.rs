@@ -127,7 +127,7 @@ use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
 use tokio::sync::oneshot;
-use webdriver::command::{SendKeysParameters, SwitchToFrameParameters, WebDriverCommand};
+use webdriver::command::{SendKeysParameters, SwitchToFrameParameters, WebDriverCommand, SwitchToWindowParameters, NewWindowParameters};
 use webdriver::common::{FrameId, ELEMENT_KEY};
 use webdriver::error::WebDriverError;
 
