@@ -313,7 +313,9 @@ impl Session {
                 Err(error::NewSessionError::NotW3C(Json::String(v)))
             }
             Err(error::CmdError::Standard(
-                e @ WebDriverError {
+                e
+                @
+                WebDriverError {
                     error: ErrorStatus::SessionNotCreated,
                     ..
                 },
@@ -488,8 +490,8 @@ impl Session {
             WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
             WebDriverCommand::GetWindowHandle => base.join("window"),
             WebDriverCommand::GetWindowHandles => base.join("window/handles"),
-            WebDriverCommand::NewWindow(..)=> base.join("window/new"),
-            WebDriverCommand::SwitchToWindow(..)=> base.join("window"),
+            WebDriverCommand::NewWindow(..) => base.join("window/new"),
+            WebDriverCommand::SwitchToWindow(..) => base.join("window"),
             WebDriverCommand::CloseWindow => base.join("window"),
             _ => unimplemented!(),
         }
@@ -583,21 +585,19 @@ impl Session {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST
             }
-            WebDriverCommand::SwitchToParentFrame => {
-                method = Method::POST
-            }
-            WebDriverCommand::GetWindowHandles| WebDriverCommand::GetWindowHandle => {},
+            WebDriverCommand::SwitchToParentFrame => method = Method::POST,
+            WebDriverCommand::GetWindowHandles | WebDriverCommand::GetWindowHandle => {}
             WebDriverCommand::SwitchToWindow(ref params) => {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST;
             }
-            WebDriverCommand::NewWindow(ref params)=> {
+            WebDriverCommand::NewWindow(ref params) => {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST;
-            },
+            }
             WebDriverCommand::CloseWindow => {
                 method = Method::DELETE;
-            },
+            }
             _ => {}
         }
 
