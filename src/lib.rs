@@ -777,7 +777,7 @@ impl Client {
     }
 
     /// Gets the current window handle.
-    pub async fn get_window_handle(&mut self) -> Result<Vec<webdriver::common::WebWindow>, error::CmdError> {
+    pub async fn get_window_handle(&mut self) -> Result<webdriver::common::WebWindow, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandle).await?;
         serde_json::from_value(res)
             .map_err(error::CmdError::Json)
