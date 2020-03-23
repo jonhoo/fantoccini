@@ -126,7 +126,7 @@ use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
 use tokio::sync::oneshot;
-use webdriver::command::{SendKeysParameters, WebDriverCommand};
+use webdriver::command::{SendKeysParameters, WebDriverCommand, SwitchToWindowParameters, NewWindowParameters};
 use webdriver::common::ELEMENT_KEY;
 use webdriver::error::WebDriverError;
 
@@ -760,6 +760,67 @@ impl Client {
         })
     }
 
+    /// Gets the current window handle.
+    pub async fn get_window_handle(&mut self) -> Result<Vec<webdriver::common::WebWindow>, error::CmdError> {
+        let res = self.issue(WebDriverCommand::GetWindowHandle).await?;
+        serde_json::from_value(res)
+            .map_err(error::CmdError::Json)
+    }
+
+    /// Gets a list of all active windows (and tabs)
+    pub async fn get_window_handles(&mut self) -> Result<Vec<webdriver::common::WebWindow>, error::CmdError> {
+        let res = self.issue(WebDriverCommand::GetWindowHandles).await?;
+        serde_json::from_value(res)
+            .map_err(error::CmdError::Json)
+    }
+
+    /// Switches to the chosen window.
+    pub async fn switch_to_window(&mut self, window: webdriver::common::WebWindow) -> Result<(), error::CmdError> {
+        let params = SwitchToWindowParameters {
+            handle: window.0
+        };
+        let _res = self.issue(WebDriverCommand::SwitchToWindow(params)).await?;
+        Ok(())
+    }
+
+    /// May close the session if no other windows exist.
+    pub async fn close_window(&mut self) -> Result<(), error::CmdError> {
+        let _res = self.issue(WebDriverCommand::CloseWindow).await?;
+        Ok(())
+    }
+
+    /// Creates a new window. If `is_tab` is `true`, then a tab will be created instead.
+    pub async fn new_window(&mut self, is_tab: bool) -> Result<webdriver::response::NewWindowResponse, error::CmdError> {
+        let type_hint = if is_tab {
+            "tab"
+        } else {
+            "window"
+        }.to_string();
+        let type_hint = Some(type_hint);
+        let params = NewWindowParameters {
+            type_hint
+        };
+        match self.issue(WebDriverCommand::NewWindow(params)).await? {
+            Json::Object(mut obj) => {
+                let handle = match obj.remove("handle").and_then(|x| x.as_str().map(String::from)) {
+                    Some(handle) => handle,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                let typ = match obj.remove("type").and_then(|x| x.as_str().map(String::from)) {
+                    Some(typ) => typ,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                Ok(webdriver::response::NewWindowResponse{
+                    handle,
+                    typ
+                })
+            }
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
     // helpers
 
     async fn by(
@@ -1177,3 +1238,4 @@ impl Form {
         self.client
     }
 }
+

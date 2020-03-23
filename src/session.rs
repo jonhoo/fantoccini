@@ -484,6 +484,11 @@ impl Session {
             WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
             WebDriverCommand::GetWindowRect => base.join("window/rect"),
             WebDriverCommand::TakeScreenshot => base.join("screenshot"),
+            WebDriverCommand::GetWindowHandle => base.join("window"),
+            WebDriverCommand::GetWindowHandles => base.join("window/handles"),
+            WebDriverCommand::NewWindow(..)=> base.join("window/new"),
+            WebDriverCommand::SwitchToWindow(..)=> base.join("window"),
+            WebDriverCommand::CloseWindow => base.join("window"),
             _ => unimplemented!(),
         }
     }
@@ -572,6 +577,18 @@ impl Session {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST;
             }
+            WebDriverCommand::GetWindowHandles| WebDriverCommand::GetWindowHandle => {},
+            WebDriverCommand::SwitchToWindow(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::NewWindow(ref params)=> {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            },
+            WebDriverCommand::CloseWindow => {
+                method = Method::DELETE;
+            },
             _ => {}
         }
 
