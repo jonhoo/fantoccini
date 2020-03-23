@@ -127,8 +127,8 @@ use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
 use tokio::sync::oneshot;
-use webdriver::command::{SendKeysParameters, WebDriverCommand, SwitchToFrameParameters};
-use webdriver::common::{ELEMENT_KEY, FrameId};
+use webdriver::command::{SendKeysParameters, SwitchToFrameParameters, WebDriverCommand};
+use webdriver::common::{FrameId, ELEMENT_KEY};
 use webdriver::error::WebDriverError;
 
 macro_rules! via_json {
@@ -1269,3 +1269,4 @@ impl Form {
         self.client
     }
 }
+
