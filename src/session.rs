@@ -586,7 +586,6 @@ impl Session {
                 method = Method::POST
             }
             WebDriverCommand::SwitchToParentFrame => method = Method::POST,
-            WebDriverCommand::GetWindowHandles | WebDriverCommand::GetWindowHandle => {}
             WebDriverCommand::SwitchToWindow(ref params) => {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST;
