@@ -779,6 +779,7 @@ impl Client {
     /// Gets the current window handle.
     pub async fn get_window_handle(&mut self) -> Result<webdriver::common::WebWindow, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandle).await?;
+        let res = dbg!(res);
         serde_json::from_value(res)
             .map_err(error::CmdError::Json)
     }
@@ -786,6 +787,7 @@ impl Client {
     /// Gets a list of all active windows (and tabs)
     pub async fn get_window_handles(&mut self) -> Result<Vec<webdriver::common::WebWindow>, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandles).await?;
+        let res = dbg!(res);
         serde_json::from_value(res)
             .map_err(error::CmdError::Json)
     }
