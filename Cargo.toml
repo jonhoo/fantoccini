@@ -40,3 +40,5 @@ http = "0.2"
 tokio = { version = "0.2.0", features = [ "full" ] }
 serial_test = "0.4"
 serial_test_derive = "0.4"
+warp = "0.2.2"
+port_scanner = "0.1.5"
