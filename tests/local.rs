@@ -150,11 +150,22 @@ async fn new_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn check_different_handles(mut c: Client, _port: u16) -> Result<(), error::CmdError> {
+async fn new_window_switch(mut c: Client, _port: u16) -> Result<(), error::CmdError> {
     let handle_1 = c.get_window_handle().await?;
     c.new_window(false).await?;
     let handle_2 = c.get_window_handle().await?;
-    assert_ne!(handle_1, handle_2, "After creating a new window, the session should have switched to it");
+    assert_eq!(handle_1, handle_2, "After creating a new window, the session should not have switched to it");
+
+    let all_handles = c.get_window_handles().await?;
+    let new_window_handle = all_handles
+        .into_iter()
+        .find(|handle| handle != &handle_1)
+        .expect("Should find a differing handle");
+
+    c.switch_to_window(new_window_handle).await?;
+
+    let handle_3 = c.get_window_handle().await?;
+    assert_ne!(handle_3, handle_2, "After switching to a new window, the handle should differ now.");
 
     c.close().await
 }
@@ -198,8 +209,8 @@ mod firefox {
 
     #[test]
     #[serial]
-    fn check_different_handles_test() {
-        tester!(check_different_handles, "firefox")
+    fn new_window_switch_test() {
+        tester!(new_window_switch, "firefox")
     }
 
     #[test]
@@ -233,8 +244,8 @@ mod chrome {
 
     #[test]
     #[serial]
-    fn check_different_handles_test() {
-        tester!(check_different_handles, "chrome")
+    fn new_window_switch_test() {
+        tester!(new_window_switch, "chrome")
     }
 
     #[test]
