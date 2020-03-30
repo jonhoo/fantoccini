@@ -160,7 +160,7 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://en.wikipedia.org/").await?;
     let es = c.find_all(Locator::Css("#p-interaction li")).await?;
-    let texts = future::try_join_all(
+    let texts = futures_util::future::try_join_all(
         es.into_iter()
             .take(4)
             .map(|mut e| async move { e.text().await }),
