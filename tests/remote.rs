@@ -1,9 +1,9 @@
 #[macro_use]
 extern crate serial_test_derive;
 
-use fantoccini::{Locator, Client, error, Method};
-use std::time::Duration;
+use fantoccini::{error, Client, Locator, Method};
 use futures_util::TryFutureExt;
+use std::time::Duration;
 use url::Url;
 
 mod common;
@@ -165,7 +165,7 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
             .take(4)
             .map(|mut e| async move { e.text().await }),
     )
-        .await?;
+    .await?;
     assert_eq!(
         texts,
         [
@@ -225,7 +225,7 @@ async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
         std::thread::sleep(Duration::from_secs(4));
         async move { Ok(true) }
     })
-        .await?;
+    .await?;
 
     c.close().await
 }

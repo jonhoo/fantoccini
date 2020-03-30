@@ -1,13 +1,12 @@
-
 extern crate fantoccini;
 extern crate futures_util;
 
 use fantoccini::{error, Client};
 
+use std::future::Future;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use warp::Filter;
-use std::net::{IpAddr, SocketAddr, Ipv4Addr};
-use std::future::Future;
 
 pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
     match s {
@@ -16,7 +15,7 @@ pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionErro
             let opts = serde_json::json!({ "args": ["--headless"] });
             caps.insert("moz:firefoxOptions".to_string(), opts.clone());
             Client::with_capabilities("http://localhost:4444", caps).await
-        },
+        }
         "chrome" => {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({
@@ -36,12 +35,14 @@ pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionErro
             caps.insert("goog:chromeOptions".to_string(), opts.clone());
 
             Client::with_capabilities("http://localhost:9515", caps).await
-        },
+        }
         browser => unimplemented!("unsupported browser backend {}", browser),
     }
 }
 
-pub fn handle_test_error(res: Result<Result<(), fantoccini::error::CmdError>, Box<dyn std::any::Any + Send>>) -> bool{
+pub fn handle_test_error(
+    res: Result<Result<(), fantoccini::error::CmdError>, Box<dyn std::any::Any + Send>>,
+) -> bool {
     match res {
         Ok(Ok(_)) => true,
         Ok(Err(e)) => {
@@ -78,7 +79,11 @@ macro_rules! local_tester {
         // run test in its own thread to catch panics
         let sid = session_id.clone();
         let res = thread::spawn(move || {
-            let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
+            let mut rt = tokio::runtime::Builder::new()
+                .enable_all()
+                .basic_scheduler()
+                .build()
+                .unwrap();
             let mut c = rt.block_on(c).expect("failed to construct test client");
             *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
             let x = rt.block_on($f(c, port));
@@ -88,9 +93,8 @@ macro_rules! local_tester {
         .join();
         let success = common::handle_test_error(res);
         assert!(success);
-    }}
+    }};
 }
-
 
 #[macro_export]
 macro_rules! tester {
@@ -108,7 +112,11 @@ macro_rules! tester {
         // run test in its own thread to catch panics
         let sid = session_id.clone();
         let res = thread::spawn(move || {
-            let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
+            let mut rt = tokio::runtime::Builder::new()
+                .enable_all()
+                .basic_scheduler()
+                .build()
+                .unwrap();
             let mut c = rt.block_on(c).expect("failed to construct test client");
             *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
             let x = rt.block_on($f(c));
@@ -119,7 +127,6 @@ macro_rules! tester {
         let success = common::handle_test_error(res);
         assert!(success);
     }};
-
 }
 
 /// Sets up the server and returns the port it bound to.
@@ -127,10 +134,15 @@ pub fn setup_server() -> u16 {
     let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
-        let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
+        let mut rt = tokio::runtime::Builder::new()
+            .enable_all()
+            .basic_scheduler()
+            .build()
+            .unwrap();
         let _ = rt.block_on(async {
             let (socket_addr, server) = start_server();
-            tx.send(socket_addr.port()).expect("To be able to send port");
+            tx.send(socket_addr.port())
+                .expect("To be able to send port");
             server.await
         });
     });
@@ -155,5 +167,3 @@ fn fileserver(
         .and(warp::fs::dir(assets_dir))
         .and(warp::path::end())
 }
-
-

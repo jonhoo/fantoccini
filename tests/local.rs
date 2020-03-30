@@ -7,7 +7,6 @@ use fantoccini::{error, Client};
 
 mod common;
 
-
 fn sample_page_url(port: u16) -> String {
     format!("http://localhost:{}/sample_page.html", port)
 }
@@ -55,7 +54,6 @@ async fn new_window_switch(mut c: Client) -> Result<(), error::CmdError> {
 
     c.close().await
 }
-
 
 async fn new_tab_switch(mut c: Client) -> Result<(), error::CmdError> {
     let window_1 = c.window().await?;
