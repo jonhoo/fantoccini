@@ -161,8 +161,7 @@ impl Error for CmdError {
         match *self {
             CmdError::Standard(ref e)
             | CmdError::NoSuchElement(ref e)
-            | CmdError::NoSuchWindow(ref e)
-            => Some(e),
+            | CmdError::NoSuchWindow(ref e) => Some(e),
             CmdError::BadUrl(ref e) => Some(e),
             CmdError::Failed(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
@@ -179,8 +178,7 @@ impl fmt::Display for CmdError {
         match *self {
             CmdError::Standard(ref e)
             | CmdError::NoSuchElement(ref e)
-            | CmdError::NoSuchWindow(ref e)
-            => write!(f, "{}", e),
+            | CmdError::NoSuchWindow(ref e) => write!(f, "{}", e),
             CmdError::BadUrl(ref e) => write!(f, "{}", e),
             CmdError::Failed(ref e) => write!(f, "{}", e),
             CmdError::Lost(ref e) => write!(f, "{}", e),

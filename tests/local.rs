@@ -4,9 +4,9 @@ extern crate fantoccini;
 extern crate futures_util;
 
 use fantoccini::{error, Client};
-use warp::Filter;
-use std::path::PathBuf;
 use std::net::Ipv4Addr;
+use std::path::PathBuf;
+use warp::Filter;
 
 macro_rules! tester {
     // Ident should identify an async fn that takes a mut Client and a port.
@@ -87,28 +87,28 @@ lazy_static::lazy_static! {
     static ref PORT_COUNTER: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(8000);
 }
 
-
 fn setup_server() -> u16 {
     let port: u16;
     loop {
         let prospective_port = PORT_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         if port_scanner::local_port_available(prospective_port) {
             port = prospective_port;
-            break
+            break;
         }
     }
 
     std::thread::spawn(move || {
-
-        let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
+        let mut rt = tokio::runtime::Builder::new()
+            .enable_all()
+            .basic_scheduler()
+            .build()
+            .unwrap();
         let server = start_server(port);
         rt.block_on(server);
     });
     std::thread::sleep(std::time::Duration::from_secs(1));
     port
 }
-
-
 
 /// Starts the fileserver
 async fn start_server(port: u16) {
@@ -121,9 +121,10 @@ async fn start_server(port: u16) {
     warp::serve(routes).run(addr).await
 }
 
-
 /// Serves files under this directory.
-fn fileserver(assets_dir: PathBuf) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+fn fileserver(
+    assets_dir: PathBuf,
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
         .and(warp::fs::dir(assets_dir))
         .and(warp::path::end())
@@ -132,7 +133,6 @@ fn fileserver(assets_dir: PathBuf) -> impl Filter<Extract = impl warp::Reply, Er
 fn sample_page_url(port: u16) -> String {
     format!("http://localhost:{}/sample_page.html", port)
 }
-
 
 async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
@@ -155,7 +155,10 @@ async fn new_window_switch(mut c: Client, _port: u16) -> Result<(), error::CmdEr
     let handle_1 = c.window().await?;
     c.new_window(false).await?;
     let handle_2 = c.window().await?;
-    assert_eq!(handle_1, handle_2, "After creating a new window, the session should not have switched to it");
+    assert_eq!(
+        handle_1, handle_2,
+        "After creating a new window, the session should not have switched to it"
+    );
 
     let all_handles = c.windows().await?;
     let new_window_handle = all_handles
@@ -166,11 +169,13 @@ async fn new_window_switch(mut c: Client, _port: u16) -> Result<(), error::CmdEr
     c.switch_to_window(new_window_handle).await?;
 
     let handle_3 = c.window().await?;
-    assert_ne!(handle_3, handle_2, "After switching to a new window, the handle should differ now.");
+    assert_ne!(
+        handle_3, handle_2,
+        "After switching to a new window, the handle should differ now."
+    );
 
     c.close().await
 }
-
 
 async fn new_tab(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
@@ -187,13 +192,18 @@ async fn close_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let window_1 = c.window().await?;
     c.new_window(true).await?;
     let window_2 = c.window().await?;
-    assert_eq!(window_1, window_2, "Creating a new window should not cause the client to switch to it.");
+    assert_eq!(
+        window_1, window_2,
+        "Creating a new window should not cause the client to switch to it."
+    );
 
     let handles = c.windows().await?;
     assert_eq!(handles.len(), 2);
 
     c.close_window().await?;
-    c.window().await.expect_err("After closing a window, the client can't find its currently selected window.");
+    c.window()
+        .await
+        .expect_err("After closing a window, the client can't find its currently selected window.");
 
     let other_window = handles
         .into_iter()
@@ -210,10 +220,11 @@ async fn close_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
 
 async fn close_window_twice_errors(mut c: Client, _port: u16) -> Result<(), error::CmdError> {
     c.close_window().await?;
-    c.close_window().await.expect_err("Should get a no such window error");
+    c.close_window()
+        .await
+        .expect_err("Should get a no such window error");
     Ok(())
 }
-
 
 mod firefox {
     use super::*;
@@ -254,7 +265,6 @@ mod firefox {
     }
 }
 
-
 mod chrome {
     use super::*;
     #[test]
@@ -287,12 +297,9 @@ mod chrome {
         tester!(close_window, "chrome")
     }
 
-
     #[test]
     #[serial]
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "chrome")
     }
 }
-
-
