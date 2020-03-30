@@ -175,27 +175,30 @@ async fn close_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
 }
 
 
-#[test]
-#[serial]
-fn navigate_to_other_page() {
-    tester!(goto, "firefox")
+mod firefox {
+    #[test]
+    #[serial]
+    fn navigate_to_other_page() {
+        tester!(goto, "firefox")
+    }
+
+    #[test]
+    #[serial]
+    fn new_window_test() {
+        tester!(new_window, "firefox")
+    }
+
+    #[test]
+    #[serial]
+    fn new_tab_test() {
+        tester!(new_tab, "firefox")
+    }
+
+    #[test]
+    #[serial]
+    fn close_window_test() {
+        tester!(close_window, "firefox")
+    }
 }
 
-#[test]
-#[serial]
-fn new_window_test() {
-    tester!(new_window, "firefox")
-}
-
-#[test]
-#[serial]
-fn new_tab_test() {
-    tester!(new_tab, "firefox")
-}
-
-#[test]
-#[serial]
-fn close_window_test() {
-    tester!(close_window, "firefox")
-}
 
