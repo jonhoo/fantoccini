@@ -17,13 +17,12 @@ before_install:
  - tar -xzf geckodriver-v0.26.0-linux64.tar.gz -C geckodriver
  - export PATH=$PATH:$PWD/geckodriver
 before_script:
- - geckodriver --version > geckodriver_version.log 2>&1 &
+ - geckodriver --version
  - chromedriver --verbose > chromedriver.log 2>&1 &
  - geckodriver -v > geckodriver.log 2>&1 &
 after_failure:
- - cat geckodriver_version.log
-# - cat chromedriver.log
-# - cat geckodriver.log
+ - cat chromedriver.log
+ - cat geckodriver.log
 script:
  - cargo build --verbose
  - cargo test --verbose
