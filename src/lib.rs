@@ -780,7 +780,7 @@ impl Client {
     }
 
     /// Gets the current window handle.
-    pub async fn get_window_handle(
+    pub async fn window(
         &mut self,
     ) -> Result<webdriver::common::WebWindow, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandle).await?;
@@ -791,7 +791,7 @@ impl Client {
     }
 
     /// Gets a list of all active windows (and tabs)
-    pub async fn get_window_handles(
+    pub async fn windows(
         &mut self,
     ) -> Result<Vec<webdriver::common::WebWindow>, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandles).await?;
@@ -817,7 +817,13 @@ impl Client {
         Ok(())
     }
 
-    /// May close the session if no other windows exist.
+    /// Closes the current window.
+    ///
+    /// Will close the session if no other windows exist.
+    ///
+    /// Closing a window will not switch the client to one of the remaining windows.
+    /// The switching must be done by calling `switch_to_window` using a still live window
+    /// after the current window has been closed.
     pub async fn close_window(&mut self) -> Result<(), error::CmdError> {
         let _res = self.issue(WebDriverCommand::CloseWindow).await?;
         Ok(())
@@ -828,13 +834,13 @@ impl Client {
     /// Requires geckodriver > 0.24 and firefox > 66
     ///
     /// Windows are treated the same as tabs by the webdriver protocol.
-    /// The functions `new_window`, `switch_to_window`, `close_window`, `get_window_handle` and `get_window_handles`
+    /// The functions `new_window`, `switch_to_window`, `close_window`, `window` and `windows`
     /// all operate on both tabs and windows.
     pub async fn new_window(
         &mut self,
-        is_tab: bool,
+        as_tab: bool,
     ) -> Result<webdriver::response::NewWindowResponse, error::CmdError> {
-        let type_hint = if is_tab { "tab" } else { "window" }.to_string();
+        let type_hint = if as_tab { "tab" } else { "window" }.to_string();
         let type_hint = Some(type_hint);
         let params = NewWindowParameters { type_hint };
         match self.issue(WebDriverCommand::NewWindow(params)).await? {

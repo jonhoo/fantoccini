@@ -6,6 +6,7 @@ extern crate futures_util;
 use fantoccini::{error, Client};
 use warp::Filter;
 use std::path::PathBuf;
+use std::net::Ipv4Addr;
 
 macro_rules! tester {
     // Ident should identify an async fn that takes a mut Client and a port.
@@ -111,7 +112,7 @@ fn setup_server() -> u16 {
 
 /// Starts the fileserver
 async fn start_server(port: u16) {
-    let localhost = [0, 0, 0, 0];
+    let localhost = Ipv4Addr::LOCALHOST;
     let addr = (localhost, port);
 
     const ASSETS_DIR: &str = "tests/test_html";
@@ -145,18 +146,18 @@ async fn new_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.new_window(false).await?;
-    let handles = c.get_window_handles().await?;
+    let handles = c.windows().await?;
     assert_eq!(handles.len(), 2);
     c.close().await
 }
 
 async fn new_window_switch(mut c: Client, _port: u16) -> Result<(), error::CmdError> {
-    let handle_1 = c.get_window_handle().await?;
+    let handle_1 = c.window().await?;
     c.new_window(false).await?;
-    let handle_2 = c.get_window_handle().await?;
+    let handle_2 = c.window().await?;
     assert_eq!(handle_1, handle_2, "After creating a new window, the session should not have switched to it");
 
-    let all_handles = c.get_window_handles().await?;
+    let all_handles = c.windows().await?;
     let new_window_handle = all_handles
         .into_iter()
         .find(|handle| handle != &handle_1)
@@ -164,7 +165,7 @@ async fn new_window_switch(mut c: Client, _port: u16) -> Result<(), error::CmdEr
 
     c.switch_to_window(new_window_handle).await?;
 
-    let handle_3 = c.get_window_handle().await?;
+    let handle_3 = c.window().await?;
     assert_ne!(handle_3, handle_2, "After switching to a new window, the handle should differ now.");
 
     c.close().await
@@ -175,7 +176,7 @@ async fn new_tab(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.new_window(true).await?;
-    let handles = c.get_window_handles().await?;
+    let handles = c.windows().await?;
     assert_eq!(handles.len(), 2);
     c.close().await
 }
@@ -183,13 +184,34 @@ async fn new_tab(mut c: Client, port: u16) -> Result<(), error::CmdError> {
 async fn close_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
+    let window_1 = c.window().await?;
     c.new_window(true).await?;
-    let handles = c.get_window_handles().await?;
+    let window_2 = c.window().await?;
+    assert_eq!(window_1, window_2, "Creating a new window should not cause the client to switch to it.");
+
+    let handles = c.windows().await?;
     assert_eq!(handles.len(), 2);
+
     c.close_window().await?;
-    let handles = c.get_window_handles().await?;
-    assert_eq!(handles.len(), 1);
-    c.close().await
+    c.window().await.expect_err("After closing a window, the client can't find its currently selected window.");
+
+    let other_window = handles
+        .into_iter()
+        .find(|handle| handle != &window_2)
+        .expect("Should find a differing handle");
+    c.switch_to_window(other_window).await?;
+
+    // Close the session by closing the remaining window
+    c.close_window().await?;
+
+    c.windows().await.expect_err("Session should be closed.");
+    Ok(())
+}
+
+async fn close_window_twice_errors(mut c: Client, _port: u16) -> Result<(), error::CmdError> {
+    c.close_window().await?;
+    c.close_window().await.expect_err("Should get a no such window error");
+    Ok(())
 }
 
 
@@ -225,6 +247,11 @@ mod firefox {
         tester!(close_window, "firefox")
     }
 
+    #[test]
+    #[serial]
+    fn double_close_window_test() {
+        tester!(close_window_twice_errors, "firefox")
+    }
 }
 
 
@@ -258,6 +285,13 @@ mod chrome {
     #[serial]
     fn close_window_test() {
         tester!(close_window, "chrome")
+    }
+
+
+    #[test]
+    #[serial]
+    fn double_close_window_test() {
+        tester!(close_window_twice_errors, "chrome")
     }
 }
 
