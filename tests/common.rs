@@ -131,10 +131,9 @@ pub fn setup_server() -> u16 {
         let _ = rt.block_on(async {
             let (socket_addr, server) = start_server();
             tx.send(socket_addr.port()).expect("To be able to send port");
-            server
+            server.await
         });
     });
-    std::thread::sleep(std::time::Duration::from_secs(5));
 
     rx.recv().expect("To get the bound port.")
 }

@@ -24,43 +24,63 @@ async fn new_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.new_window(false).await?;
-    let handles = c.windows().await?;
-    assert_eq!(handles.len(), 2);
+    let windows = c.windows().await?;
+    assert_eq!(windows.len(), 2);
     c.close().await
 }
 
-async fn new_window_switch(mut c: Client, _port: u16) -> Result<(), error::CmdError> {
-    let handle_1 = c.window().await?;
+async fn new_window_switch(mut c: Client) -> Result<(), error::CmdError> {
+    let window_1 = c.window().await?;
     c.new_window(false).await?;
-    let handle_2 = c.window().await?;
+    let window_2 = c.window().await?;
     assert_eq!(
-        handle_1, handle_2,
+        window_1, window_2,
         "After creating a new window, the session should not have switched to it"
     );
 
-    let all_handles = c.windows().await?;
-    let new_window_handle = all_handles
+    let all_windows = c.windows().await?;
+    assert_eq!(all_windows.len(), 2);
+    let new_window = all_windows
         .into_iter()
-        .find(|handle| handle != &handle_1)
-        .expect("Should find a differing handle");
+        .find(|handle| handle != &window_1)
+        .expect("Should find a differing window handle");
 
-    c.switch_to_window(new_window_handle).await?;
+    c.switch_to_window(new_window).await?;
 
-    let handle_3 = c.window().await?;
+    let window_3 = c.window().await?;
     assert_ne!(
-        handle_3, handle_2,
-        "After switching to a new window, the handle should differ now."
+        window_3, window_2,
+        "After switching to a new window, the window handle returned from window() should differ now."
     );
 
     c.close().await
 }
 
-async fn new_tab(mut c: Client, port: u16) -> Result<(), error::CmdError> {
-    let url = sample_page_url(port);
-    c.goto(&url).await?;
+
+async fn new_tab_switch(mut c: Client) -> Result<(), error::CmdError> {
+    let window_1 = c.window().await?;
     c.new_window(true).await?;
-    let handles = c.windows().await?;
-    assert_eq!(handles.len(), 2);
+    let window_2 = c.window().await?;
+    assert_eq!(
+        window_1, window_2,
+        "After creating a new window, the session should not have switched to it"
+    );
+
+    let all_windows = c.windows().await?;
+    assert_eq!(all_windows.len(), 2);
+    let new_window = all_windows
+        .into_iter()
+        .find(|handle| handle != &window_1)
+        .expect("Should find a differing window handle");
+
+    c.switch_to_window(new_window).await?;
+
+    let window_3 = c.window().await?;
+    assert_ne!(
+        window_3, window_2,
+        "After switching to a new window, the window handle returned from window() should differ now."
+    );
+
     c.close().await
 }
 
@@ -121,13 +141,13 @@ mod firefox {
     #[test]
     #[serial]
     fn new_window_switch_test() {
-        local_tester!(new_window_switch, "firefox")
+        tester!(new_window_switch, "firefox")
     }
 
     #[test]
     #[serial]
-    fn new_tab_test() {
-        local_tester!(new_tab, "firefox")
+    fn new_tab_switch_test() {
+        tester!(new_tab_switch, "firefox")
     }
 
     #[test]
@@ -160,13 +180,13 @@ mod chrome {
     #[test]
     #[serial]
     fn new_window_switch_test() {
-        local_tester!(new_window_switch, "chrome")
+        tester!(new_window_switch, "chrome")
     }
 
     #[test]
     #[serial]
     fn new_tab_test() {
-        local_tester!(new_tab, "chrome")
+        tester!(new_tab_switch, "chrome")
     }
 
     #[test]
