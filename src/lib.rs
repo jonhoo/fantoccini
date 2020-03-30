@@ -824,6 +824,8 @@ impl Client {
     }
 
     /// Creates a new window. If `is_tab` is `true`, then a tab will be created instead.
+    ///
+    /// (requires geckodriver > 0.26)
     pub async fn new_window(
         &mut self,
         is_tab: bool,
