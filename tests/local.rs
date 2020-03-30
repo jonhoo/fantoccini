@@ -176,6 +176,7 @@ async fn close_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
 
 
 mod firefox {
+    use super::*;
     #[test]
     #[serial]
     fn navigate_to_other_page() {
