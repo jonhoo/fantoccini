@@ -109,22 +109,20 @@ fn setup_server() -> u16 {
 
 
 
+/// Starts the fileserver
 async fn start_server(port: u16) {
-
     let localhost = [0, 0, 0, 0];
     let addr = (localhost, port);
 
-    // You will need to change this if you use this as a template for your application.
-
     const ASSETS_DIR: &str = "tests/test_html";
     let assets_dir: PathBuf = PathBuf::from(ASSETS_DIR);
-    let routes = static_files_handler(assets_dir);
+    let routes = fileserver(assets_dir);
     warp::serve(routes).run(addr).await
 }
 
 
-/// Expose filters that work with static files
-fn static_files_handler(assets_dir: PathBuf) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+/// Serves files under this directory.
+fn fileserver(assets_dir: PathBuf) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::get()
         .and(warp::fs::dir(assets_dir))
         .and(warp::path::end())
@@ -149,6 +147,15 @@ async fn new_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.new_window(false).await?;
     let handles = c.get_window_handles().await?;
     assert_eq!(handles.len(), 2);
+    c.close().await
+}
+
+async fn check_different_handles(mut c: Client, _port: u16) -> Result<(), error::CmdError> {
+    let handle_1 = c.get_window_handle().await?;
+    c.new_window(false).await?;
+    let handle_2 = c.get_window_handle().await?;
+    assert_ne!(handle_1, handle_2, "After creating a new window, the session should have switched to it");
+
     c.close().await
 }
 
@@ -191,6 +198,12 @@ mod firefox {
 
     #[test]
     #[serial]
+    fn check_different_handles_test() {
+        tester!(check_different_handles, "firefox")
+    }
+
+    #[test]
+    #[serial]
     fn new_tab_test() {
         tester!(new_tab, "firefox")
     }
@@ -199,6 +212,41 @@ mod firefox {
     #[serial]
     fn close_window_test() {
         tester!(close_window, "firefox")
+    }
+
+}
+
+
+mod chrome {
+    use super::*;
+    #[test]
+    #[serial]
+    fn navigate_to_other_page() {
+        tester!(goto, "chrome")
+    }
+
+    #[test]
+    #[serial]
+    fn new_window_test() {
+        tester!(new_window, "chrome")
+    }
+
+    #[test]
+    #[serial]
+    fn check_different_handles_test() {
+        tester!(check_different_handles, "chrome")
+    }
+
+    #[test]
+    #[serial]
+    fn new_tab_test() {
+        tester!(new_tab, "chrome")
+    }
+
+    #[test]
+    #[serial]
+    fn close_window_test() {
+        tester!(close_window, "chrome")
     }
 }
 

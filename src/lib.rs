@@ -825,7 +825,11 @@ impl Client {
 
     /// Creates a new window. If `is_tab` is `true`, then a tab will be created instead.
     ///
-    /// (requires geckodriver > 0.26)
+    /// Requires geckodriver > 0.24 and firefox > 66
+    ///
+    /// Windows are treated the same as tabs by the webdriver protocol.
+    /// The functions `new_window`, `switch_to_window`, `close_window`, `get_window_handle` and `get_window_handles`
+    /// all operate on both tabs and windows.
     pub async fn new_window(
         &mut self,
         is_tab: bool,
