@@ -4,47 +4,73 @@ extern crate fantoccini;
 extern crate futures_util;
 
 use fantoccini::{error, Client};
-use std::net::Ipv4Addr;
+use std::net::{Ipv4Addr, TcpListener, SocketAddr};
 use std::path::PathBuf;
 use warp::Filter;
+use futures_core::Future;
+use fantoccini::error::CmdError;
+use warp::test::request;
 
-macro_rules! tester {
-    // Ident should identify an async fn that takes a mut Client and a port.
+
+async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
+    match s {
+        "firefox" => {
+            let mut caps = serde_json::map::Map::new();
+            let opts = serde_json::json!({ "args": ["--headless"] });
+            caps.insert("moz:firefoxOptions".to_string(), opts.clone());
+            Client::with_capabilities("http://localhost:4444", caps).await
+        },
+        "chrome" => {
+            let mut caps = serde_json::map::Map::new();
+            let opts = serde_json::json!({
+                "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
+                "binary":
+                    if std::path::Path::new("/usr/bin/chromium-browser").exists() {
+                        // on Ubuntu, it's called chromium-browser
+                        "/usr/bin/chromium-browser"
+                    } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
+                        // macOS
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                    } else {
+                        // elsewhere, it's just called chromium
+                        "/usr/bin/chromium"
+                    }
+            });
+            caps.insert("goog:chromeOptions".to_string(), opts.clone());
+
+            Client::with_capabilities("http://localhost:9515", caps).await
+        },
+        browser => unimplemented!("unsupported browser backend {}", browser),
+    }
+}
+
+fn handle_test_error(res: Result<Result<(), CmdError>, Box<dyn std::any::Any + Send>>) -> bool{
+    match res {
+        Ok(Ok(_)) => true,
+        Ok(Err(e)) => {
+            eprintln!("test future failed to resolve: {:?}", e);
+            false
+        }
+        Err(e) => {
+            if let Some(e) = e.downcast_ref::<error::CmdError>() {
+                eprintln!("test future panicked: {:?}", e);
+            } else if let Some(e) = e.downcast_ref::<error::NewSessionError>() {
+                eprintln!("test future panicked: {:?}", e);
+            } else {
+                eprintln!("test future panicked; an assertion probably failed");
+            }
+            false
+        }
+    }
+}
+
+macro_rules! local_tester {
     ($f:ident, $endpoint:expr) => {{
         use std::sync::{Arc, Mutex};
         use std::thread;
 
-        let port = setup_server();
-
-        let c = match $endpoint {
-            "firefox" => {
-                let mut caps = serde_json::map::Map::new();
-                let opts = serde_json::json!({ "args": ["--headless"] });
-                caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-                Client::with_capabilities("http://localhost:4444", caps)
-            },
-            "chrome" => {
-                let mut caps = serde_json::map::Map::new();
-                let opts = serde_json::json!({
-                    "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
-                    "binary":
-                        if std::path::Path::new("/usr/bin/chromium-browser").exists() {
-                            // on Ubuntu, it's called chromium-browser
-                            "/usr/bin/chromium-browser"
-                        } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
-                            // macOS
-                            "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                        } else {
-                            // elsewhere, it's just called chromium
-                            "/usr/bin/chromium"
-                        }
-                });
-                caps.insert("goog:chromeOptions".to_string(), opts.clone());
-
-                Client::with_capabilities("http://localhost:9515", caps)
-            },
-            browser => unimplemented!("unsupported browser backend {}", browser),
-        };
+        let port: u16 = setup_server();
+        let c = select_client_type($endpoint);
 
         // we'll need the session_id from the thread
         // NOTE: even if it panics, so can't just return it
@@ -52,73 +78,93 @@ macro_rules! tester {
 
         // run test in its own thread to catch panics
         let sid = session_id.clone();
-        let success = match thread::spawn(move || {
-            let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
+        let res = thread::spawn(move || {
+        let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
             let mut c = rt.block_on(c).expect("failed to construct test client");
             *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
             let x = rt.block_on($f(c, port));
             drop(rt);
             x
         })
-        .join()
-        {
-            Ok(Ok(_)) => true,
-            Ok(Err(e)) => {
-                eprintln!("test future failed to resolve: {:?}", e);
-                false
-            }
-            Err(e) => {
-                if let Some(e) = e.downcast_ref::<error::CmdError>() {
-                    eprintln!("test future panicked: {:?}", e);
-                } else if let Some(e) = e.downcast_ref::<error::NewSessionError>() {
-                    eprintln!("test future panicked: {:?}", e);
-                } else {
-                    eprintln!("test future panicked; an assertion probably failed");
-                }
-                false
-            }
-        };
-
+        .join();
+        let success = handle_test_error(res);
         assert!(success);
-    }};
+    }}
 }
 
-lazy_static::lazy_static! {
-    static ref PORT_COUNTER: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(8000);
+
+macro_rules! tester {
+    // Ident should identify an async fn that takes just a Client.
+    ($f:ident, $endpoint:expr) => {{
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+
+        let c = select_client_type($endpoint);
+
+        // we'll need the session_id from the thread
+        // NOTE: even if it panics, so can't just return it
+        let session_id = Arc::new(Mutex::new(None));
+
+        // run test in its own thread to catch panics
+        let sid = session_id.clone();
+        let res = thread::spawn(move || {
+            let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
+            let mut c = rt.block_on(c).expect("failed to construct test client");
+            *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
+            let x = rt.block_on($f(c));
+            drop(rt);
+            x
+        });
+        let success = handle_test_error(res);
+        assert!(success);
+    }};
+
 }
 
 fn setup_server() -> u16 {
-    let port: u16;
+    let (tx, rx) = std::sync::mpsc::channel();
+
+     std::thread::spawn(move || {
+         let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
+         let _ = rt.block_on(async {
+             let socket_addr = TcpListener::bind("127.0.0.1:0")
+                .unwrap()
+                .local_addr()
+                .unwrap();
+             let (socket_addr, server) = start_server(socket_addr);
+             tx.send(socket_addr.port()).expect("To be able to send");
+             server
+        });
+    });
+
+    let port = rx.recv().expect("to get port");
+    println!("got port: {}", port);
+
+    let url = format!("http://localhost:{}/sample_page.html", port);
+    let mut count = 0;
     loop {
-        let prospective_port = PORT_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        if port_scanner::local_port_available(prospective_port) {
-            port = prospective_port;
-            break;
+        match reqwest::blocking::get(&url) {
+            Ok(..) => break,
+            e => {
+                println!("error: {:?}", e);
+                count += 1;
+                if count > 100 {
+                    break;
+                }
+
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
         }
     }
-
-    std::thread::spawn(move || {
-        let mut rt = tokio::runtime::Builder::new()
-            .enable_all()
-            .basic_scheduler()
-            .build()
-            .unwrap();
-        let server = start_server(port);
-        rt.block_on(server);
-    });
-    std::thread::sleep(std::time::Duration::from_secs(1));
     port
 }
 
 /// Starts the fileserver
-async fn start_server(port: u16) {
-    let localhost = Ipv4Addr::LOCALHOST;
-    let addr = (localhost, port);
-
+fn start_server(socket_addr: SocketAddr) -> (SocketAddr, impl Future<Output = ()> + 'static) {
     const ASSETS_DIR: &str = "tests/test_html";
     let assets_dir: PathBuf = PathBuf::from(ASSETS_DIR);
     let routes = fileserver(assets_dir);
-    warp::serve(routes).run(addr).await
+    warp::serve(routes).bind_ephemeral(socket_addr)
 }
 
 /// Serves files under this directory.
@@ -231,37 +277,37 @@ mod firefox {
     #[test]
     #[serial]
     fn navigate_to_other_page() {
-        tester!(goto, "firefox")
+        local_tester!(goto, "firefox")
     }
 
     #[test]
     #[serial]
     fn new_window_test() {
-        tester!(new_window, "firefox")
+        local_tester!(new_window, "firefox")
     }
 
     #[test]
     #[serial]
     fn new_window_switch_test() {
-        tester!(new_window_switch, "firefox")
+        local_tester!(new_window_switch, "firefox")
     }
 
     #[test]
     #[serial]
     fn new_tab_test() {
-        tester!(new_tab, "firefox")
+        local_tester!(new_tab, "firefox")
     }
 
     #[test]
     #[serial]
     fn close_window_test() {
-        tester!(close_window, "firefox")
+        local_tester!(close_window, "firefox")
     }
 
     #[test]
     #[serial]
     fn double_close_window_test() {
-        tester!(close_window_twice_errors, "firefox")
+        local_tester!(close_window_twice_errors, "firefox")
     }
 }
 
@@ -270,36 +316,36 @@ mod chrome {
     #[test]
     #[serial]
     fn navigate_to_other_page() {
-        tester!(goto, "chrome")
+        local_tester!(goto, "chrome")
     }
 
     #[test]
     #[serial]
     fn new_window_test() {
-        tester!(new_window, "chrome")
+        local_tester!(new_window, "chrome")
     }
 
     #[test]
     #[serial]
     fn new_window_switch_test() {
-        tester!(new_window_switch, "chrome")
+        local_tester!(new_window_switch, "chrome")
     }
 
     #[test]
     #[serial]
     fn new_tab_test() {
-        tester!(new_tab, "chrome")
+        local_tester!(new_tab, "chrome")
     }
 
     #[test]
     #[serial]
     fn close_window_test() {
-        tester!(close_window, "chrome")
+        local_tester!(close_window, "chrome")
     }
 
     #[test]
     #[serial]
     fn double_close_window_test() {
-        tester!(close_window_twice_errors, "chrome")
+        local_tester!(close_window_twice_errors, "chrome")
     }
 }
