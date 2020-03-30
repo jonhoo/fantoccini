@@ -3,12 +3,9 @@ extern crate serial_test_derive;
 extern crate fantoccini;
 extern crate futures_util;
 
-use fantoccini::{error, Client, Locator, Method};
-
-use futures_util::future;
-use futures_util::TryFutureExt;
-use std::time::Duration;
-use url::Url;
+use fantoccini::{error, Client};
+use warp::Filter;
+use std::path::PathBuf;
 
 macro_rules! tester {
     // Ident should identify an async fn that takes a mut Client and a port.
@@ -110,16 +107,7 @@ fn setup_server() -> u16 {
     port
 }
 
-use std::path::PathBuf;
 
-#[rustfmt::skip]
-use warp::{
-    filters::BoxedFilter,
-    fs::File,
-    path::Peek,
-    path,
-    Filter, Reply,
-};
 
 async fn start_server(port: u16) {
 
