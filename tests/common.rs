@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 extern crate fantoccini;
 extern crate futures_util;
 

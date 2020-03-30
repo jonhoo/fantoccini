@@ -1,3 +1,4 @@
+//! Tests that make use of external websites.
 #[macro_use]
 extern crate serial_test_derive;
 
