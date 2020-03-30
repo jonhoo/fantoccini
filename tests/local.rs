@@ -85,8 +85,21 @@ macro_rules! tester {
     }};
 }
 
+lazy_static::lazy_static! {
+    static ref PORT_COUNTER: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(8000);
+}
+
+
 fn setup_server() -> u16 {
-    let port = port_scanner::local_ports_available_range(8000..10_000).pop().expect("no available port");
+    let port: u16;
+    loop {
+        let prospective_port = PORT_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        if port_scanner::local_port_available(prospective_port) {
+            port = prospective_port;
+            break
+        }
+    }
+
     std::thread::spawn(move || {
 
         let mut rt = tokio::runtime::Builder::new().enable_all().basic_scheduler().build().unwrap();
@@ -139,7 +152,7 @@ async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.goto(&url).await?;
     let current_url = c.current_url().await?;
     assert_eq!(url.as_str(), current_url.as_str());
-    Ok(())
+    c.close().await
 }
 
 async fn new_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
@@ -148,7 +161,7 @@ async fn new_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.new_window(false).await?;
     let handles = c.get_window_handles().await?;
     assert_eq!(handles.len(), 2);
-    Ok(())
+    c.close().await
 }
 
 
@@ -158,7 +171,7 @@ async fn new_tab(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.new_window(true).await?;
     let handles = c.get_window_handles().await?;
     assert_eq!(handles.len(), 2);
-    Ok(())
+    c.close().await
 }
 
 async fn close_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
@@ -170,26 +183,30 @@ async fn close_window(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.close_window().await?;
     let handles = c.get_window_handles().await?;
     assert_eq!(handles.len(), 1);
-    Ok(())
+    c.close().await
 }
 
 
 #[test]
+#[serial]
 fn navigate_to_other_page() {
     tester!(goto, "firefox")
 }
 
 #[test]
+#[serial]
 fn new_window_test() {
     tester!(new_window, "firefox")
 }
 
 #[test]
+#[serial]
 fn new_tab_test() {
     tester!(new_tab, "firefox")
 }
 
 #[test]
+#[serial]
 fn close_window_test() {
     tester!(close_window, "firefox")
 }
