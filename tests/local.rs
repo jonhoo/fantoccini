@@ -23,7 +23,10 @@ async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
 async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
-    c.find(Locator::Css("#other_page_id")).await?.click().await?;
+    c.find(Locator::Css("#other_page_id"))
+        .await?
+        .click()
+        .await?;
 
     let new_url = c.current_url().await?;
     let expected_url = format!("http://localhost:{}/other_page.html", port);
@@ -36,9 +39,14 @@ async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     let url = sample_page_url(port);
     c.goto(&url).await?;
     // Go to the page that holds the iframe
-    c.find(Locator::Css("#iframe_page_id")).await?.click().await?;
+    c.find(Locator::Css("#iframe_page_id"))
+        .await?
+        .click()
+        .await?;
 
-    c.find(Locator::Id("iframe_button")).await.expect_err("should not find the button in the iframe");
+    c.find(Locator::Id("iframe_button"))
+        .await
+        .expect_err("should not find the button in the iframe");
     c.find(Locator::Id("root_button")).await?; // Can find the button in the root context though.
 
     // find and switch into the iframe
@@ -46,9 +54,11 @@ async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     iframe_element.frame().await?;
 
     // search for something in the iframe
-    let button_in_iframe= c.find(Locator::Id("iframe_button")).await?;
+    let button_in_iframe = c.find(Locator::Id("iframe_button")).await?;
     button_in_iframe.click().await?;
-    c.find(Locator::Id("root_button")).await.expect_err("Should not be able to access content in the root context");
+    c.find(Locator::Id("root_button"))
+        .await
+        .expect_err("Should not be able to access content in the root context");
 
     // switch back to the root context and access content there.
     let mut c = c.parent_frame().await?;
