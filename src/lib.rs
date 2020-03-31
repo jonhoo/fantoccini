@@ -670,7 +670,7 @@ impl Client {
     }
 
     /// Switches to the frame specified at the index.
-    pub async fn frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
         let params = SwitchToFrameParameters {
             id: index.map(FrameId::Short),
         };
@@ -679,7 +679,7 @@ impl Client {
     }
 
     /// Switches to the parent of the frame the client is currently contained within.
-    pub async fn parent_frame(mut self) -> Result<Client, error::CmdError> {
+    pub async fn enter_parent_frame(mut self) -> Result<Client, error::CmdError> {
         self.issue(WebDriverCommand::SwitchToParentFrame).await?;
         Ok(self)
     }
@@ -1121,7 +1121,7 @@ impl Element {
     }
 
     /// Switches to the frame contained within the element.
-    pub async fn frame(self) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
         let Self {
             mut client,
             element,

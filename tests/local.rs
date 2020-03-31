@@ -51,7 +51,7 @@ async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> 
 
     // find and switch into the iframe
     let iframe_element = c.find(Locator::Id("iframe")).await?;
-    iframe_element.frame().await?;
+    iframe_element.enter_frame().await?;
 
     // search for something in the iframe
     let button_in_iframe = c.find(Locator::Id("iframe_button")).await?;
@@ -61,7 +61,7 @@ async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> 
         .expect_err("Should not be able to access content in the root context");
 
     // switch back to the root context and access content there.
-    let mut c = c.parent_frame().await?;
+    let mut c = c.enter_parent_frame().await?;
     c.find(Locator::Id("root_button")).await?;
 
     c.close().await
