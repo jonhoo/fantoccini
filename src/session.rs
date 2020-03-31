@@ -488,6 +488,11 @@ impl Session {
             WebDriverCommand::TakeScreenshot => base.join("screenshot"),
             WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
             WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
+            WebDriverCommand::GetWindowHandle => base.join("window"),
+            WebDriverCommand::GetWindowHandles => base.join("window/handles"),
+            WebDriverCommand::NewWindow(..) => base.join("window/new"),
+            WebDriverCommand::SwitchToWindow(..) => base.join("window"),
+            WebDriverCommand::CloseWindow => base.join("window"),
             _ => unimplemented!(),
         }
     }
@@ -580,7 +585,21 @@ impl Session {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST
             }
-            WebDriverCommand::SwitchToParentFrame => method = Method::POST,
+            WebDriverCommand::SwitchToParentFrame => {
+                body = Some("{}".to_string());
+                method = Method::POST
+            }
+            WebDriverCommand::SwitchToWindow(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::NewWindow(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::CloseWindow => {
+                method = Method::DELETE;
+            }
             _ => {}
         }
 
@@ -762,6 +781,7 @@ impl Session {
                             "no such cookie" => ErrorStatus::NoSuchCookie,
                             "invalid session id" => ErrorStatus::InvalidSessionId,
                             "no such element" => ErrorStatus::NoSuchElement,
+                            "no such window" => ErrorStatus::NoSuchWindow,
                             _ => unreachable!(
                                 "received unknown error ({}) for NOT_FOUND status code",
                                 error

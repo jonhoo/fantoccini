@@ -74,6 +74,14 @@ pub enum CmdError {
     /// ["no such element"]: https://www.w3.org/TR/webdriver/#dfn-no-such-element
     NoSuchElement(wderror::WebDriverError),
 
+    /// The requested window does not exist.
+    ///
+    /// This variant lifts the ["no such window"] error variant from `Standard` to simplify
+    /// checking for it in user code.
+    ///
+    /// ["no such window"]: https://www.w3.org/TR/webdriver/#dfn-no-such-window
+    NoSuchWindow(wderror::WebDriverError),
+
     /// A bad URL was encountered during parsing.
     ///
     /// This normally happens if a link is clicked or the current URL is requested, but the URL in
@@ -137,6 +145,7 @@ impl Error for CmdError {
         match *self {
             CmdError::Standard(..) => "webdriver returned error",
             CmdError::NoSuchElement(..) => "no element found matching selector",
+            CmdError::NoSuchWindow(..) => "no window is currently selected",
             CmdError::BadUrl(..) => "bad url provided",
             CmdError::Failed(..) => "webdriver could not be reached",
             CmdError::Lost(..) => "webdriver connection lost",
@@ -150,7 +159,9 @@ impl Error for CmdError {
 
     fn cause(&self) -> Option<&dyn Error> {
         match *self {
-            CmdError::Standard(ref e) | CmdError::NoSuchElement(ref e) => Some(e),
+            CmdError::Standard(ref e)
+            | CmdError::NoSuchElement(ref e)
+            | CmdError::NoSuchWindow(ref e) => Some(e),
             CmdError::BadUrl(ref e) => Some(e),
             CmdError::Failed(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
@@ -165,7 +176,9 @@ impl fmt::Display for CmdError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: ", self)?;
         match *self {
-            CmdError::Standard(ref e) | CmdError::NoSuchElement(ref e) => write!(f, "{}", e),
+            CmdError::Standard(ref e)
+            | CmdError::NoSuchElement(ref e)
+            | CmdError::NoSuchWindow(ref e) => write!(f, "{}", e),
             CmdError::BadUrl(ref e) => write!(f, "{}", e),
             CmdError::Failed(ref e) => write!(f, "{}", e),
             CmdError::Lost(ref e) => write!(f, "{}", e),

@@ -3,7 +3,7 @@ rust:
  - stable
  - beta
  - nightly
-dist: xenial
+dist: bionic
 addons:
   apt:
     packages:
@@ -12,9 +12,9 @@ addons:
     - chromium-chromedriver
 # XXX: https://packages.ubuntu.com/bionic/firefoxdriver
 before_install:
- - wget https://github.com/mozilla/geckodriver/releases/download/v0.24.0/geckodriver-v0.24.0-linux64.tar.gz
+ - wget https://github.com/mozilla/geckodriver/releases/download/v0.26.0/geckodriver-v0.26.0-linux64.tar.gz
  - mkdir geckodriver
- - tar -xzf geckodriver-v0.24.0-linux64.tar.gz -C geckodriver
+ - tar -xzf geckodriver-v0.26.0-linux64.tar.gz -C geckodriver
  - export PATH=$PATH:$PWD/geckodriver
 before_script:
  - chromedriver --verbose > chromedriver.log 2>&1 &
