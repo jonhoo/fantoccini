@@ -28,7 +28,33 @@ async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdE
     let new_url = c.current_url().await?;
     let expected_url = format!("http://localhost:{}/other_page.html", port);
     assert_eq!(new_url.as_str(), expected_url.as_str());
-    Ok(())
+
+    c.close().await
+}
+
+async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+    // Go to the page that holds the iframe
+    c.find(Locator::Css("#iframe_page_id")).await?.click().await?;
+
+    c.find(Locator::Id("iframe_button")).await.expect_err("should not find the button in the iframe");
+    c.find(Locator::Id("root_button")).await?; // Can find the button in the root context though.
+
+    // find and switch into the iframe
+    let iframe_element = c.find(Locator::Id("iframe")).await?;
+    iframe_element.frame().await?;
+
+    // search for something in the iframe
+    let button_in_iframe= c.find(Locator::Id("iframe_button")).await?;
+    button_in_iframe.click().await?;
+    c.find(Locator::Id("root_button")).await.expect_err("Should not be able to access content in the root context");
+
+    // switch back to the root context and access content there.
+    let mut c = c.parent_frame().await?;
+    c.find(Locator::Id("root_button")).await?;
+
+    c.close().await
 }
 
 async fn new_window(mut c: Client) -> Result<(), error::CmdError> {
@@ -146,6 +172,12 @@ mod firefox {
 
     #[test]
     #[serial]
+    fn iframe_test() {
+        local_tester!(iframe_switch, "firefox")
+    }
+
+    #[test]
+    #[serial]
     fn new_window_test() {
         tester!(new_window, "firefox")
     }
@@ -178,43 +210,41 @@ mod firefox {
 mod chrome {
     use super::*;
     #[test]
-    #[serial]
     fn navigate_to_other_page() {
         local_tester!(goto, "chrome")
     }
 
     #[test]
-    #[serial]
     fn find_and_click_link_test() {
         local_tester!(find_and_click_link, "chrome")
     }
 
     #[test]
-    #[serial]
+    fn iframe_test() {
+        local_tester!(iframe_switch, "chrome")
+    }
+
+    #[test]
     fn new_window_test() {
         tester!(new_window, "chrome")
     }
 
     #[test]
-    #[serial]
     fn new_window_switch_test() {
         tester!(new_window_switch, "chrome")
     }
 
     #[test]
-    #[serial]
     fn new_tab_test() {
         tester!(new_tab_switch, "chrome")
     }
 
     #[test]
-    #[serial]
     fn close_window_test() {
         tester!(close_window, "chrome")
     }
 
     #[test]
-    #[serial]
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "chrome")
     }
