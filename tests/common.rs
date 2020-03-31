@@ -65,42 +65,7 @@ pub fn handle_test_error(
 }
 
 #[macro_export]
-macro_rules! local_tester {
-    // The ident should point to a function that takes a client and a port.
-    ($f:ident, $endpoint:expr) => {{
-        use std::sync::{Arc, Mutex};
-        use std::thread;
-
-        let port: u16 = common::setup_server();
-        let c = common::select_client_type($endpoint);
-
-        // we'll need the session_id from the thread
-        // NOTE: even if it panics, so can't just return it
-        let session_id = Arc::new(Mutex::new(None));
-
-        // run test in its own thread to catch panics
-        let sid = session_id.clone();
-        let res = thread::spawn(move || {
-            let mut rt = tokio::runtime::Builder::new()
-                .enable_all()
-                .basic_scheduler()
-                .build()
-                .unwrap();
-            let mut c = rt.block_on(c).expect("failed to construct test client");
-            *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
-            let x = rt.block_on($f(c, port));
-            drop(rt);
-            x
-        })
-        .join();
-        let success = common::handle_test_error(res);
-        assert!(success);
-    }};
-}
-
-#[macro_export]
 macro_rules! tester {
-    // Ident should identify an async fn that takes just a Client.
     ($f:ident, $endpoint:expr) => {{
         use std::sync::{Arc, Mutex};
         use std::thread;
@@ -128,6 +93,15 @@ macro_rules! tester {
         .join();
         let success = common::handle_test_error(res);
         assert!(success);
+    }};
+}
+
+#[macro_export]
+macro_rules! local_tester {
+    ($f:ident, $endpoint:expr) => {{
+        let port: u16 = common::setup_server();
+        let f = move |c: Client| async move { $f(c, port).await };
+        tester!(f, $endpoint)
     }};
 }
 
