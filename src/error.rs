@@ -173,8 +173,9 @@ impl Error for CmdError {
 }
 
 impl fmt::Display for CmdError {
+    #[allow(deprecated)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self)?;
+        write!(f, "{}: ", self.description())?;
         match *self {
             CmdError::Standard(ref e)
             | CmdError::NoSuchElement(ref e)
