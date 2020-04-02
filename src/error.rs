@@ -230,3 +230,14 @@ impl From<serde_json::Error> for CmdError {
         CmdError::Json(e)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ensure_display_error_doesnt_stackoverflow() {
+        println!("{}", CmdError::NotJson("test".to_string()));
+        println!("{}", NewSessionError::Lost(IOError::last_os_error()));
+    }
+}
