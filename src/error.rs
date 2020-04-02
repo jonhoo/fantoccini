@@ -43,8 +43,9 @@ impl Error for NewSessionError {
 }
 
 impl fmt::Display for NewSessionError {
+    #[allow(deprecated)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self)?;
+        write!(f, "{}: ", self.description())?;
         match *self {
             NewSessionError::BadWebdriverUrl(ref e) => write!(f, "{}", e),
             NewSessionError::Failed(ref e) => write!(f, "{}", e),
