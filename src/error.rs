@@ -43,8 +43,9 @@ impl Error for NewSessionError {
 }
 
 impl fmt::Display for NewSessionError {
+    #[allow(deprecated)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self)?;
+        write!(f, "{}: ", self.description())?;
         match *self {
             NewSessionError::BadWebdriverUrl(ref e) => write!(f, "{}", e),
             NewSessionError::Failed(ref e) => write!(f, "{}", e),
@@ -173,8 +174,9 @@ impl Error for CmdError {
 }
 
 impl fmt::Display for CmdError {
+    #[allow(deprecated)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self)?;
+        write!(f, "{}: ", self.description())?;
         match *self {
             CmdError::Standard(ref e)
             | CmdError::NoSuchElement(ref e)
@@ -228,5 +230,16 @@ impl From<wderror::WebDriverError> for CmdError {
 impl From<serde_json::Error> for CmdError {
     fn from(e: serde_json::Error) -> Self {
         CmdError::Json(e)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ensure_display_error_doesnt_stackoverflow() {
+        println!("{}", CmdError::NotJson("test".to_string()));
+        println!("{}", NewSessionError::Lost(IOError::last_os_error()));
     }
 }
