@@ -32,7 +32,7 @@ tokio = { version = "0.2.0", features = [ "sync" ] }
 hyper = { version = "0.13.0", features = [ "stream" ] }
 hyper-tls = "0.4.0"
 cookie = { version = "0.13", features = ["percent-encode"] }
-base64 = "0.11"
+base64 = "0.12"
 mime = "0.3.9"
 http = "0.2"
 
