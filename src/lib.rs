@@ -169,9 +169,9 @@ pub enum Locator<'a> {
     XPath(&'a str),
 }
 
-impl<'a> Into<webdriver::command::LocatorParameters> for Locator<'a> {
-    fn into(self) -> webdriver::command::LocatorParameters {
-        match self {
+impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
+    fn from(locator: Locator<'a>) -> webdriver::command::LocatorParameters {
+        match locator {
             Locator::Css(s) => webdriver::command::LocatorParameters {
                 using: webdriver::common::LocatorStrategy::CSSSelector,
                 value: s.to_string(),
