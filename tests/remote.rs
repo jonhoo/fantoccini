@@ -237,17 +237,21 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
 
     let path_string = format!("file://{}", path.to_str().unwrap());
     let file_url_str = path_string.as_str();
-    let starting_url = Url::parse(file_url_str)?;
+    let mut url = Url::parse(file_url_str)?;
 
-    c.goto(starting_url.as_str()).await?;
+    c.goto(url.as_str()).await?;
 
-    let wait_for = c.wait_for_navigation(Some(starting_url)).await;
-
-    assert!(wait_for.is_ok());
-
-    let final_url = c.current_url().await?;
-
-    assert_eq!(final_url.as_str(), "https://www.wikipedia.org/");
+    loop {
+        let wait_for = c.wait_for_navigation(Some(url)).await;
+        assert!(wait_for.is_ok());
+        url = c.current_url().await?;
+        if url.as_str() == "about:blank" {
+            // try again
+            continue;
+        }
+        assert_eq!(url.as_str(), "https://www.wikipedia.org/");
+        break;
+    }
 
     c.close().await
 }

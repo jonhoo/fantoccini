@@ -127,7 +127,7 @@ impl Ongoing {
             Ongoing::Break => OngoingResult::Break,
             Ongoing::Shutdown { mut fut, ack } => {
                 if Pin::new(&mut fut).poll(cx).is_pending() {
-                    mem::replace(self, Ongoing::Shutdown { fut, ack });
+                    *self = Ongoing::Shutdown { fut, ack };
                     return Poll::Pending;
                 }
 
@@ -140,7 +140,7 @@ impl Ongoing {
                 let rsp = if let Poll::Ready(v) = fut.as_mut().poll(cx) {
                     v
                 } else {
-                    mem::replace(self, Ongoing::WebDriver { fut, ack });
+                    *self = Ongoing::WebDriver { fut, ack };
                     return Poll::Pending;
                 };
                 let mut rt = OngoingResult::Continue;
@@ -166,7 +166,7 @@ impl Ongoing {
                 let rt = if let Poll::Ready(v) = Pin::new(&mut fut).poll(cx) {
                     v
                 } else {
-                    mem::replace(self, Ongoing::Raw { fut, ack, ret });
+                    *self = Ongoing::Raw { fut, ack, ret };
                     return Poll::Pending;
                 };
                 let _ = ack.send(Ok(Json::Null));
