@@ -86,9 +86,14 @@ macro_rules! tester {
                 .unwrap();
             let mut c = rt.block_on(c).expect("failed to construct test client");
             *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
-            let x = rt.block_on($f(c));
+            // make sure we close, even if an assertion fails
+            let x = rt.block_on(async move {
+                let r = tokio::spawn($f(c.clone())).await;
+                let _ = c.close().await;
+                r
+            });
             drop(rt);
-            x
+            x.expect("test panicked")
         })
         .join();
         let success = common::handle_test_error(res);
