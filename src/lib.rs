@@ -1171,7 +1171,7 @@ impl Form {
 
     /// Find a form input with the given `name` and set its value to `value`.
     pub async fn set_by_name(&mut self, field: &str, value: &str) -> Result<Self, error::CmdError> {
-        let locator = format!("input[name='{}']", field);
+        let locator = format!("[name='{}']", field);
         let locator = Locator::Css(&locator);
         self.set(locator, value).await
     }
