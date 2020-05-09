@@ -142,12 +142,15 @@ macro_rules! via_json {
 
 pub use hyper::Method;
 
+mod call;
 /// Error types.
 pub mod error;
 
 /// The long-running session future we spawn for multiplexing onto a running WebDriver instance.
 mod session;
 use crate::session::{Cmd, Session};
+
+pub use crate::call::{Find, FindDescendant, Retry};
 
 /// An element locator.
 ///
@@ -685,8 +688,8 @@ impl Client {
     }
 
     /// Find an element on the page.
-    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        self.by(search.into()).await
+    pub fn find(&mut self, search: Locator<'_>) -> Retry<Find> {
+        Retry::find(self.clone(), search)
     }
 
     /// Find elements on the page.
@@ -717,29 +720,6 @@ impl Client {
     {
         while !is_ready(self).await? {}
         Ok(())
-    }
-
-    /// Wait for the given element to be present on the page.
-    ///
-    /// This can be useful to wait for something to appear on the page before interacting with it.
-    /// While this currently just spins and yields, it may be more efficient than this in the
-    /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
-    /// the page.
-    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        let s: webdriver::command::LocatorParameters = search.into();
-        loop {
-            match self
-                .by(webdriver::command::LocatorParameters {
-                    using: s.using,
-                    value: s.value.clone(),
-                })
-                .await
-            {
-                Ok(v) => break Ok(v),
-                Err(error::CmdError::NoSuchElement(_)) => {}
-                Err(e) => break Err(e),
-            }
-        }
     }
 
     /// Wait for the page to navigate to a new URL before proceeding.
@@ -998,20 +978,10 @@ impl Element {
     }
 
     /// Find the first matching descendant element.
-    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        let res = self
-            .client
-            .issue(WebDriverCommand::FindElementElement(
-                self.element.clone(),
-                search.into(),
-            ))
-            .await?;
-        let e = self.client.parse_lookup(res)?;
-        Ok(Element {
-            client: self.client.clone(),
-            element: e,
-        })
+    pub fn find(&mut self, search: Locator<'_>) -> Retry<FindDescendant> {
+        Retry::find_descendant(self.client.clone(), self.element.clone(), search)
     }
+
     /// Find all matching descendant elements.
     pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
         let res = self
@@ -1171,7 +1141,7 @@ impl Form {
 
     /// Find a form input with the given `name` and set its value to `value`.
     pub async fn set_by_name(&mut self, field: &str, value: &str) -> Result<Self, error::CmdError> {
-        let locator = format!("input[name='{}']", field);
+        let locator = format!("[name='{}']", field);
         let locator = Locator::Css(&locator);
         self.set(locator, value).await
     }

@@ -117,6 +117,9 @@ pub enum CmdError {
 
     /// Could not decode a base64 image
     ImageDecodeError(::base64::DecodeError),
+
+    /// A timeout or retry limit was reached.
+    RetriesExhausted,
 }
 
 impl CmdError {
@@ -155,6 +158,7 @@ impl Error for CmdError {
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
             CmdError::ImageDecodeError(..) => "error decoding image",
+            CmdError::RetriesExhausted => "timeout or retry limit reached",
         }
     }
 
@@ -168,7 +172,10 @@ impl Error for CmdError {
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
             CmdError::ImageDecodeError(ref e) => Some(e),
-            CmdError::NotJson(_) | CmdError::NotW3C(_) | CmdError::InvalidArgument(..) => None,
+            CmdError::NotJson(_)
+            | CmdError::NotW3C(_)
+            | CmdError::InvalidArgument(..)
+            | CmdError::RetriesExhausted => None,
         }
     }
 }
@@ -191,6 +198,7 @@ impl fmt::Display for CmdError {
             CmdError::InvalidArgument(ref arg, ref msg) => {
                 write!(f, "Invalid argument `{}`: {}", arg, msg)
             }
+            CmdError::RetriesExhausted => write!(f, "timeout or retry limit reached"),
         }
     }
 }

@@ -69,7 +69,7 @@ async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::Cmd
     c.goto("https://www.wikipedia.org/").await?;
 
     // find search input element
-    let mut e = c.wait_for_find(Locator::Id("searchInput")).await?;
+    let mut e = c.find(Locator::Id("searchInput")).retry_forever().await?;
     e.send_keys("foobar").await?;
     assert_eq!(
         e.prop("value")

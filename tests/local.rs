@@ -166,6 +166,25 @@ async fn close_window_twice_errors(mut c: Client) -> Result<(), error::CmdError>
     Ok(())
 }
 
+async fn set_by_name_textarea(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
+    let mut form = c.form(Locator::Css("form")).await?;
+    form.set_by_name("some_textarea", "a value!").await?;
+
+    let value = c
+        .find(Locator::Css("textarea"))
+        .await?
+        .prop("value")
+        .await?
+        .expect("textarea should contain a value");
+
+    assert_eq!(value, "a value!");
+
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -215,6 +234,12 @@ mod firefox {
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "firefox")
     }
+
+    #[test]
+    #[serial]
+    fn set_by_name_textarea_test() {
+        local_tester!(set_by_name_textarea, "firefox")
+    }
 }
 
 mod chrome {
@@ -257,5 +282,11 @@ mod chrome {
     #[test]
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "chrome")
+    }
+
+    #[test]
+    #[serial]
+    fn set_by_name_textarea_test() {
+        local_tester!(set_by_name_textarea, "chrome")
     }
 }
