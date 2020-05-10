@@ -172,8 +172,12 @@ async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     let elem = c.find(Locator::Css("#other_page_id")).await?;
 
     // Remove the element from the DOM
-    c.execute("var elem = document.getElementById('other_page_id');
-               elem.parentNode.removeChild(elem);", vec![]).await?;
+    c.execute(
+        "var elem = document.getElementById('other_page_id');
+         elem.parentNode.removeChild(elem);",
+        vec![],
+    )
+    .await?;
 
     match elem.click().await {
         Err(error::CmdError::NoSuchElement(_)) => Ok(()),
