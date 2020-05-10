@@ -123,6 +123,7 @@
 #![deny(missing_docs)]
 #![warn(missing_debug_implementations, rust_2018_idioms)]
 
+use serde::Serialize;
 use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
@@ -195,9 +196,11 @@ impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
 pub use crate::session::Client;
 
 /// A single element on the current page.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Element {
+    #[serde(skip_serializing)]
     client: Client,
+    #[serde(flatten)]
     element: webdriver::common::WebElement,
 }
 
