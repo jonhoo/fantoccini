@@ -285,7 +285,6 @@ mod chrome {
     }
 
     #[test]
-    #[serial]
     fn stale_element_test() {
         local_tester!(stale_element, "chrome")
     }
