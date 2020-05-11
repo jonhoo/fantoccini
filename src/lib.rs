@@ -608,8 +608,7 @@ impl Client {
         // TODO: go back before we return if this call errors:
         let cookies = self.issue(WebDriverCommand::GetCookies).await?;
         if !cookies.is_array() {
-            // NOTE: this clone should _really_ not be necessary
-            Err(error::CmdError::NotW3C(cookies.clone()))?;
+            return Err(error::CmdError::NotW3C(cookies));
         }
         self.back().await?;
         let ua = self.get_ua().await?;
@@ -650,8 +649,7 @@ impl Client {
         }
 
         if !all_ok {
-            // NOTE: this clone should _really_ not be necessary
-            Err(error::CmdError::NotW3C(cookies))?;
+            return Err(error::CmdError::NotW3C(cookies));
         }
 
         let mut req = hyper::Request::builder();
@@ -1094,9 +1092,9 @@ impl Element {
                     webdriver::error::ErrorStatus::InvalidArgument,
                     "cannot follow element without href attribute",
                 );
-                Err(error::CmdError::Standard(e))?
+                return Err(error::CmdError::Standard(e));
             }
-            v => Err(error::CmdError::NotW3C(v))?,
+            v => return Err(error::CmdError::NotW3C(v)),
         };
 
         let url = self.client.current_url_().await?;

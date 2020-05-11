@@ -65,7 +65,7 @@ impl Client {
         });
 
         async move {
-            if let Err(_) = r {
+            if r.is_err() {
                 return Err(error::CmdError::Lost(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "WebDriver session has been closed",
@@ -347,7 +347,7 @@ impl Session {
             rx,
             ongoing: Ongoing::None,
             client,
-            wdb: wdb,
+            wdb,
             session: None,
             is_legacy: false,
             ua: None,
