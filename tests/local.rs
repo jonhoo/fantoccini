@@ -47,6 +47,15 @@ async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdErr
     )
     .await?;
 
+    // Check that it fails with an invalid serialization (from a previous run of the test)
+    let json = r#"{"element-6066-11e4-a52e-4f735466cecf":"fbe5004d-ec8b-4c7b-ad08-642c55d84505"}"#;
+    c.execute(
+        "arguments[0].scrollIntoView(true);",
+        vec![serde_json::from_str(json)?],
+    )
+    .await
+    .expect_err("Failure expected with an invalid ID");
+
     c.close().await
 }
 
