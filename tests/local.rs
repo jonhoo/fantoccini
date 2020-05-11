@@ -35,6 +35,30 @@ async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdE
     c.close().await
 }
 
+async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+    let elem = c.find(Locator::Css("#other_page_id")).await?;
+
+    // Check that webdriver understands it
+    c.execute(
+        "arguments[0].scrollIntoView(true);",
+        vec![serde_json::to_value(elem)?],
+    )
+    .await?;
+
+    // Check that it fails with an invalid serialization (from a previous run of the test)
+    let json = r#"{"element-6066-11e4-a52e-4f735466cecf":"fbe5004d-ec8b-4c7b-ad08-642c55d84505"}"#;
+    c.execute(
+        "arguments[0].scrollIntoView(true);",
+        vec![serde_json::from_str(json)?],
+    )
+    .await
+    .expect_err("Failure expected with an invalid ID");
+
+    c.close().await
+}
+
 async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
@@ -201,6 +225,12 @@ mod firefox {
 
     #[test]
     #[serial]
+    fn serialize_element_test() {
+        local_tester!(serialize_element, "firefox")
+    }
+
+    #[test]
+    #[serial]
     fn iframe_test() {
         local_tester!(iframe_switch, "firefox")
     }
@@ -252,6 +282,11 @@ mod chrome {
     #[test]
     fn find_and_click_link_test() {
         local_tester!(find_and_click_link, "chrome")
+    }
+
+    #[test]
+    fn serialize_element_test() {
+        local_tester!(serialize_element, "chrome")
     }
 
     #[test]
