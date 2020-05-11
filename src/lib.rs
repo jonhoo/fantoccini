@@ -541,8 +541,8 @@ impl Client {
     /// Execute the given JavaScript `script` in the current browser session.
     ///
     /// `args` is available to the script inside the `arguments` array. Since `Element` implements
-    /// `ToJson`, you can also provide serialized `Element`s as arguments, and they will correctly
-    /// serialize to DOM elements on the other side.
+    /// `Serialize`, you can also provide serialized `Element`s as arguments, and they will
+    /// correctly deserialize to DOM elements on the other side.
     ///
     /// To retrieve the value of a variable, `return` has to be used in the JavaScript code.
     pub async fn execute(
