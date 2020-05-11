@@ -166,6 +166,25 @@ async fn close_window_twice_errors(mut c: Client) -> Result<(), error::CmdError>
     Ok(())
 }
 
+async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+    let elem = c.find(Locator::Css("#other_page_id")).await?;
+
+    // Remove the element from the DOM
+    c.execute(
+        "var elem = document.getElementById('other_page_id');
+         elem.parentNode.removeChild(elem);",
+        vec![],
+    )
+    .await?;
+
+    match elem.click().await {
+        Err(error::CmdError::NoSuchElement(_)) => Ok(()),
+        _ => panic!("Expected a stale element reference error"),
+    }
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -215,6 +234,12 @@ mod firefox {
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "firefox")
     }
+
+    #[test]
+    #[serial]
+    fn stale_element_test() {
+        local_tester!(stale_element, "firefox")
+    }
 }
 
 mod chrome {
@@ -257,5 +282,10 @@ mod chrome {
     #[test]
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "chrome")
+    }
+
+    #[test]
+    fn stale_element_test() {
+        local_tester!(stale_element, "chrome")
     }
 }
