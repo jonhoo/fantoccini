@@ -193,8 +193,8 @@ impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
     }
 }
 
-pub use crate::session::Client;
-use crate::session::ExtensionCommand;
+pub use crate::session::{Client, ExtensionCommand, VoidExtensionCommand};
+pub use webdriver::command::WebDriverExtensionCommand;
 
 /// A single element on the current page.
 #[derive(Clone, Debug, Serialize)]
@@ -863,6 +863,14 @@ impl <T: ExtensionCommand +'static> Client <T> {
             }
             v => Err(error::CmdError::NotW3C(v)),
         }
+    }
+
+    /// Executes a browser specific extension command.
+    ///
+    /// You can install or uninstall browser extensions and control other browser
+    /// specific features with this method.
+    pub async fn extension_command(&mut self, command: T)->Result<Json, error::CmdError> {
+        self.issue(WebDriverCommand::Extension(command)).await
     }
 
     // helpers

@@ -3,20 +3,20 @@
 extern crate fantoccini;
 extern crate futures_util;
 
-use fantoccini::{error, Client};
+use fantoccini::{error, Client, VoidExtensionCommand};
 
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use warp::Filter;
 
-pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
+pub async fn select_client_type(s: &str) -> Result<Client<VoidExtensionCommand>, error::NewSessionError> {
     match s {
         "firefox" => {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({ "args": ["--headless"] });
             caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-            Client::with_capabilities("http://localhost:4444", caps).await
+            Client::<VoidExtensionCommand>::with_capabilities("http://localhost:4444", caps).await
         }
         "chrome" => {
             let mut caps = serde_json::map::Map::new();
@@ -105,7 +105,7 @@ macro_rules! tester {
 macro_rules! local_tester {
     ($f:ident, $endpoint:expr) => {{
         let port: u16 = common::setup_server();
-        let f = move |c: Client| async move { $f(c, port).await };
+        let f = move |c: Client<VoidExtensionCommand>| async move { $f(c, port).await };
         tester!(f, $endpoint)
     }};
 }
