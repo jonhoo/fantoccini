@@ -1125,16 +1125,9 @@ impl Element {
     ///
     /// Index starts from 0.
     pub async fn select_by_index(mut self, index: usize) -> Result<Client, error::CmdError> {
-        let options = self.find_all(Locator::Css("option")).await?;
+        let locator = format!("option:nth-of-type({})", index + 1);
 
-        if options.len() > index {
-            options[index].clone().click().await
-        } else {
-            Err(error::CmdError::NoSuchElement(WebDriverError::new(
-                webdriver::error::ErrorStatus::NoSuchElement,
-                format!("there is no element with by {} index", index),
-            )))
-        }
+        self.find(Locator::Css(&locator)).await?.click().await
     }
 
     /// Switches to the frame contained within the element.
