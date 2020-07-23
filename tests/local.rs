@@ -209,6 +209,25 @@ async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     }
 }
 
+async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+    let mut select_element = c.find(Locator::Css("#select1")).await?;
+
+    // Get first display text
+    let initial_text = select_element.html(false).await?;
+
+    // Select second option
+    select_element.clone().select_by_index(1).await?;
+
+    // Get display text after selection
+    let text_after_selecting = select_element.html(false).await?;
+
+    // Make sure that it's changed
+    assert_ne!(initial_text, text_after_selecting);
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -270,6 +289,12 @@ mod firefox {
     fn stale_element_test() {
         local_tester!(stale_element, "firefox")
     }
+
+    #[test]
+    #[serial]
+    fn select_by_index_test() {
+        local_tester!(select_by_index, "firefox")
+    }
 }
 
 mod chrome {
@@ -322,5 +347,10 @@ mod chrome {
     #[test]
     fn stale_element_test() {
         local_tester!(stale_element, "chrome")
+    }
+
+    #[test]
+    fn select_by_index_test() {
+        local_tester!(select_by_index, "chrome")
     }
 }
