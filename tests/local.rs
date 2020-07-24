@@ -215,16 +215,24 @@ async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError
     let mut select_element = c.find(Locator::Css("#select1")).await?;
 
     // Get first display text
-    let initial_text = select_element.html(false).await?;
+    let initial_text = select_element.prop("value").await?;
+    assert_eq!(Some("Select1-Option1".into()), initial_text);
 
     // Select second option
     select_element.clone().select_by_index(1).await?;
 
     // Get display text after selection
-    let text_after_selecting = select_element.html(false).await?;
+    let text_after_selecting = select_element.prop("value").await?;
+    assert_eq!(Some("Select1-Option2".into()), text_after_selecting);
 
-    // Make sure that it's changed
-    assert_ne!(initial_text, text_after_selecting);
+    // Check that the second select is not changed
+    let select2_text = c
+        .find(Locator::Css("#select2"))
+        .await?
+        .prop("value")
+        .await?;
+    assert_eq!(Some("Select2-Option1".into()), select2_text);
+
     Ok(())
 }
 
