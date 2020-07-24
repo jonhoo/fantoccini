@@ -1124,11 +1124,19 @@ impl Element {
     /// Find and click an `option` child element by its index.
     ///
     /// It expects there only to be one set of `option`s.
-    /// It doesn't set a selected attribute to an indexed option.
+    /// It doesn't set a `selected` attribute to an indexed option.
     /// Index starts from 0.
     ///
-    /// It uses a CSS selector `nth-of-type` therefore it ignores other's
+    /// It uses a CSS selector [nth-of-type] therefore it ignores other's
     /// type of elements except of an `option`.
+    ///
+    /// To get a text value of changed `select` element you can use [prop]
+    /// ```no_run
+    /// select_element.prop("value").await?
+    /// ```
+    ///
+    /// [prop]: Element::prop
+    /// [nth-of-type]: https://developer.mozilla.org/en-US/docs/Web/CSS/:nth-child
     pub async fn select_by_index(mut self, index: usize) -> Result<Client, error::CmdError> {
         let locator = format!("option:nth-of-type({})", index + 1);
 
