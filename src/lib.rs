@@ -1131,17 +1131,6 @@ impl Element {
     /// in the form, or if it there are stray `<option>` in the form.
     ///
     /// The indexing in this method is 0-based.
-    ///
-    /// It uses a CSS selector [nth-of-type] therefore it ignores other's
-    /// type of elements except of an `<option>`.
-    ///
-    /// To get a text value of a `<select>` element you can use [prop]
-    /// ```no_run
-    /// select_element.prop("value").await?
-    /// ```
-    ///
-    /// [prop]: Element::prop
-    /// [nth-of-type]: https://developer.mozilla.org/en-US/docs/Web/CSS/:nth-child
     pub async fn select_by_index(mut self, index: usize) -> Result<Client, error::CmdError> {
         let locator = format!("option:nth-of-type({})", index + 1);
 
