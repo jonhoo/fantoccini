@@ -1123,7 +1123,8 @@ impl Element {
 
     /// Find and click an `option` child element by its index.
     ///
-    /// It expects there only to be one set of `option`s. 
+    /// It expects there only to be one set of `option`s.
+    /// It doesn't set a selected attribute to an indexed option.
     /// Index starts from 0.
     ///
     /// It uses a CSS selector `nth-of-type` therefore it ignores other's
