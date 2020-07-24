@@ -209,6 +209,40 @@ async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     }
 }
 
+async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
+    let mut select_element = c.find(Locator::Css("#select1")).await?;
+
+    // Get first display text
+    let initial_text = select_element.prop("value").await?;
+    assert_eq!(Some("Select1-Option1".into()), initial_text);
+
+    // Select second option
+    select_element.clone().select_by_index(1).await?;
+
+    // Get display text after selection
+    let text_after_selecting = select_element.prop("value").await?;
+    assert_eq!(Some("Select1-Option2".into()), text_after_selecting);
+
+    // Check that the second select is not changed
+    let select2_text = c
+        .find(Locator::Css("#select2"))
+        .await?
+        .prop("value")
+        .await?;
+    assert_eq!(Some("Select2-Option1".into()), select2_text);
+
+    // Show off that it selects only options and skip any other elements
+    let mut select_element = c.find(Locator::Css("#select2")).await?;
+    select_element.clone().select_by_index(1).await?;
+    let text = select_element.prop("value").await?;
+    assert_eq!(Some("Select2-Option2".into()), text);
+
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -270,6 +304,12 @@ mod firefox {
     fn stale_element_test() {
         local_tester!(stale_element, "firefox")
     }
+
+    #[test]
+    #[serial]
+    fn select_by_index_test() {
+        local_tester!(select_by_index, "firefox")
+    }
 }
 
 mod chrome {
@@ -322,5 +362,10 @@ mod chrome {
     #[test]
     fn stale_element_test() {
         local_tester!(stale_element, "chrome")
+    }
+
+    #[test]
+    fn select_by_index_test() {
+        local_tester!(select_by_index, "chrome")
     }
 }

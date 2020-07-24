@@ -1121,6 +1121,22 @@ impl Element {
         .await
     }
 
+    /// Find and click an `<option>` child element by its index.
+    ///
+    /// This method clicks the first `<option>` element that is an `index`th child
+    /// (`option:nth-of-type(index+1)`). This will be the `index`th `<option>`
+    /// element if the current element is a `<select>`. If you use this method on
+    /// an `Element` that is _not_ a `<select>` (such as on a full `<form>`), it
+    /// may not do what you expect if there are multiple `<select>` elements
+    /// in the form, or if it there are stray `<option>` in the form.
+    ///
+    /// The indexing in this method is 0-based.
+    pub async fn select_by_index(mut self, index: usize) -> Result<Client, error::CmdError> {
+        let locator = format!("option:nth-of-type({})", index + 1);
+
+        self.find(Locator::Css(&locator)).await?.click().await
+    }
+
     /// Switches to the frame contained within the element.
     pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
         let Self {
