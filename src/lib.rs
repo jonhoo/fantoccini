@@ -1121,11 +1121,16 @@ impl Element {
         .await
     }
 
-    /// Find and click an `option` child element by its index.
+    /// Find and click an `<option>` child element by its index.
     ///
-    /// It expects there only to be one set of `option`s.
-    /// It doesn't set a `selected` attribute to an indexed option.
-    /// Index starts from 0.
+    /// This method clicks the first `<option>` element that is an `index`th child
+    /// (`option:nth-of-type(index+1)`). This will be the `index`th `<option>`
+    /// element if the current element is a `<select>`. If you use this method on
+    /// an `Element` that is _not_ a `<select>` (such as on a full `<form>`), it
+    /// may not do what you expect if there are multiple `<select>` elements
+    /// in the form, or if it there are stray `<option>` in the form.
+    ///
+    /// The indexing in this method is 0-based.
     ///
     /// It uses a CSS selector [nth-of-type] therefore it ignores other's
     /// type of elements except of an `option`.
