@@ -1133,9 +1133,9 @@ impl Element {
     /// The indexing in this method is 0-based.
     ///
     /// It uses a CSS selector [nth-of-type] therefore it ignores other's
-    /// type of elements except of an `option`.
+    /// type of elements except of an `<option>`.
     ///
-    /// To get a text value of changed `select` element you can use [prop]
+    /// To get a text value of a `<select>` element you can use [prop]
     /// ```no_run
     /// select_element.prop("value").await?
     /// ```
