@@ -212,6 +212,7 @@ async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> 
 async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
+
     let mut select_element = c.find(Locator::Css("#select1")).await?;
 
     // Get first display text
@@ -232,6 +233,12 @@ async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError
         .prop("value")
         .await?;
     assert_eq!(Some("Select2-Option1".into()), select2_text);
+
+    // Show off that it selects only options and skip any other elements
+    let mut select_element = c.find(Locator::Css("#select2")).await?;
+    select_element.clone().select_by_index(1).await?;
+    let text = select_element.prop("value").await?;
+    assert_eq!(Some("Select2-Option2".into()), text);
 
     Ok(())
 }
