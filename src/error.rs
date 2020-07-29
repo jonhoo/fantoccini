@@ -2,6 +2,7 @@ use hyper::error as herror;
 use std::error::Error;
 use std::fmt;
 use std::io::Error as IOError;
+use std::time::Duration;
 use url::ParseError;
 use webdriver::error as wderror;
 
@@ -120,6 +121,10 @@ pub enum CmdError {
 
     /// Could not decode a base64 image
     ImageDecodeError(::base64::DecodeError),
+
+    /// The user specified timeout is reached
+    /// Contains expired duration
+    Timeout(Duration),
 }
 
 impl CmdError {
@@ -158,6 +163,7 @@ impl Error for CmdError {
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
             CmdError::ImageDecodeError(..) => "error decoding image",
+            CmdError::Timeout(..) => "timeout occured",
         }
     }
 
@@ -171,7 +177,10 @@ impl Error for CmdError {
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
             CmdError::ImageDecodeError(ref e) => Some(e),
-            CmdError::NotJson(_) | CmdError::NotW3C(_) | CmdError::InvalidArgument(..) => None,
+            CmdError::NotJson(_)
+            | CmdError::NotW3C(_)
+            | CmdError::InvalidArgument(..)
+            | CmdError::Timeout(..) => None,
         }
     }
 }
@@ -191,6 +200,7 @@ impl fmt::Display for CmdError {
             CmdError::Json(ref e) => write!(f, "{}", e),
             CmdError::NotW3C(ref e) => write!(f, "{:?}", e),
             CmdError::ImageDecodeError(ref e) => write!(f, "{:?}", e),
+            CmdError::Timeout(timeout) => write!(f, "timeout was exceeded on {} ms", timeout.as_millis()),
             CmdError::InvalidArgument(ref arg, ref msg) => {
                 write!(f, "Invalid argument `{}`: {}", arg, msg)
             }
