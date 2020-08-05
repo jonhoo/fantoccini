@@ -123,6 +123,7 @@
 #![deny(missing_docs)]
 #![warn(missing_debug_implementations, rust_2018_idioms)]
 
+use serde::Serialize;
 use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
@@ -195,9 +196,11 @@ impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
 pub use crate::session::Client;
 
 /// A single element on the current page.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct Element {
+    #[serde(skip_serializing)]
     client: Client,
+    #[serde(flatten)]
     element: webdriver::common::WebElement,
 }
 
@@ -498,6 +501,23 @@ impl Client {
         }
     }
 
+    /// Get the active element for this session.
+    ///
+    /// The "active" element is the `Element` within the DOM that currently has focus. This will
+    /// often be an `<input>` or `<textarea>` element that currently has the text selection, or
+    /// another input element such as a checkbox or radio button. Which elements are focusable
+    /// depends on the platform and browser configuration.
+    ///
+    /// If no element has focus, the result may be the page body or a `NoSuchElement` error.
+    pub async fn active_element(&mut self) -> Result<Element, error::CmdError> {
+        let res = self.issue(WebDriverCommand::GetActiveElement).await?;
+        let e = self.parse_lookup(res)?;
+        Ok(Element {
+            client: self.clone(),
+            element: e,
+        })
+    }
+
     /// Retrieve the currently active URL for this session.
     pub async fn current_url(&mut self) -> Result<url::Url, error::CmdError> {
         self.current_url_().await
@@ -538,8 +558,8 @@ impl Client {
     /// Execute the given JavaScript `script` in the current browser session.
     ///
     /// `args` is available to the script inside the `arguments` array. Since `Element` implements
-    /// `ToJson`, you can also provide serialized `Element`s as arguments, and they will correctly
-    /// serialize to DOM elements on the other side.
+    /// `Serialize`, you can also provide serialized `Element`s as arguments, and they will
+    /// correctly deserialize to DOM elements on the other side.
     ///
     /// To retrieve the value of a variable, `return` has to be used in the JavaScript code.
     pub async fn execute(
@@ -605,8 +625,7 @@ impl Client {
         // TODO: go back before we return if this call errors:
         let cookies = self.issue(WebDriverCommand::GetCookies).await?;
         if !cookies.is_array() {
-            // NOTE: this clone should _really_ not be necessary
-            Err(error::CmdError::NotW3C(cookies.clone()))?;
+            return Err(error::CmdError::NotW3C(cookies));
         }
         self.back().await?;
         let ua = self.get_ua().await?;
@@ -647,8 +666,7 @@ impl Client {
         }
 
         if !all_ok {
-            // NOTE: this clone should _really_ not be necessary
-            Err(error::CmdError::NotW3C(cookies))?;
+            return Err(error::CmdError::NotW3C(cookies));
         }
 
         let mut req = hyper::Request::builder();
@@ -1091,9 +1109,9 @@ impl Element {
                     webdriver::error::ErrorStatus::InvalidArgument,
                     "cannot follow element without href attribute",
                 );
-                Err(error::CmdError::Standard(e))?
+                return Err(error::CmdError::Standard(e));
             }
-            v => Err(error::CmdError::NotW3C(v))?,
+            v => return Err(error::CmdError::NotW3C(v)),
         };
 
         let url = self.client.current_url_().await?;
@@ -1118,6 +1136,22 @@ impl Element {
         }
         .click()
         .await
+    }
+
+    /// Find and click an `<option>` child element by its index.
+    ///
+    /// This method clicks the first `<option>` element that is an `index`th child
+    /// (`option:nth-of-type(index+1)`). This will be the `index`th `<option>`
+    /// element if the current element is a `<select>`. If you use this method on
+    /// an `Element` that is _not_ a `<select>` (such as on a full `<form>`), it
+    /// may not do what you expect if there are multiple `<select>` elements
+    /// in the form, or if it there are stray `<option>` in the form.
+    ///
+    /// The indexing in this method is 0-based.
+    pub async fn select_by_index(mut self, index: usize) -> Result<Client, error::CmdError> {
+        let locator = format!("option:nth-of-type({})", index + 1);
+
+        self.find(Locator::Css(&locator)).await?.click().await
     }
 
     /// Switches to the frame contained within the element.

@@ -65,7 +65,7 @@ impl Client {
         });
 
         async move {
-            if let Err(_) = r {
+            if r.is_err() {
                 return Err(error::CmdError::Lost(io::Error::new(
                     io::ErrorKind::BrokenPipe,
                     "WebDriver session has been closed",
@@ -347,7 +347,7 @@ impl Session {
             rx,
             ongoing: Ongoing::None,
             client,
-            wdb: wdb,
+            wdb,
             session: None,
             is_legacy: false,
             ua: None,
@@ -493,6 +493,7 @@ impl Session {
             WebDriverCommand::NewWindow(..) => base.join("window/new"),
             WebDriverCommand::SwitchToWindow(..) => base.join("window"),
             WebDriverCommand::CloseWindow => base.join("window"),
+            WebDriverCommand::GetActiveElement => base.join("element/active"),
             _ => unimplemented!(),
         }
     }
@@ -782,6 +783,7 @@ impl Session {
                             "invalid session id" => ErrorStatus::InvalidSessionId,
                             "no such element" => ErrorStatus::NoSuchElement,
                             "no such window" => ErrorStatus::NoSuchWindow,
+                            "stale element reference" => ErrorStatus::NoSuchElement,
                             _ => unreachable!(
                                 "received unknown error ({}) for NOT_FOUND status code",
                                 error

@@ -169,12 +169,7 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     .await?;
     assert_eq!(
         texts,
-        [
-            "Help",
-            "About Wikipedia",
-            "Community portal",
-            "Recent changes"
-        ]
+        ["Help", "Community portal", "Recent changes", "Upload file"]
     );
 
     c.close().await
@@ -186,16 +181,16 @@ async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
     // Get the main sidebar panel
     let mut panel = c.find(Locator::Css("div#mw-panel")).await?;
     // Get all the ul elements in the sidebar
-    let mut portals = panel.find_all(Locator::Css("div.portal")).await?;
+    let mut portals = panel.find_all(Locator::Css("nav.portal")).await?;
 
     let portal_titles = &[
         // Because GetElementText (used by Element::text()) returns the text
         // *as rendered*, hidden elements return an empty String.
         "",
-        "Interaction",
+        "Contribute",
         "Tools",
-        "In other projects",
         "Print/export",
+        "In other projects",
         "Languages",
     ];
     // Unless something fundamentally changes, this should work

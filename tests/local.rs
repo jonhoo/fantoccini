@@ -35,6 +35,41 @@ async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdE
     c.close().await
 }
 
+async fn get_active_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+    c.find(Locator::Css("#select1")).await?.click().await?;
+
+    let mut active = c.active_element().await?;
+    assert_eq!(active.attr("id").await?, Some(String::from("select1")));
+
+    c.close().await
+}
+
+async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+    let elem = c.find(Locator::Css("#other_page_id")).await?;
+
+    // Check that webdriver understands it
+    c.execute(
+        "arguments[0].scrollIntoView(true);",
+        vec![serde_json::to_value(elem)?],
+    )
+    .await?;
+
+    // Check that it fails with an invalid serialization (from a previous run of the test)
+    let json = r#"{"element-6066-11e4-a52e-4f735466cecf":"fbe5004d-ec8b-4c7b-ad08-642c55d84505"}"#;
+    c.execute(
+        "arguments[0].scrollIntoView(true);",
+        vec![serde_json::from_str(json)?],
+    )
+    .await
+    .expect_err("Failure expected with an invalid ID");
+
+    c.close().await
+}
+
 async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
@@ -185,6 +220,59 @@ async fn set_by_name_textarea(mut c: Client, port: u16) -> Result<(), error::Cmd
     Ok(())
 }
 
+async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+    let elem = c.find(Locator::Css("#other_page_id")).await?;
+
+    // Remove the element from the DOM
+    c.execute(
+        "var elem = document.getElementById('other_page_id');
+         elem.parentNode.removeChild(elem);",
+        vec![],
+    )
+    .await?;
+
+    match elem.click().await {
+        Err(error::CmdError::NoSuchElement(_)) => Ok(()),
+        _ => panic!("Expected a stale element reference error"),
+    }
+}
+
+async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
+    let mut select_element = c.find(Locator::Css("#select1")).await?;
+
+    // Get first display text
+    let initial_text = select_element.prop("value").await?;
+    assert_eq!(Some("Select1-Option1".into()), initial_text);
+
+    // Select second option
+    select_element.clone().select_by_index(1).await?;
+
+    // Get display text after selection
+    let text_after_selecting = select_element.prop("value").await?;
+    assert_eq!(Some("Select1-Option2".into()), text_after_selecting);
+
+    // Check that the second select is not changed
+    let select2_text = c
+        .find(Locator::Css("#select2"))
+        .await?
+        .prop("value")
+        .await?;
+    assert_eq!(Some("Select2-Option1".into()), select2_text);
+
+    // Show off that it selects only options and skip any other elements
+    let mut select_element = c.find(Locator::Css("#select2")).await?;
+    select_element.clone().select_by_index(1).await?;
+    let text = select_element.prop("value").await?;
+    assert_eq!(Some("Select2-Option2".into()), text);
+
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -197,6 +285,18 @@ mod firefox {
     #[serial]
     fn find_and_click_link_test() {
         local_tester!(find_and_click_link, "firefox")
+    }
+
+    #[test]
+    #[serial]
+    fn get_active_element_test() {
+        local_tester!(get_active_element, "firefox")
+    }
+
+    #[test]
+    #[serial]
+    fn serialize_element_test() {
+        local_tester!(serialize_element, "firefox")
     }
 
     #[test]
@@ -234,11 +334,23 @@ mod firefox {
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "firefox")
     }
-
+  
     #[test]
     #[serial]
     fn set_by_name_textarea_test() {
         local_tester!(set_by_name_textarea, "firefox")
+    }
+  
+    #[test]
+    #[serial]
+    fn stale_element_test() {
+        local_tester!(stale_element, "firefox")
+    }
+
+    #[test]
+    #[serial]
+    fn select_by_index_test() {
+        local_tester!(select_by_index, "firefox")
     }
 }
 
@@ -252,6 +364,16 @@ mod chrome {
     #[test]
     fn find_and_click_link_test() {
         local_tester!(find_and_click_link, "chrome")
+    }
+
+    #[test]
+    fn get_active_element_test() {
+        local_tester!(get_active_element, "chrome")
+    }
+
+    #[test]
+    fn serialize_element_test() {
+        local_tester!(serialize_element, "chrome")
     }
 
     #[test]
@@ -283,10 +405,19 @@ mod chrome {
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "chrome")
     }
-
+  
     #[test]
-    #[serial]
     fn set_by_name_textarea_test() {
         local_tester!(set_by_name_textarea, "chrome")
+    }
+
+    #[test]
+    fn stale_element_test() {
+        local_tester!(stale_element, "chrome")
+    }
+
+    #[test]
+    fn select_by_index_test() {
+        local_tester!(select_by_index, "chrome")
     }
 }

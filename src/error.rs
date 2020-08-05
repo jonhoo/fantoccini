@@ -72,7 +72,10 @@ pub enum CmdError {
     /// This variant lifts the ["no such element"] error variant from `Standard` to simplify
     /// checking for it in user code.
     ///
+    /// It is also used for the ["stale element reference"] error variant.
+    ///
     /// ["no such element"]: https://www.w3.org/TR/webdriver/#dfn-no-such-element
+    /// ["stale element reference"]: https://www.w3.org/TR/webdriver/#dfn-stale-element-reference
     NoSuchElement(wderror::WebDriverError),
 
     /// The requested window does not exist.
