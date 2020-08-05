@@ -25,6 +25,8 @@ after_failure:
 script:
  - cargo build --verbose
  - cargo test --verbose
+ - rustup component add clippy
+ - cargo clippy -- -D warnings
 matrix:
   allow_failures:
   - rust: nightly
