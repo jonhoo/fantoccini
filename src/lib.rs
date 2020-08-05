@@ -299,48 +299,18 @@ impl Client {
     }
 
     /// Sets the x, y, width, and height properties of the current window.
-    ///
-    /// All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
     pub async fn set_window_rect(
         &mut self,
-        x: i32,
-        y: i32,
-        width: i32,
-        height: i32,
+        x: u32,
+        y: u32,
+        width: u32,
+        height: u32,
     ) -> Result<(), error::CmdError> {
-        if x < 0 {
-            return Err(error::CmdError::InvalidArgument(
-                stringify!(x).into(),
-                format!("Expected to be `>= 0` but was `{}`", x),
-            ));
-        }
-
-        if y < 0 {
-            return Err(error::CmdError::InvalidArgument(
-                stringify!(y).into(),
-                format!("Expected to be `>= 0` but was `{}`", y),
-            ));
-        }
-
-        if width < 0 {
-            return Err(error::CmdError::InvalidArgument(
-                stringify!(width).into(),
-                format!("Expected to be `>= 0` but was `{}`", width),
-            ));
-        }
-
-        if height < 0 {
-            return Err(error::CmdError::InvalidArgument(
-                stringify!(height).into(),
-                format!("Expected to be `>= 0` but was `{}`", height),
-            ));
-        }
-
         let cmd = WebDriverCommand::SetWindowRect(webdriver::command::WindowRectParameters {
-            x: Some(x),
-            y: Some(y),
-            width: Some(width),
-            height: Some(height),
+            x: Some(x as i32),
+            y: Some(y as i32),
+            width: Some(width as i32),
+            height: Some(height as i32),
         });
 
         self.issue(cmd).await?;
@@ -378,32 +348,16 @@ impl Client {
     }
 
     /// Sets the x, y, width, and height properties of the current window.
-    ///
-    /// All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
     pub async fn set_window_size(
         &mut self,
-        width: i32,
-        height: i32,
+        width: u32,
+        height: u32,
     ) -> Result<(), error::CmdError> {
-        if width < 0 {
-            return Err(error::CmdError::InvalidArgument(
-                stringify!(width).into(),
-                format!("Expected to be `>= 0` but was `{}`", width),
-            ));
-        }
-
-        if height < 0 {
-            return Err(error::CmdError::InvalidArgument(
-                stringify!(height).into(),
-                format!("Expected to be `>= 0` but was `{}`", height),
-            ));
-        }
-
         let cmd = WebDriverCommand::SetWindowRect(webdriver::command::WindowRectParameters {
             x: None,
             y: None,
-            width: Some(width),
-            height: Some(height),
+            width: Some(width as i32),
+            height: Some(height as i32),
         });
 
         self.issue(cmd).await?;
@@ -431,26 +385,10 @@ impl Client {
     }
 
     /// Sets the x, y, width, and height properties of the current window.
-    ///
-    /// All values must be `>= 0` or you will get a `CmdError::InvalidArgument`.
-    pub async fn set_window_position(&mut self, x: i32, y: i32) -> Result<(), error::CmdError> {
-        if x < 0 {
-            return Err(error::CmdError::InvalidArgument(
-                stringify!(x).into(),
-                format!("Expected to be `>= 0` but was `{}`", x),
-            ));
-        }
-
-        if y < 0 {
-            return Err(error::CmdError::InvalidArgument(
-                stringify!(y).into(),
-                format!("Expected to be `>= 0` but was `{}`", y),
-            ));
-        }
-
+    pub async fn set_window_position(&mut self, x: u32, y: u32) -> Result<(), error::CmdError> {
         let cmd = WebDriverCommand::SetWindowRect(webdriver::command::WindowRectParameters {
-            x: Some(x),
-            y: Some(y),
+            x: Some(x as i32),
+            y: Some(y as i32),
             width: None,
             height: None,
         });
