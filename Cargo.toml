@@ -17,10 +17,6 @@ categories = ["api-bindings", "development-tools::testing", "web-programming::ht
 
 license = "MIT/Apache-2.0"
 
-[badges]
-travis-ci = { repository = "jonhoo/fantoccini" }
-maintenance = { status = "looking-for-maintainer" }
-
 [dependencies]
 webdriver = "0.40.0"
 url = "2.0.0"
