@@ -108,12 +108,3 @@ For more examples, take a look at the `examples/` directory.
 [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
 [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 [`geckodriver`]: https://github.com/mozilla/geckodriver
-
-## CI testing
-
-Big thanks to [Sauce Labs][homepage] for providing us with free cross-browser
-testing!
-
-[![Sauce Test Status](https://saucelabs.com/browser-matrix/fantoccini.svg)](https://saucelabs.com/u/fantoccini)
-
-[homepage]: https://saucelabs.com
