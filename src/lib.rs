@@ -193,25 +193,26 @@ impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
     }
 }
 
-pub use crate::session::Client;
+pub use crate::session::{Client, ExtensionCommand, VoidExtensionCommand};
+pub use webdriver::command::WebDriverExtensionCommand;
 
 /// A single element on the current page.
 #[derive(Clone, Debug, Serialize)]
-pub struct Element {
+pub struct Element<T: ExtensionCommand > {
     #[serde(skip_serializing)]
-    client: Client,
+    client: Client<T>,
     #[serde(flatten)]
     element: webdriver::common::WebElement,
 }
 
 /// An HTML form on the current page.
 #[derive(Clone, Debug)]
-pub struct Form {
-    client: Client,
+pub struct Form <T: ExtensionCommand + 'static> {
+    client: Client<T>,
     form: webdriver::common::WebElement,
 }
 
-impl Client {
+impl <T: ExtensionCommand +'static> Client <T> {
     /// Create a new `Client` associated with a new WebDriver session on the server at the given
     /// URL.
     ///
@@ -671,7 +672,7 @@ impl Client {
     }
 
     /// Switches to the frame specified at the index.
-    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client<T>, error::CmdError> {
         let params = SwitchToFrameParameters {
             id: index.map(FrameId::Short),
         };
@@ -680,18 +681,18 @@ impl Client {
     }
 
     /// Switches to the parent of the frame the client is currently contained within.
-    pub async fn enter_parent_frame(mut self) -> Result<Client, error::CmdError> {
+    pub async fn enter_parent_frame(mut self) -> Result<Client<T>, error::CmdError> {
         self.issue(WebDriverCommand::SwitchToParentFrame).await?;
         Ok(self)
     }
 
     /// Find an element on the page.
-    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element<T>, error::CmdError> {
         self.by(search.into()).await
     }
 
     /// Find elements on the page.
-    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
+    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element<T>>, error::CmdError> {
         let res = self
             .issue(WebDriverCommand::FindElements(search.into()))
             .await?;
@@ -713,7 +714,7 @@ impl Client {
     /// the page.
     pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
     where
-        F: FnMut(&mut Client) -> FF,
+        F: FnMut(&mut Client<T>) -> FF,
         FF: Future<Output = Result<bool, error::CmdError>>,
     {
         while !is_ready(self).await? {}
@@ -726,7 +727,7 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element<T>, error::CmdError> {
         let s: webdriver::command::LocatorParameters = search.into();
         loop {
             match self
@@ -770,7 +771,7 @@ impl Client {
     /// Locate a form on the page.
     ///
     /// Through the returned `Form`, HTML forms can be filled out and submitted.
-    pub async fn form(&mut self, search: Locator<'_>) -> Result<Form, error::CmdError> {
+    pub async fn form(&mut self, search: Locator<'_>) -> Result<Form<T>, error::CmdError> {
         let l = search.into();
         let res = self.issue(WebDriverCommand::FindElement(l)).await?;
         let f = self.parse_lookup(res)?;
@@ -864,12 +865,20 @@ impl Client {
         }
     }
 
+    /// Executes a browser specific extension command.
+    ///
+    /// You can install or uninstall browser extensions and control other browser
+    /// specific features with this method.
+    pub async fn extension_command(&mut self, command: T)->Result<Json, error::CmdError> {
+        self.issue(WebDriverCommand::Extension(command)).await
+    }
+
     // helpers
 
     async fn by(
         &mut self,
         locator: webdriver::command::LocatorParameters,
-    ) -> Result<Element, error::CmdError> {
+    ) -> Result<Element<T>, error::CmdError> {
         let res = self.issue(WebDriverCommand::FindElement(locator)).await?;
         let e = self.parse_lookup(res)?;
         Ok(Element {
@@ -943,7 +952,7 @@ impl Client {
     }
 }
 
-impl Element {
+impl <T: ExtensionCommand + 'static> Element <T> {
     /// Look up an [attribute] value for this element by name.
     ///
     /// `Ok(None)` is returned if the element does not have the given attribute.
@@ -999,7 +1008,7 @@ impl Element {
     }
 
     /// Find the first matching descendant element.
-    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element<T>, error::CmdError> {
         let res = self
             .client
             .issue(WebDriverCommand::FindElementElement(
@@ -1014,7 +1023,7 @@ impl Element {
         })
     }
     /// Find all matching descendant elements.
-    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
+    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element<T>>, error::CmdError> {
         let res = self
             .client
             .issue(WebDriverCommand::FindElementElements(
@@ -1035,7 +1044,7 @@ impl Element {
     /// Simulate the user clicking on this element.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub async fn click(mut self) -> Result<Client, error::CmdError> {
+    pub async fn click(mut self) -> Result<Client<T>, error::CmdError> {
         let cmd = WebDriverCommand::ElementClick(self.element);
         let r = self.client.issue(cmd).await?;
         if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
@@ -1074,7 +1083,7 @@ impl Element {
     }
 
     /// Get back the [`Client`] hosting this `Element`.
-    pub fn client(self) -> Client {
+    pub fn client(self) -> Client<T> {
         self.client
     }
 
@@ -1082,7 +1091,7 @@ impl Element {
     /// click interaction.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub async fn follow(mut self) -> Result<Client, error::CmdError> {
+    pub async fn follow(mut self) -> Result<Client<T>, error::CmdError> {
         let cmd = WebDriverCommand::GetElementAttribute(self.element, "href".to_string());
         let href = self.client.issue(cmd).await?;
         let href = match href {
@@ -1104,7 +1113,7 @@ impl Element {
     }
 
     /// Find and click an `option` child element by its `value` attribute.
-    pub async fn select_by_value(mut self, value: &str) -> Result<Client, error::CmdError> {
+    pub async fn select_by_value(mut self, value: &str) -> Result<Client<T>, error::CmdError> {
         let locator = format!("option[value='{}']", value);
         let locator = webdriver::command::LocatorParameters {
             using: webdriver::common::LocatorStrategy::CSSSelector,
@@ -1138,7 +1147,7 @@ impl Element {
     }
 
     /// Switches to the frame contained within the element.
-    pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(self) -> Result<Client<T>, error::CmdError> {
         let Self {
             mut client,
             element,
@@ -1153,7 +1162,7 @@ impl Element {
     }
 }
 
-impl Form {
+impl <T: ExtensionCommand +'static> Form <T> {
     /// Find a form input using the given `locator` and set its value to `value`.
     pub async fn set(
         &mut self,
@@ -1196,7 +1205,7 @@ impl Form {
     /// Submit this form using the first available submit button.
     ///
     /// `false` is returned if no submit button was not found.
-    pub async fn submit(self) -> Result<Client, error::CmdError> {
+    pub async fn submit(self) -> Result<Client<T>, error::CmdError> {
         self.submit_with(Locator::Css("input[type=submit],button[type=submit]"))
             .await
     }
@@ -1204,7 +1213,7 @@ impl Form {
     /// Submit this form using the button matched by the given selector.
     ///
     /// `false` is returned if a matching button was not found.
-    pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client, error::CmdError> {
+    pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client<T>, error::CmdError> {
         let locator = WebDriverCommand::FindElementElement(self.form, button.into());
         let res = self.client.issue(locator).await?;
         let submit = self.client.parse_lookup(res)?;
@@ -1223,7 +1232,7 @@ impl Form {
     /// Submit this form using the form submit button with the given label (case-insensitive).
     ///
     /// `false` is returned if a matching button was not found.
-    pub async fn submit_using(self, button_label: &str) -> Result<Client, error::CmdError> {
+    pub async fn submit_using(self, button_label: &str) -> Result<Client<T>, error::CmdError> {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
         let btn = format!(
             "input[type=submit][value=\"{}\" i],\
@@ -1241,7 +1250,7 @@ impl Form {
     ///
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
-    pub async fn submit_direct(mut self) -> Result<Client, error::CmdError> {
+    pub async fn submit_direct(mut self) -> Result<Client<T>, error::CmdError> {
         let mut args = vec![via_json!(&self.form)];
         self.client.fixup_elements(&mut args);
         // some sites are silly, and name their submit button "submit". this ends up overwriting
@@ -1276,7 +1285,7 @@ impl Form {
         mut self,
         field: &str,
         value: &str,
-    ) -> Result<Client, error::CmdError> {
+    ) -> Result<Client<T>, error::CmdError> {
         let mut args = vec![via_json!(&self.form), Json::from(field), Json::from(value)];
         self.client.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
@@ -1308,7 +1317,7 @@ impl Form {
     }
 
     /// Get back the [`Client`] hosting this `Form`.
-    pub fn client(self) -> Client {
+    pub fn client(self) -> Client<T> {
         self.client
     }
 }

@@ -10,7 +10,7 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 use tokio::sync::{mpsc, oneshot};
-use webdriver::command::WebDriverCommand;
+use webdriver::command::{WebDriverCommand, WebDriverExtensionCommand, VoidWebDriverExtensionCommand};
 use webdriver::error::ErrorStatus;
 use webdriver::error::WebDriverError;
 
@@ -18,16 +18,40 @@ type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
 
 /// A WebDriver client tied to a single browser session.
 #[derive(Clone, Debug)]
-pub struct Client {
-    tx: mpsc::UnboundedSender<Task>,
+pub struct Client<T: ExtensionCommand> {
+    tx: mpsc::UnboundedSender<Task<T>>,
     is_legacy: bool,
 }
 
-type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
+/// Browser Specific extension commands
+pub trait ExtensionCommand: WebDriverExtensionCommand {
+    /// Browser specific endpoint URL
+    ///
+    /// Example:-
+    /// Use `moz/addon/install` to install an addon on geckodriver
+    fn endpoint(&self) -> &str;
+
+    /// Http method that using for calling to the endpoint
+    fn method(&self) -> http::Method;
+}
+
+/// Extension command that does nothing. Use this type
+/// when you don't want to use extension commands.
+pub type VoidExtensionCommand = VoidWebDriverExtensionCommand;
+
+impl ExtensionCommand for VoidExtensionCommand {
+   fn endpoint(&self) -> &str {
+        panic!("No extensions implemented");
+   }
+
+   fn method(&self) -> http::Method {
+        panic!("No extensions implemented");
+   }
+}
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
-pub(crate) enum Cmd {
+pub(crate) enum Cmd<T: ExtensionCommand> {
     SetUA(String),
     GetSessionId,
     Shutdown,
@@ -37,25 +61,25 @@ pub(crate) enum Cmd {
         req: hyper::Request<hyper::Body>,
         rsp: oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
     },
-    WebDriver(Wcmd),
+    WebDriver(WebDriverCommand<T>),
 }
 
-impl From<Wcmd> for Cmd {
-    fn from(o: Wcmd) -> Self {
+impl<T: ExtensionCommand> From<WebDriverCommand<T>> for Cmd<T> {
+    fn from(o: WebDriverCommand<T>) -> Self {
         Cmd::WebDriver(o)
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct Task {
-    request: Cmd,
+pub(crate) struct Task<T: ExtensionCommand> {
+    request: Cmd<T>,
     ack: Ack,
 }
 
-impl Client {
+impl<T: ExtensionCommand> Client<T> {
     pub(crate) fn issue<C>(&mut self, cmd: C) -> impl Future<Output = Result<Json, error::CmdError>>
     where
-        C: Into<Cmd>,
+        C: Into<Cmd<T>>,
     {
         let (tx, rx) = oneshot::channel();
         let cmd = cmd.into();
@@ -178,9 +202,9 @@ impl Ongoing {
     }
 }
 
-pub(crate) struct Session {
+pub(crate) struct Session<T: ExtensionCommand> {
     ongoing: Ongoing,
-    rx: mpsc::UnboundedReceiver<Task>,
+    rx: mpsc::UnboundedReceiver<Task<T>>,
     client: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
     wdb: url::Url,
     session: Option<String>,
@@ -189,7 +213,7 @@ pub(crate) struct Session {
     persist: bool,
 }
 
-impl Future for Session {
+impl<T: ExtensionCommand + 'static> Future for Session<T> {
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -269,7 +293,7 @@ impl Future for Session {
     }
 }
 
-impl Session {
+impl<T: ExtensionCommand + 'static> Session<T> {
     fn shutdown(&mut self, ack: Option<Ack>) {
         let url = {
             self.wdb
@@ -329,7 +353,7 @@ impl Session {
     pub(crate) async fn with_capabilities(
         webdriver: &str,
         mut cap: webdriver::capabilities::Capabilities,
-    ) -> Result<Client, error::NewSessionError> {
+    ) -> Result<Client<T>, error::NewSessionError> {
         // Where is the WebDriver server?
         let wdb = webdriver.parse::<url::Url>();
 
@@ -442,7 +466,7 @@ impl Session {
     /// Helper for determining what URL endpoint to use for various requests.
     ///
     /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
-    fn endpoint_for(&self, cmd: &Wcmd) -> Result<url::Url, url::ParseError> {
+    fn endpoint_for(&self, cmd: &WebDriverCommand<T>) -> Result<url::Url, url::ParseError> {
         if let WebDriverCommand::NewSession(..) = *cmd {
             return self.wdb.join("session");
         }
@@ -451,7 +475,7 @@ impl Session {
             self.wdb
                 .join(&format!("session/{}/", self.session.as_ref().unwrap()))?
         };
-        match *cmd {
+        match &*cmd {
             WebDriverCommand::NewSession(..) => unreachable!(),
             WebDriverCommand::DeleteSession => unreachable!(),
             WebDriverCommand::Get(..) | WebDriverCommand::GetCurrentUrl => base.join("url"),
@@ -493,6 +517,11 @@ impl Session {
             WebDriverCommand::NewWindow(..) => base.join("window/new"),
             WebDriverCommand::SwitchToWindow(..) => base.join("window"),
             WebDriverCommand::CloseWindow => base.join("window"),
+            WebDriverCommand::Extension(extension_command) => {
+                let endpoint = extension_command.endpoint();
+                let endpoint = endpoint.trim_start_matches("/");
+                base.join(endpoint)
+            }
             _ => unimplemented!(),
         }
     }
@@ -506,7 +535,7 @@ impl Session {
     /// [the spec]: https://www.w3.org/TR/webdriver/#list-of-endpoints
     fn issue_wd_cmd(
         &mut self,
-        cmd: WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>,
+        cmd: WebDriverCommand<T>,
     ) -> impl Future<Output = Result<Json, error::CmdError>> {
         // TODO: make this an async fn
         // will take some doing as returned future must be independent of self
@@ -523,7 +552,7 @@ impl Session {
         let mut body = None;
 
         // but some are special
-        match cmd {
+        match &cmd {
             WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
                 // TODO: awful hacks
                 let mut also = String::new();
@@ -599,6 +628,12 @@ impl Session {
             }
             WebDriverCommand::CloseWindow => {
                 method = Method::DELETE;
+            }
+            WebDriverCommand::Extension(ext_command) => {
+                method = ext_command.method();
+                if let Some(param) = ext_command.parameters_json() {
+                    body = Some(param.to_string())
+                }
             }
             _ => {}
         }
