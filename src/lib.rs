@@ -502,6 +502,13 @@ impl Client {
     }
 
     /// Get the active element for this session.
+    ///
+    /// The "active" element is the `Element` within the DOM that currently has focus. This will
+    /// often be an `<input>` or `<textarea>` element that currently has the text selection, or
+    /// another input element such as a checkbox or radio button. Which elements are focusable
+    /// depends on the platform and browser configuration.
+    ///
+    /// If no element has focus, the result may be the page body or a `NoSuchElement` error.
     pub async fn active_element(&mut self) -> Result<Element, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetActiveElement).await?;
         let e = self.parse_lookup(res)?;
