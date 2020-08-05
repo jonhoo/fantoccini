@@ -493,6 +493,7 @@ impl Session {
             WebDriverCommand::NewWindow(..) => base.join("window/new"),
             WebDriverCommand::SwitchToWindow(..) => base.join("window"),
             WebDriverCommand::CloseWindow => base.join("window"),
+            WebDriverCommand::GetActiveElement => base.join("element/active"),
             _ => unimplemented!(),
         }
     }
