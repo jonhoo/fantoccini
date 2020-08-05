@@ -501,6 +501,16 @@ impl Client {
         }
     }
 
+    /// Get the active element for this session.
+    pub async fn active_element(&mut self) -> Result<Element, error::CmdError> {
+        let res = self.issue(WebDriverCommand::GetActiveElement).await?;
+        let e = self.parse_lookup(res)?;
+        Ok(Element {
+            client: self.clone(),
+            element: e,
+        })
+    }
+
     /// Retrieve the currently active URL for this session.
     pub async fn current_url(&mut self) -> Result<url::Url, error::CmdError> {
         self.current_url_().await

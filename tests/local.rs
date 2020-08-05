@@ -35,6 +35,17 @@ async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdE
     c.close().await
 }
 
+async fn get_active_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+    c.find(Locator::Css("#select1")).await?.click().await?;
+
+    let mut active = c.active_element().await?;
+    assert_eq!(active.attr("id").await?, Some(String::from("select1")));
+
+    c.close().await
+}
+
 async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
@@ -259,6 +270,12 @@ mod firefox {
 
     #[test]
     #[serial]
+    fn get_active_element_test() {
+        local_tester!(get_active_element, "firefox")
+    }
+
+    #[test]
+    #[serial]
     fn serialize_element_test() {
         local_tester!(serialize_element, "firefox")
     }
@@ -322,6 +339,11 @@ mod chrome {
     #[test]
     fn find_and_click_link_test() {
         local_tester!(find_and_click_link, "chrome")
+    }
+
+    #[test]
+    fn get_active_element_test() {
+        local_tester!(get_active_element, "chrome")
     }
 
     #[test]
