@@ -334,13 +334,13 @@ mod firefox {
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "firefox")
     }
-  
+
     #[test]
     #[serial]
     fn set_by_name_textarea_test() {
         local_tester!(set_by_name_textarea, "firefox")
     }
-  
+
     #[test]
     #[serial]
     fn stale_element_test() {
@@ -405,7 +405,7 @@ mod chrome {
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "chrome")
     }
-  
+
     #[test]
     fn set_by_name_textarea_test() {
         local_tester!(set_by_name_textarea, "chrome")
