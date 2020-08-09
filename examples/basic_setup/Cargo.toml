@@ -7,8 +7,8 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fantoccini = "0.12.0"
+fantoccini = "0.14.0"
 
 [dependencies.tokio]
-version = "0.2.6"
+version = "0.2.22"
 features = ["macros", "time"] # macros is needed for #[tokio::main], time is for needed for delay_for
