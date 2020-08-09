@@ -11,4 +11,4 @@ fantoccini = "0.12.0"
 
 [dependencies.tokio]
 version = "0.2.6"
-features = ["macros"] # Needed for #[tokio::main]
+features = ["macros", "time"] # macros is needed for #[tokio::main], time is for needed for delay_for
