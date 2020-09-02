@@ -271,6 +271,12 @@ impl Future for Session {
 
 impl Session {
     fn shutdown(&mut self, ack: Option<Ack>) {
+        // session was not created
+        if self.session.is_none() {
+            self.ongoing = Ongoing::Break;
+            return;
+        }
+
         let url = {
             self.wdb
                 .join(&format!("session/{}", self.session.as_ref().unwrap()))
