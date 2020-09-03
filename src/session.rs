@@ -113,11 +113,7 @@ enum OngoingResult {
 
 impl Ongoing {
     fn is_some(&self) -> bool {
-        if let Ongoing::None = *self {
-            false
-        } else {
-            true
-        }
+        !matches!(self, Ongoing::None)
     }
 
     // returns true if outer loop should break
@@ -680,11 +676,7 @@ impl Session {
             })
             .map(move |r| {
                 let (body, status) = r?;
-                let is_new_session = if let WebDriverCommand::NewSession(..) = cmd {
-                    true
-                } else {
-                    false
-                };
+                let is_new_session = matches!(cmd, WebDriverCommand::NewSession(..));
 
                 let mut is_success = status.is_success();
                 let mut legacy_status = 0;

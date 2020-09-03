@@ -136,11 +136,7 @@ impl CmdError {
     /// };
     /// ```
     pub fn is_miss(&self) -> bool {
-        if let CmdError::NoSuchElement(..) = *self {
-            true
-        } else {
-            false
-        }
+        matches!(self, CmdError::NoSuchElement(..))
     }
 }
 
