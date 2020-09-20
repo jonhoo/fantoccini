@@ -141,7 +141,7 @@ macro_rules! via_json {
     }};
 }
 
-pub use hyper::Method;
+pub use hyper::{self, Method};
 
 /// Error types.
 pub mod error;
@@ -526,6 +526,20 @@ impl Client {
             .await
     }
 
+    /// Issue an raw hyper::Request
+    pub async fn with_raw_client_request(
+        &self,
+        req: hyper::Request<hyper::Body>,
+    ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
+        let (tx, rx) = oneshot::channel();
+        self.issue(Cmd::Raw { req, rsp: tx }).await?;
+        match rx.await {
+            Ok(Ok(r)) => Ok(r),
+            Ok(Err(e)) => Err(e.into()),
+            Err(e) => unreachable!("Session ended prematurely: {:?}", e),
+        }
+    }
+
     /// Build and issue an HTTP request to the given `url` with all the same cookies as the current
     /// session.
     ///
@@ -615,14 +629,7 @@ impl Client {
         if let Some(s) = ua {
             req = req.header(hyper::header::USER_AGENT, s);
         }
-        let req = before(req);
-        let (tx, rx) = oneshot::channel();
-        self.issue(Cmd::Raw { req, rsp: tx }).await?;
-        match rx.await {
-            Ok(Ok(r)) => Ok(r),
-            Ok(Err(e)) => Err(e.into()),
-            Err(e) => unreachable!("Session ended prematurely: {:?}", e),
-        }
+        self.with_raw_client_request(before(req)).await
     }
 
     /// Switches to the frame specified at the index.
