@@ -987,6 +987,16 @@ impl Element {
             .collect())
     }
 
+    /// Look up a CSS value for this element by name (color, width, etc)
+    pub async fn css(&mut self, prop: &str) -> Result<Option<String>, error::CmdError> {
+        let cmd = WebDriverCommand::GetCSSValue(self.element.clone(), prop.to_string());
+        match self.client.issue(cmd).await? {
+            Json::String(v) => Ok(Some(v)),
+            Json::Null => Ok(None),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
     /// Simulate the user clicking on this element.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.

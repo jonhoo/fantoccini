@@ -471,6 +471,9 @@ impl Session {
             WebDriverCommand::GetElementAttribute(ref we, ref attr) => {
                 base.join(&format!("element/{}/attribute/{}", we.0, attr))
             }
+            WebDriverCommand::GetCSSValue(ref we, ref prop) => {
+                base.join(&format!("element/{}/css/{}", we.0, prop))
+            }
             WebDriverCommand::FindElementElement(ref p, _) => {
                 base.join(&format!("element/{}/element", p.0))
             }
