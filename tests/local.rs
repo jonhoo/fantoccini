@@ -273,6 +273,32 @@ async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError
     Ok(())
 }
 
+async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
+    let count: u64 = c
+        .execute_async(
+            &"setTimeout(() => arguments[1](arguments[0] + 1))",
+            vec![1_u32.into()],
+        )
+        .await?
+        .as_u64()
+        .expect("should be integer variant");
+
+    assert_eq!(2, count);
+
+    let count: u64 = c
+        .execute_async(&"setTimeout(() => arguments[0](2))", vec![])
+        .await?
+        .as_u64()
+        .expect("should be integer variant");
+
+    assert_eq!(2, count);
+
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -334,13 +360,13 @@ mod firefox {
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "firefox")
     }
-  
+
     #[test]
     #[serial]
     fn set_by_name_textarea_test() {
         local_tester!(set_by_name_textarea, "firefox")
     }
-  
+
     #[test]
     #[serial]
     fn stale_element_test() {
@@ -351,6 +377,12 @@ mod firefox {
     #[serial]
     fn select_by_index_test() {
         local_tester!(select_by_index, "firefox")
+    }
+
+    #[test]
+    #[serial]
+    fn resolve_execute_async_value_test() {
+        local_tester!(resolve_execute_async_value, "firefox")
     }
 }
 
@@ -405,7 +437,7 @@ mod chrome {
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "chrome")
     }
-  
+
     #[test]
     fn set_by_name_textarea_test() {
         local_tester!(set_by_name_textarea, "chrome")

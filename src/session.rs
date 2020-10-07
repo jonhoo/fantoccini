@@ -465,6 +465,7 @@ impl Session {
             WebDriverCommand::GetCookies => base.join("cookie"),
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
+            WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
                 base.join(&format!("element/{}/property/{}", we.0, prop))
             }
@@ -566,6 +567,10 @@ impl Session {
                 method = Method::POST;
             }
             WebDriverCommand::ExecuteScript(ref script) => {
+                body = Some(serde_json::to_string(script).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::ExecuteAsyncScript(ref script) => {
                 body = Some(serde_json::to_string(script).unwrap());
                 method = Method::POST;
             }

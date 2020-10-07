@@ -514,6 +514,37 @@ impl Client {
         self.issue(WebDriverCommand::ExecuteScript(cmd)).await
     }
 
+    /// Execute the given async JavaScript script in the current browser session.
+    ///
+    /// `args` is available to the script inside the `arguments` array. Since `Element` implements
+    /// `Serialize`, you can also provide serialized `Element`s as arguments, and they will
+    /// correctly deserialize to DOM elements on the other side.
+    ///
+    /// The final arg in `args` is a callback function that when called will trigger completion
+    /// with the provided value. For example,
+    ///
+    /// ```javascript
+    /// const done = arguments.pop();
+    ///
+    /// setInterval(() => {
+    ///     // ... do stuff
+    ///     done(valueToReturn);
+    /// }, 5000);
+    /// ```
+    pub async fn execute_async(
+        &mut self,
+        script: &str,
+        mut args: Vec<Json>,
+    ) -> Result<Json, error::CmdError> {
+        self.fixup_elements(&mut args);
+        let cmd = webdriver::command::JavascriptCommandParameters {
+            script: script.to_string(),
+            args: Some(args),
+        };
+
+        self.issue(WebDriverCommand::ExecuteAsyncScript(cmd)).await
+    }
+
     /// Issue an HTTP request to the given `url` with all the same cookies as the current session.
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
