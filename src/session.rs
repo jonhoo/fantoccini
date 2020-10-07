@@ -800,6 +800,7 @@ impl Session {
                             "unable to capture screen" => ErrorStatus::UnableToCaptureScreen,
                             "unexpected alert open" => ErrorStatus::UnexpectedAlertOpen,
                             "unknown error" => ErrorStatus::UnknownError,
+                            "script timeout" => ErrorStatus::ScriptTimeout,
                             "unsupported operation" => ErrorStatus::UnsupportedOperation,
                             _ => unreachable!(
                                 "received unknown error ({}) for INTERNAL_SERVER_ERROR status code",

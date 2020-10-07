@@ -86,6 +86,13 @@ pub enum CmdError {
     /// ["no such window"]: https://www.w3.org/TR/webdriver/#dfn-no-such-window
     NoSuchWindow(wderror::WebDriverError),
 
+    /// The allowed script execution time was exceeded. This variant lifts the
+    /// ["script timeout"] error variant from `Standard` to simplify checking for it in
+    /// user code
+    ///
+    /// ["script timeout"]: https://www.w3.org/TR/webdriver/#dfn-script-timeout-error
+    ScriptTimeout(wderror::WebDriverError),
+
     /// A bad URL was encountered during parsing.
     ///
     /// This normally happens if a link is clicked or the current URL is requested, but the URL in
@@ -154,6 +161,7 @@ impl Error for CmdError {
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
             CmdError::ImageDecodeError(..) => "error decoding image",
+            CmdError::ScriptTimeout(..) => "script timeout",
         }
     }
 
@@ -167,7 +175,10 @@ impl Error for CmdError {
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
             CmdError::ImageDecodeError(ref e) => Some(e),
-            CmdError::NotJson(_) | CmdError::NotW3C(_) | CmdError::InvalidArgument(..) => None,
+            CmdError::NotJson(_)
+            | CmdError::NotW3C(_)
+            | CmdError::InvalidArgument(..)
+            | CmdError::ScriptTimeout(_) => None,
         }
     }
 }
@@ -187,6 +198,7 @@ impl fmt::Display for CmdError {
             CmdError::Json(ref e) => write!(f, "{}", e),
             CmdError::NotW3C(ref e) => write!(f, "{:?}", e),
             CmdError::ImageDecodeError(ref e) => write!(f, "{:?}", e),
+            CmdError::ScriptTimeout(ref e) => write!(f, "{:?}", e),
             CmdError::InvalidArgument(ref arg, ref msg) => {
                 write!(f, "Invalid argument `{}`: {}", arg, msg)
             }
@@ -214,14 +226,16 @@ impl From<herror::Error> for CmdError {
 
 impl From<wderror::WebDriverError> for CmdError {
     fn from(e: wderror::WebDriverError) -> Self {
-        if let wderror::WebDriverError {
-            error: wderror::ErrorStatus::NoSuchElement,
-            ..
-        } = e
-        {
-            CmdError::NoSuchElement(e)
-        } else {
-            CmdError::Standard(e)
+        match e {
+            wderror::WebDriverError {
+                error: wderror::ErrorStatus::NoSuchElement,
+                ..
+            } => CmdError::NoSuchElement(e),
+            wderror::WebDriverError {
+                error: wderror::ErrorStatus::ScriptTimeout,
+                ..
+            } => CmdError::ScriptTimeout(e),
+            _ => CmdError::Standard(e),
         }
     }
 }
@@ -235,6 +249,20 @@ impl From<serde_json::Error> for CmdError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn from_wderror_to_cmderror() {
+        // script timeout should goto CmdError::ScriptTimeout
+        {
+            let status = wderror::ErrorStatus::from(String::from("script timeout"));
+            let err = wderror::WebDriverError::new(status, "");
+
+            if let CmdError::ScriptTimeout(..) = err.into() {
+            } else {
+                assert!(false)
+            };
+        }
+    }
 
     #[test]
     fn ensure_display_error_doesnt_stackoverflow() {
