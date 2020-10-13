@@ -520,16 +520,26 @@ impl Client {
     /// `Serialize`, you can also provide serialized `Element`s as arguments, and they will
     /// correctly deserialize to DOM elements on the other side.
     ///
-    /// The final arg in `args` is a callback function that when called will trigger completion
-    /// with the provided value. For example,
+    /// The final argument in `args` is a callback function that when called will trigger completion
+    /// of `execute_async`'s `Future` with the provided value.
     ///
-    /// ```javascript
-    /// const done = arguments.pop();
+    /// # Examples
     ///
-    /// setInterval(() => {
-    ///     // ... do stuff
-    ///     done(valueToReturn);
-    /// }, 5000);
+    /// Call a web API from the browser and retrieve the value asynchronously
+    ///
+    /// ```ignore
+    /// const JS: &'static str = r#"
+    ///     const [date, callback] = arguments;
+    ///
+    ///     fetch(`http://weather.api/${date}/hourly`)
+    ///     // whenever the HTTP Request completes,
+    ///     // send the value back to the Rust context
+    ///     .then(data => {
+    ///         callback(data.json())
+    ///     })
+    /// "#;
+    ///
+    /// let weather = client.execute_async(JS, vec![date]).await?;
     /// ```
     pub async fn execute_async(
         &mut self,
