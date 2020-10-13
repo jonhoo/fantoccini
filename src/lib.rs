@@ -520,7 +520,7 @@ impl Client {
     /// `Serialize`, you can also provide serialized `Element`s as arguments, and they will
     /// correctly deserialize to DOM elements on the other side.
     ///
-    /// The final argument in `args` is a callback function that when called will trigger completion
+    /// The final value in the `arguments` array is a callback function that when called will trigger completion
     /// of `execute_async`'s `Future` with the provided value.
     ///
     /// # Examples
