@@ -516,8 +516,8 @@ impl Client {
 
     /// Execute the given async JavaScript `script` in the current browser session.
     ///
-    /// The provided JavaScript has access to the `args` through the `arguments` array.
-    /// The array also holds an additional element at the end that provides a completion callback
+    /// The provided JavaScript has access to `args` through the JavaScript variable `arguments`.
+    /// The `arguments` array also holds an additional element at the end that provides a completion callback
     /// for the asynchronous code.
     ///
     /// Since `Element` implements `Serialize`, you can also provide serialized `Element`s as arguments, and they will
