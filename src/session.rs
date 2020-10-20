@@ -700,7 +700,7 @@ impl Session {
                             Ok(Json::Object(v))
                         } else {
                             v.remove("value")
-                                .ok_or_else(|| error::CmdError::NotW3C(Json::Object(v)))
+                                .ok_or(error::CmdError::NotW3C(Json::Object(v)))
                         }
                     }
                     v => Err(error::CmdError::NotW3C(v)),
