@@ -465,6 +465,7 @@ impl Session {
             WebDriverCommand::GetCookies => base.join("cookie"),
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
+            WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
             WebDriverCommand::GetElementProperty(ref we, ref prop) => {
                 base.join(&format!("element/{}/property/{}", we.0, prop))
             }
@@ -566,6 +567,10 @@ impl Session {
                 method = Method::POST;
             }
             WebDriverCommand::ExecuteScript(ref script) => {
+                body = Some(serde_json::to_string(script).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::ExecuteAsyncScript(ref script) => {
                 body = Some(serde_json::to_string(script).unwrap());
                 method = Method::POST;
             }
@@ -695,7 +700,7 @@ impl Session {
                             Ok(Json::Object(v))
                         } else {
                             v.remove("value")
-                                .ok_or_else(|| error::CmdError::NotW3C(Json::Object(v)))
+                                .ok_or(error::CmdError::NotW3C(Json::Object(v)))
                         }
                     }
                     v => Err(error::CmdError::NotW3C(v)),
@@ -795,6 +800,7 @@ impl Session {
                             "unable to capture screen" => ErrorStatus::UnableToCaptureScreen,
                             "unexpected alert open" => ErrorStatus::UnexpectedAlertOpen,
                             "unknown error" => ErrorStatus::UnknownError,
+                            "script timeout" => ErrorStatus::ScriptTimeout,
                             "unsupported operation" => ErrorStatus::UnsupportedOperation,
                             _ => unreachable!(
                                 "received unknown error ({}) for INTERNAL_SERVER_ERROR status code",

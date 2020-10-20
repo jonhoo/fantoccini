@@ -514,6 +514,47 @@ impl Client {
         self.issue(WebDriverCommand::ExecuteScript(cmd)).await
     }
 
+    /// Execute the given async JavaScript `script` in the current browser session.
+    ///
+    /// The provided JavaScript has access to `args` through the JavaScript variable `arguments`.
+    /// The `arguments` array also holds an additional element at the end that provides a completion callback
+    /// for the asynchronous code.
+    ///
+    /// Since `Element` implements `Serialize`, you can also provide serialized `Element`s as arguments, and they will
+    /// correctly deserialize to DOM elements on the other side.
+    ///
+    /// # Examples
+    ///
+    /// Call a web API from the browser and retrieve the value asynchronously
+    ///
+    /// ```ignore
+    /// const JS: &'static str = r#"
+    ///     const [date, callback] = arguments;
+    ///
+    ///     fetch(`http://weather.api/${date}/hourly`)
+    ///     // whenever the HTTP Request completes,
+    ///     // send the value back to the Rust context
+    ///     .then(data => {
+    ///         callback(data.json())
+    ///     })
+    /// "#;
+    ///
+    /// let weather = client.execute_async(JS, vec![date]).await?;
+    /// ```
+    pub async fn execute_async(
+        &mut self,
+        script: &str,
+        mut args: Vec<Json>,
+    ) -> Result<Json, error::CmdError> {
+        self.fixup_elements(&mut args);
+        let cmd = webdriver::command::JavascriptCommandParameters {
+            script: script.to_string(),
+            args: Some(args),
+        };
+
+        self.issue(WebDriverCommand::ExecuteAsyncScript(cmd)).await
+    }
+
     /// Issue an HTTP request to the given `url` with all the same cookies as the current session.
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
