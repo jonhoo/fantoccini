@@ -169,7 +169,12 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     .await?;
     assert_eq!(
         texts,
-        ["Help", "Community portal", "Recent changes", "Upload file"]
+        [
+            "Help",
+            "Learn to edit",
+            "Community portal",
+            "Recent changes"
+        ]
     );
 
     c.close().await
