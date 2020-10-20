@@ -514,14 +514,14 @@ impl Client {
         self.issue(WebDriverCommand::ExecuteScript(cmd)).await
     }
 
-    /// Execute the given async JavaScript script in the current browser session.
+    /// Execute the given async JavaScript `script` in the current browser session.
     ///
-    /// `args` is available to the script inside the `arguments` array. Since `Element` implements
-    /// `Serialize`, you can also provide serialized `Element`s as arguments, and they will
+    /// The provided JavaScript has access to the `args` through the `arguments` array.
+    /// The array also holds an additional element at the end that provides a completion callback
+    /// for the asynchronous code.
+    ///
+    /// Since `Element` implements `Serialize`, you can also provide serialized `Element`s as arguments, and they will
     /// correctly deserialize to DOM elements on the other side.
-    ///
-    /// The final value in the `arguments` array is a callback function that when called will trigger completion
-    /// of `execute_async`'s `Future` with the provided value.
     ///
     /// # Examples
     ///
