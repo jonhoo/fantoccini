@@ -273,6 +273,29 @@ async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError
     Ok(())
 }
 
+async fn select_by_id(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
+    let mut select_element = c.find(Locator::Css("#select3")).await?;
+
+    // Get first display text
+    let initial_text = select_element.prop("value").await?;
+    assert_eq!(Some("Select3-Option1".into()), initial_text);
+
+    // Select second option
+    select_element
+        .clone()
+        .select_by_id("select3-option-2")
+        .await?;
+
+    // Get display text after selection
+    let text_after_selecting = select_element.prop("value").await?;
+    assert_eq!(Some("Select3-Option2".into()), text_after_selecting);
+
+    Ok(())
+}
+
 async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
@@ -380,6 +403,11 @@ mod firefox {
     }
 
     #[test]
+    fn select_by_id_test() {
+        local_tester!(select_by_id, "firefox")
+    }
+
+    #[test]
     #[serial]
     fn resolve_execute_async_value_test() {
         local_tester!(resolve_execute_async_value, "firefox")
@@ -451,5 +479,10 @@ mod chrome {
     #[test]
     fn select_by_index_test() {
         local_tester!(select_by_index, "chrome")
+    }
+
+    #[test]
+    fn select_by_id_test() {
+        local_tester!(select_by_id, "chrome")
     }
 }

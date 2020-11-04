@@ -1133,6 +1133,15 @@ impl Element {
         self.find(Locator::Css(&locator)).await?.click().await
     }
 
+    /// Find and click an `<option>` child element by its id.
+    ///
+    /// This method clicks the first `<option>` element that has an appropriate `id`.
+    /// If the element wasn't found a erorr will be issued.
+    pub async fn select_by_id(mut self, id: &str) -> Result<Client, error::CmdError> {
+        let locator = format!(r#"option[id='{}']"#, id);
+        self.find(Locator::Css(&locator)).await?.click().await
+    }
+
     /// Switches to the frame contained within the element.
     pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
         let Self {
