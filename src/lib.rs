@@ -1133,6 +1133,12 @@ impl Element {
         self.find(Locator::Css(&locator)).await?.click().await
     }
 
+    /// Find and click an `<option>` element by its visible text/label.
+    pub async fn select_by_label(mut self, label: &str) -> Result<Client, error::CmdError> {
+        let locator = format!(r".//option[normalize-space(.)='{}']", label);
+        self.find(Locator::XPath(&locator)).await?.click().await
+    }
+
     /// Switches to the frame contained within the element.
     pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
         let Self {
