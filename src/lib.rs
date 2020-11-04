@@ -988,11 +988,12 @@ impl Element {
     }
 
     /// Look up a CSS value for this element by name (color, width, etc)
+    ///
+    /// See <https://www.w3.org/TR/webdriver/#dfn-get-element-css-value>.
     pub async fn css(&mut self, prop: &str) -> Result<Option<String>, error::CmdError> {
         let cmd = WebDriverCommand::GetCSSValue(self.element.clone(), prop.to_string());
         match self.client.issue(cmd).await? {
             Json::String(v) => Ok(Some(v)),
-            Json::Null => Ok(None),
             v => Err(error::CmdError::NotW3C(v)),
         }
     }
