@@ -412,7 +412,7 @@ mod firefox {
 
     #[test]
     #[serial]
-    fn select_by_index_label() {
+    fn select_by_label_test() {
         local_tester!(select_by_label, "firefox")
     }
 
@@ -481,13 +481,9 @@ mod chrome {
     }
 
     #[test]
-    fn stale_element_test() {
-        local_tester!(stale_element, "chrome")
-    }
-
-    #[test]
-    fn select_by_index_test() {
-        local_tester!(select_by_index, "chrome")
+    #[serial]
+    fn select_by_label_test() {
+        local_tester!(select_by_label, "chrome")
     }
 
     #[test]

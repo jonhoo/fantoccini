@@ -1133,9 +1133,14 @@ impl Element {
         self.find(Locator::Css(&locator)).await?.click().await
     }
 
-    /// Find and click an `<option>` element by its visible text/label.
+    /// Find and click an `<option>` element by its visible text.
+    ///
+    /// The method doesn't make any escaping for the argument like it is done in python webdriver client for [example].
+    /// It also doesn't make any normalizations before match.
+    ///
+    /// [example]: https://github.com/SeleniumHQ/selenium/blob/941dc9c6b2e2aa4f701c1b72be8de03d4b7e996a/py/selenium/webdriver/support/select.py#L67
     pub async fn select_by_label(mut self, label: &str) -> Result<Client, error::CmdError> {
-        let locator = format!(r".//option[normalize-space(.)='{}']", label);
+        let locator = format!(r".//option[.='{}']", label);
         self.find(Locator::XPath(&locator)).await?.click().await
     }
 
