@@ -1147,6 +1147,12 @@ impl Element {
     ///
     /// This method clicks the first `<option>` element that is found.
     /// If the element wasn't found a erorr will be issued.
+    ///
+    /// An example how to select by Id
+    ///
+    /// ```no_run
+    ///     c.select_by(Locator::Id("some-id")).await?;
+    /// ```
     pub async fn select_by(mut self, locator: Locator<'_>) -> Result<Client, error::CmdError> {
         self.find(locator).await?.click().await
     }
