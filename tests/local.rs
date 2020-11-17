@@ -442,6 +442,7 @@ mod firefox {
     }
 
     #[test]
+    #[serial]
     fn select_by_test() {
         local_tester!(select_by, "firefox")
     }
