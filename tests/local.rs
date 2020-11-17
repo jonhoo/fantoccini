@@ -304,6 +304,37 @@ async fn select_by_label(mut c: Client, port: u16) -> Result<(), error::CmdError
     Ok(())
 }
 
+async fn select_by(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
+    let mut select_element = c.find(Locator::Css("#select1")).await?;
+
+    // Get first display text
+    let initial_text = select_element.prop("value").await?;
+    assert_eq!(Some("Select1-Option1".into()), initial_text);
+
+    // Select third option via css
+    select_element
+        .clone()
+        .select_by(Locator::Css("option:nth-child(3)"))
+        .await?;
+
+    // Get display text after selection
+    let text_after_selecting = select_element.prop("value").await?;
+    assert_eq!(Some("Select1-Option3".into()), text_after_selecting);
+
+    // Check that the second select is not changed
+    let select2_text = c
+        .find(Locator::Css("#select2"))
+        .await?
+        .prop("value")
+        .await?;
+    assert_eq!(Some("Select2-Option1".into()), select2_text);
+
+    Ok(())
+}
+
 async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
@@ -411,6 +442,11 @@ mod firefox {
     }
 
     #[test]
+    fn select_by_test() {
+        local_tester!(select_by, "firefox")
+    }
+
+    #[test]
     #[serial]
     fn select_by_label_test() {
         local_tester!(select_by_label, "firefox")
@@ -489,5 +525,10 @@ mod chrome {
     #[test]
     fn select_by_index_label() {
         local_tester!(select_by_label, "chrome")
+    }
+
+    #[test]
+    fn select_by_test() {
+        local_tester!(select_by, "chrome")
     }
 }

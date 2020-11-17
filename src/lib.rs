@@ -1144,6 +1144,14 @@ impl Element {
         self.find(Locator::XPath(&locator)).await?.click().await
     }
 
+    /// Find and click an `<option>` child element by a locator.
+    ///
+    /// This method clicks the first `<option>` element that is found.
+    /// If the element wasn't found a erorr will be issued.
+    pub async fn select_by(mut self, locator: Locator<'_>) -> Result<Client, error::CmdError> {
+        self.find(locator).await?.click().await
+    }
+
     /// Switches to the frame contained within the element.
     pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
         let Self {
