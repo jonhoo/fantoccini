@@ -308,29 +308,21 @@ async fn select_by(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
-    let mut select_element = c.find(Locator::Css("#select1")).await?;
+    let mut select_element = c.find(Locator::Css("#select3")).await?;
 
     // Get first display text
     let initial_text = select_element.prop("value").await?;
-    assert_eq!(Some("Select1-Option1".into()), initial_text);
+    assert_eq!(Some("Select3-Option1".into()), initial_text);
 
     // Select third option via css
     select_element
         .clone()
-        .select_by(Locator::Css("option:nth-child(3)"))
+        .select_by(Locator::Css("#select3-option-3"))
         .await?;
 
     // Get display text after selection
     let text_after_selecting = select_element.prop("value").await?;
-    assert_eq!(Some("Select1-Option3".into()), text_after_selecting);
-
-    // Check that the second select is not changed
-    let select2_text = c
-        .find(Locator::Css("#select2"))
-        .await?
-        .prop("value")
-        .await?;
-    assert_eq!(Some("Select2-Option1".into()), select2_text);
+    assert_eq!(Some("Select3-Option3".into()), text_after_selecting);
 
     Ok(())
 }
