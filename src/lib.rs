@@ -13,6 +13,11 @@
 //! For low-level access to the page, `Client::source` can be used to fetch the full page HTML
 //! source code, and `Client::raw_client_for` to build a raw HTTP request for a particular URL.
 //!
+//! # Feature flags
+//! - `rustls-tls`: Use rustls for https, enabled by default
+//! - `openssl-tls`: Use openssl for https
+//!
+//!
 //! # Examples
 //!
 //! These examples all assume that you have a [WebDriver compatible] process running on port 4444.

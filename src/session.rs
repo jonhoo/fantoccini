@@ -177,7 +177,10 @@ impl Ongoing {
 pub(crate) struct Session {
     ongoing: Ongoing,
     rx: mpsc::UnboundedReceiver<Task>,
+    #[cfg(any(feature = "rustls-tls", not(feature = "openssl-tls")))]
     client: hyper::Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
+    #[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
+    client: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
     wdb: url::Url,
     session: Option<String>,
     is_legacy: bool,
@@ -327,6 +330,14 @@ impl Session {
             }
         }
     }
+    #[cfg(all(not(feature = "rustls-tls"), feature = "openssl-tls"))]
+    fn construct_https() -> hyper_tls::HttpsConnector<hyper::client::HttpConnector> {
+        hyper_tls::HttpsConnector::new()
+    }
+    #[cfg(any(not(feature = "openssl-tls"), feature = "rustls-tls"))]
+    fn construct_https() -> hyper_rustls::HttpsConnector<hyper::client::HttpConnector> {
+        hyper_rustls::HttpsConnector::new()
+    }
 
     pub(crate) async fn with_capabilities(
         webdriver: &str,
@@ -337,9 +348,11 @@ impl Session {
 
         let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
 
+        // Create a https connector depending on the feature flags with rustls being the default
+        let https_connector = Self::construct_https();
+
         // We want a tls-enabled client
-        let client =
-            hyper::Client::builder().build::<_, hyper::Body>(hyper_rustls::HttpsConnector::new());
+        let client = hyper::Client::builder().build::<_, hyper::Body>(https_connector);
 
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
