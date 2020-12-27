@@ -244,7 +244,10 @@ impl Client {
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
     ) -> Result<Self, error::NewSessionError> {
-        Session::with_capabilities(webdriver, cap).await
+        Session::<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>::new_rustls(
+            webdriver, cap,
+        )
+        .await
     }
 
     /// Get the session ID assigned by the WebDriver server to this client.
