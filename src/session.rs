@@ -273,7 +273,7 @@ where
 
 impl<C> Session<C>
 where
-    C: Clone + hyper::client::connect::Connect + Sync + Send + ?Sized + 'static,
+    C: Clone + hyper::client::connect::Connect + Sync + Send + 'static,
 {
     fn shutdown(&mut self, ack: Option<Ack>) {
         // session was not created
