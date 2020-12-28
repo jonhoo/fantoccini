@@ -155,6 +155,16 @@ pub mod error;
 mod session;
 use crate::session::{Cmd, Session};
 
+/// Which TLS type should be used
+#[derive(Debug)]
+pub enum Tls {
+    #[cfg(feature = "openssl-tls")]
+    /// OpenSSL
+    OpenSSL,
+    /// RustTLS
+    RustTLS,
+}
+
 /// An element locator.
 ///
 /// See <https://www.w3.org/TR/webdriver/#element-retrieval>.
@@ -220,12 +230,65 @@ impl Client {
     /// Create a new `Client` associated with a new WebDriver session on the server at the given
     /// URL.
     ///
+    /// To choose between OpenSSL and RustTLS for HTTPS pass the Tls enum
+    /// Only available on feature `openssl-tls`
+    ///
+    ///
     /// Calls `with_capabilities` with an empty capabilities list.
+    #[cfg(all(feature = "openssl-tls", feature = "rustls-tls"))]
+    #[allow(clippy::new_ret_no_self)]
+    pub async fn new(webdriver: &str, tls: Tls) -> Result<Self, error::NewSessionError> {
+        Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new(), tls).await
+    }
+    /// Create a new `Client` associated with a new WebDriver session on the server at the given
+    /// URL.
+    ///
+    /// Calls `with_capabilities` with an empty capabilities list.
+    #[cfg(not(feature = "openssl-tls"))]
     #[allow(clippy::new_ret_no_self)]
     pub async fn new(webdriver: &str) -> Result<Self, error::NewSessionError> {
         Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new()).await
     }
 
+    /// Create a new `Client` associated with a new WebDriver session on the server at the given
+    /// URL.
+    ///
+    /// The given capabilities will be requested in `alwaysMatch` or `desiredCapabilities`
+    /// depending on the protocol version supported by the server.
+    ///
+    /// To choose between OpenSSL and RustTLS for HTTPS pass the Tls enum
+    ///
+    /// Only available on feature `openssl-tls`
+    ///
+    /// Returns a future that resolves to a handle for issuing additional WebDriver tasks.
+    ///
+    /// Note that most callers should explicitly call `Client::close`, and wait for the returned
+    /// future before exiting. Not doing so may result in the WebDriver session not being cleanly
+    /// closed, which is particularly important for some drivers, such as geckodriver, where
+    /// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
+    /// session close request will be spawned on the given `handle` when the last instance of this
+    /// `Client` is dropped.
+    #[cfg(all(feature = "openssl-tls", feature = "rustls-tls"))]
+    pub async fn with_capabilities(
+        webdriver: &str,
+        cap: webdriver::capabilities::Capabilities,
+        tls: Tls,
+    ) -> Result<Self, error::NewSessionError> {
+        match tls {
+            Tls::OpenSSL => {
+                Session::<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>::new_openssl(
+                    webdriver, cap,
+                )
+                .await
+            }
+            Tls::RustTLS => {
+                Session::<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>::new_rustls(
+                    webdriver, cap,
+                )
+                .await
+            }
+        }
+    }
     /// Create a new `Client` associated with a new WebDriver session on the server at the given
     /// URL.
     ///
@@ -240,11 +303,36 @@ impl Client {
     /// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
     /// session close request will be spawned on the given `handle` when the last instance of this
     /// `Client` is dropped.
+    #[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
     pub async fn with_capabilities(
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
     ) -> Result<Self, error::NewSessionError> {
         Session::<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>::new_rustls(
+            webdriver, cap,
+        )
+        .await
+    }
+    /// Create a new `Client` associated with a new WebDriver session on the server at the given
+    /// URL.
+    ///
+    /// The given capabilities will be requested in `alwaysMatch` or `desiredCapabilities`
+    /// depending on the protocol version supported by the server.
+    ///
+    /// Returns a future that resolves to a handle for issuing additional WebDriver tasks.
+    ///
+    /// Note that most callers should explicitly call `Client::close`, and wait for the returned
+    /// future before exiting. Not doing so may result in the WebDriver session not being cleanly
+    /// closed, which is particularly important for some drivers, such as geckodriver, where
+    /// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
+    /// session close request will be spawned on the given `handle` when the last instance of this
+    /// `Client` is dropped.
+    #[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
+    pub async fn with_capabilities(
+        webdriver: &str,
+        cap: webdriver::capabilities::Capabilities,
+    ) -> Result<Self, error::NewSessionError> {
+        Session::<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>::new_openssl(
             webdriver, cap,
         )
         .await

@@ -173,18 +173,10 @@ impl Ongoing {
         Poll::Ready(rt)
     }
 }
-pub(crate) trait Connector:
-    Sized + Sync + Clone + hyper::client::connect::Connect + Unpin + Send + 'static
-{
-}
-impl<T> Connector for T where
-    T: Sized + Sync + Clone + hyper::client::connect::Connect + Unpin + Send + 'static
-{
-}
 
 pub(crate) struct Session<C>
 where
-    C: Connector,
+    C: Clone + hyper::client::connect::Connect + Sync + Send,
 {
     ongoing: Ongoing,
     rx: mpsc::UnboundedReceiver<Task>,
@@ -198,7 +190,7 @@ where
 
 impl<C> Future for Session<C>
 where
-    C: Connector,
+    C: Clone + hyper::client::connect::Connect + Sync + Send + Unpin + 'static,
 {
     type Output = ();
 
@@ -281,7 +273,7 @@ where
 
 impl<C> Session<C>
 where
-    C: Connector,
+    C: Clone + hyper::client::connect::Connect + Sync + Send + ?Sized + 'static,
 {
     fn shutdown(&mut self, ack: Option<Ack>) {
         // session was not created
@@ -352,6 +344,7 @@ where
         let connector = hyper_tls::HttpsConnector::new();
         Self::with_capabilities(webdriver, cap, connector).await
     }
+    #[cfg(feature = "rustls-tls")]
     pub(crate) async fn new_rustls(
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
@@ -360,11 +353,14 @@ where
         Self::with_capabilities(webdriver, cap, connector).await
     }
 
-    pub(crate) async fn with_capabilities(
+    pub(crate) async fn with_capabilities<T>(
         webdriver: &str,
         mut cap: webdriver::capabilities::Capabilities,
-        connector: impl Connector,
-    ) -> Result<Client, error::NewSessionError> {
+        connector: T,
+    ) -> Result<Client, error::NewSessionError>
+    where
+        T: Clone + hyper::client::connect::Connect + Sync + Send + 'static + Unpin,
+    {
         // Where is the WebDriver server?
         let wdb = webdriver.parse::<url::Url>();
 
