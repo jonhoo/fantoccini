@@ -3,14 +3,13 @@
 extern crate fantoccini;
 extern crate futures_util;
 
-use fantoccini::{error, Client, Tls};
+use fantoccini::{error, Client};
 
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use warp::Filter;
 
-#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
 pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
     match s {
         "firefox" => {
@@ -37,69 +36,6 @@ pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionErro
             });
             caps.insert("goog:chromeOptions".to_string(), opts.clone());
             Client::with_capabilities("http://localhost:9515", caps).await
-        }
-        browser => unimplemented!("unsupported browser backend {}", browser),
-    }
-}
-
-#[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
-pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
-    match s {
-        "firefox" => {
-            let mut caps = serde_json::map::Map::new();
-            let opts = serde_json::json!({ "args": ["--headless"] });
-            caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-            Client::with_capabilities("http://localhost:4444", caps).await
-        }
-        "chrome" => {
-            let mut caps = serde_json::map::Map::new();
-            let opts = serde_json::json!({
-                "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
-                "binary":
-                    if std::path::Path::new("/usr/bin/chromium-browser").exists() {
-                        // on Ubuntu, it's called chromium-browser
-                        "/usr/bin/chromium-browser"
-                    } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
-                        // macOS
-                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                    } else {
-                        // elsewhere, it's just called chromium
-                        "/usr/bin/chromium"
-                    }
-            });
-            caps.insert("goog:chromeOptions".to_string(), opts.clone());
-            Client::with_capabilities("http://localhost:9515", caps).await
-        }
-        browser => unimplemented!("unsupported browser backend {}", browser),
-    }
-}
-#[cfg(all(feature = "openssl-tls", feature = "rustls-tls"))]
-pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
-    match s {
-        "firefox" => {
-            let mut caps = serde_json::map::Map::new();
-            let opts = serde_json::json!({ "args": ["--headless"] });
-            caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-            Client::with_capabilities("http://localhost:4444", caps, Tls::OpenSSL).await
-        }
-        "chrome" => {
-            let mut caps = serde_json::map::Map::new();
-            let opts = serde_json::json!({
-                "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
-                "binary":
-                    if std::path::Path::new("/usr/bin/chromium-browser").exists() {
-                        // on Ubuntu, it's called chromium-browser
-                        "/usr/bin/chromium-browser"
-                    } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
-                        // macOS
-                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                    } else {
-                        // elsewhere, it's just called chromium
-                        "/usr/bin/chromium"
-                    }
-            });
-            caps.insert("goog:chromeOptions".to_string(), opts.clone());
-            Client::with_capabilities("http://localhost:9515", caps, Tls::OpenSSL).await
         }
         browser => unimplemented!("unsupported browser backend {}", browser),
     }

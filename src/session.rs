@@ -1,7 +1,9 @@
 use crate::error;
+use crate::traits::NewConnector;
 use futures_core::ready;
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt};
+use hyper::client::connect;
 use serde_json::Value as Json;
 use std::future::Future;
 use std::io;
@@ -23,6 +25,18 @@ pub struct Client {
     is_legacy: bool,
 }
 
+#[cfg(feature = "rustls-tls")]
+impl NewConnector for hyper_rustls::HttpsConnector<hyper::client::HttpConnector> {
+    fn new() -> Self {
+        hyper_rustls::HttpsConnector::new()
+    }
+}
+#[cfg(feature = "openssl-tls")]
+impl NewConnector for hyper_tls::HttpsConnector<hyper::client::HttpConnector> {
+    fn new() -> Self {
+        hyper_tls::HttpsConnector::new()
+    }
+}
 type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 
 #[allow(clippy::large_enum_variant)]
@@ -176,7 +190,7 @@ impl Ongoing {
 
 pub(crate) struct Session<C>
 where
-    C: Clone + hyper::client::connect::Connect + Sync + Send,
+    C: NewConnector + hyper::client::connect::Connect,
 {
     ongoing: Ongoing,
     rx: mpsc::UnboundedReceiver<Task>,
@@ -190,7 +204,7 @@ where
 
 impl<C> Future for Session<C>
 where
-    C: Clone + hyper::client::connect::Connect + Sync + Send + Unpin + 'static,
+    C: NewConnector + connect::Connect,
 {
     type Output = ();
 
@@ -273,7 +287,7 @@ where
 
 impl<C> Session<C>
 where
-    C: Clone + hyper::client::connect::Connect + Sync + Send + 'static,
+    C: NewConnector + connect::Connect,
 {
     fn shutdown(&mut self, ack: Option<Ack>) {
         // session was not created
@@ -336,34 +350,21 @@ where
             }
         }
     }
-    #[cfg(feature = "openssl-tls")]
-    pub(crate) async fn new_openssl(
+    pub(crate) async fn new(
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
     ) -> Result<Client, error::NewSessionError> {
-        let connector = hyper_tls::HttpsConnector::new();
-        Self::with_capabilities(webdriver, cap, connector).await
-    }
-    #[cfg(feature = "rustls-tls")]
-    pub(crate) async fn new_rustls(
-        webdriver: &str,
-        cap: webdriver::capabilities::Capabilities,
-    ) -> Result<Client, error::NewSessionError> {
-        let connector = hyper_rustls::HttpsConnector::new();
+        let connector = C::new();
         Self::with_capabilities(webdriver, cap, connector).await
     }
 
-    pub(crate) async fn with_capabilities<T>(
+    pub(crate) async fn with_capabilities(
         webdriver: &str,
         mut cap: webdriver::capabilities::Capabilities,
-        connector: T,
-    ) -> Result<Client, error::NewSessionError>
-    where
-        T: Clone + hyper::client::connect::Connect + Sync + Send + 'static + Unpin,
-    {
+        connector: C,
+    ) -> Result<Client, error::NewSessionError> {
         // Where is the WebDriver server?
         let wdb = webdriver.parse::<url::Url>();
-
         let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
 
         // We want a tls-enabled client
