@@ -6,10 +6,15 @@ use fantoccini::{error, Client, Locator, Method};
 use futures_util::TryFutureExt;
 use std::time::Duration;
 use url::Url;
+#[cfg(feature = "rustls-tls")]
+use hyper_rustls::HttpsConnector;
+#[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
+use hyper_tls::HttpsConnector;
+use hyper::client::HttpConnector;
 
 mod common;
 
-async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn works_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     // go to the Wikipedia page for Foobar
     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
     let mut e = c.find(Locator::Id("History_and_etymology")).await?;
@@ -30,7 +35,7 @@ async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
+async fn clicks_inner_by_locator(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -48,7 +53,7 @@ async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn clicks_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -64,7 +69,7 @@ async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn send_keys_and_clear_input_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -92,7 +97,7 @@ async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::Cmd
     c.close().await
 }
 
-async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn raw_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     // go back to the frontpage
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -115,7 +120,7 @@ async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_size_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(500, 400).await?;
     let (width, height) = c.get_window_size().await?;
@@ -125,7 +130,7 @@ async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_position_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(200, 100).await?;
     c.set_window_position(0, 0).await?;
@@ -137,7 +142,7 @@ async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_rect_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_rect(0, 0, 500, 400).await?;
     let (x, y) = c.get_window_position().await?;
@@ -157,7 +162,7 @@ async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn finds_all_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://en.wikipedia.org/").await?;
     let es = c.find_all(Locator::Css("#p-interaction li")).await?;
@@ -180,7 +185,7 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
+async fn finds_sub_elements(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     // Go to the Wikipedia front page
     c.goto("https://en.wikipedia.org/").await?;
     // Get the main sidebar panel
@@ -214,14 +219,14 @@ async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn persist_inner(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     c.goto("https://en.wikipedia.org/").await?;
     c.persist().await?;
 
     c.close().await
 }
 
-async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
+async fn simple_wait_test(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
         async move { Ok(true) }
@@ -231,7 +236,7 @@ async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> {
+async fn wait_for_navigation_test(mut c: Client<HttpsConnector<HttpConnector>>) -> Result<(), error::CmdError> {
     let mut path = std::env::current_dir().unwrap();
     path.push("tests/redirect_test.html");
 

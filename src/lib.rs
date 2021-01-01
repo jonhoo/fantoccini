@@ -140,6 +140,8 @@ use webdriver::command::{
 };
 use webdriver::common::{FrameId, ELEMENT_KEY};
 use webdriver::error::WebDriverError;
+use hyper::client::connect;
+use std::marker;
 
 macro_rules! via_json {
     ($x:expr) => {{
@@ -205,21 +207,33 @@ pub use crate::session::Client;
 
 /// A single element on the current page.
 #[derive(Clone, Debug, Serialize)]
-pub struct Element {
+pub struct Element<C>
+where
+    C: NewConnector + connect::Connect,
+{
     #[serde(skip_serializing)]
-    client: Client,
+    client: Client<C>,
     #[serde(flatten)]
     element: webdriver::common::WebElement,
+    #[serde(skip_serializing)]
+    _marker: marker::PhantomData<C>,
 }
 
 /// An HTML form on the current page.
 #[derive(Clone, Debug)]
-pub struct Form {
-    client: Client,
+pub struct Form<C>
+where
+    C: NewConnector + connect::Connect,
+{
+    client: Client<C>,
     form: webdriver::common::WebElement,
+    _marker: marker::PhantomData<C>,
 }
 
-impl Client {
+impl<C> Client<C>
+where
+    C: NewConnector + connect::Connect,
+{
     /// Create a new [`Client`][crate::Client] associated with a new WebDriver session on the server at the given
     /// URL.
     ///
@@ -236,12 +250,10 @@ impl Client {
     ///
     ///
     /// Calls `with_capabilities_and_connector` with an empty capabilities list.
-    pub async fn new_with_connector<C>(
+    pub async fn new_with_connector(
         webdriver: &str,
         connector: C,
     ) -> Result<Self, error::NewSessionError>
-    where
-        C: NewConnector + hyper::client::connect::Connect + 'static,
     {
         Self::with_capabilities_and_connector(
             webdriver,
@@ -270,15 +282,13 @@ impl Client {
     /// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
     /// session close request will be spawned on the given `handle` when the last instance of this
     /// `Client` is dropped.
-    pub async fn with_capabilities_and_connector<C>(
+    pub async fn with_capabilities_and_connector(
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
         connector: C,
     ) -> Result<Self, error::NewSessionError>
-    where
-        C: NewConnector + hyper::client::connect::Connect + 'static,
     {
-        Session::with_capabilities(webdriver, cap, connector).await
+        Session::with_capabilities_and_connector(webdriver, cap, connector).await
     }
 
     /// Create a new `Client` associated with a new WebDriver session on the server at the given
@@ -300,7 +310,7 @@ impl Client {
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
     ) -> Result<Self, error::NewSessionError> {
-        Session::<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>::new(webdriver, cap)
+        Session::<C>::with_capabilities(webdriver, cap)
             .await
     }
 
@@ -509,12 +519,13 @@ impl Client {
     /// depends on the platform and browser configuration.
     ///
     /// If no element has focus, the result may be the page body or a `NoSuchElement` error.
-    pub async fn active_element(&mut self) -> Result<Element, error::CmdError> {
+    pub async fn active_element(&mut self) -> Result<Element<C>, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetActiveElement).await?;
         let e = self.parse_lookup(res)?;
         Ok(Element {
             client: self.clone(),
             element: e,
+            _marker: Default::default()
         })
     }
 
@@ -729,7 +740,7 @@ impl Client {
     }
 
     /// Switches to the frame specified at the index.
-    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client<C>, error::CmdError> {
         let params = SwitchToFrameParameters {
             id: index.map(FrameId::Short),
         };
@@ -738,18 +749,18 @@ impl Client {
     }
 
     /// Switches to the parent of the frame the client is currently contained within.
-    pub async fn enter_parent_frame(mut self) -> Result<Client, error::CmdError> {
+    pub async fn enter_parent_frame(mut self) -> Result<Client<C>, error::CmdError> {
         self.issue(WebDriverCommand::SwitchToParentFrame).await?;
         Ok(self)
     }
 
     /// Find an element on the page.
-    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element<C>, error::CmdError> {
         self.by(search.into()).await
     }
 
     /// Find elements on the page.
-    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
+    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element<C>>, error::CmdError> {
         let res = self
             .issue(WebDriverCommand::FindElements(search.into()))
             .await?;
@@ -759,6 +770,7 @@ impl Client {
             .map(move |e| Element {
                 client: self.clone(),
                 element: e,
+                _marker: Default::default()
             })
             .collect())
     }
@@ -771,7 +783,7 @@ impl Client {
     /// the page.
     pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
     where
-        F: FnMut(&mut Client) -> FF,
+        F: FnMut(&mut Client<C>) -> FF,
         FF: Future<Output = Result<bool, error::CmdError>>,
     {
         while !is_ready(self).await? {}
@@ -784,7 +796,7 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element<C>, error::CmdError> {
         let s: webdriver::command::LocatorParameters = search.into();
         loop {
             match self
@@ -828,13 +840,14 @@ impl Client {
     /// Locate a form on the page.
     ///
     /// Through the returned `Form`, HTML forms can be filled out and submitted.
-    pub async fn form(&mut self, search: Locator<'_>) -> Result<Form, error::CmdError> {
+    pub async fn form(&mut self, search: Locator<'_>) -> Result<Form<C>, error::CmdError> {
         let l = search.into();
         let res = self.issue(WebDriverCommand::FindElement(l)).await?;
         let f = self.parse_lookup(res)?;
         Ok(Form {
             client: self.clone(),
             form: f,
+            _marker: Default::default()
         })
     }
 
@@ -927,12 +940,13 @@ impl Client {
     async fn by(
         &mut self,
         locator: webdriver::command::LocatorParameters,
-    ) -> Result<Element, error::CmdError> {
+    ) -> Result<Element<C>, error::CmdError> {
         let res = self.issue(WebDriverCommand::FindElement(locator)).await?;
         let e = self.parse_lookup(res)?;
         Ok(Element {
             client: self.clone(),
             element: e,
+            _marker: Default::default()
         })
     }
 
@@ -1001,7 +1015,10 @@ impl Client {
     }
 }
 
-impl Element {
+impl<C> Element<C>
+where
+    C: NewConnector + connect::Connect,
+{
     /// Look up an [attribute] value for this element by name.
     ///
     /// `Ok(None)` is returned if the element does not have the given attribute.
@@ -1057,7 +1074,7 @@ impl Element {
     }
 
     /// Find the first matching descendant element.
-    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element<C>, error::CmdError> {
         let res = self
             .client
             .issue(WebDriverCommand::FindElementElement(
@@ -1069,10 +1086,11 @@ impl Element {
         Ok(Element {
             client: self.client.clone(),
             element: e,
+            _marker: Default::default()
         })
     }
     /// Find all matching descendant elements.
-    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
+    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element<C>>, error::CmdError> {
         let res = self
             .client
             .issue(WebDriverCommand::FindElementElements(
@@ -1086,6 +1104,7 @@ impl Element {
             .map(move |e| Element {
                 client: self.client.clone(),
                 element: e,
+                _marker: Default::default()
             })
             .collect())
     }
@@ -1093,7 +1112,7 @@ impl Element {
     /// Simulate the user clicking on this element.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub async fn click(mut self) -> Result<Client, error::CmdError> {
+    pub async fn click(mut self) -> Result<Client<C>, error::CmdError> {
         let cmd = WebDriverCommand::ElementClick(self.element);
         let r = self.client.issue(cmd).await?;
         if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
@@ -1132,7 +1151,7 @@ impl Element {
     }
 
     /// Get back the [`Client`] hosting this `Element`.
-    pub fn client(self) -> Client {
+    pub fn client(self) -> Client<C>{
         self.client
     }
 
@@ -1140,7 +1159,7 @@ impl Element {
     /// click interaction.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub async fn follow(mut self) -> Result<Client, error::CmdError> {
+    pub async fn follow(mut self) -> Result<Client<C>, error::CmdError> {
         let cmd = WebDriverCommand::GetElementAttribute(self.element, "href".to_string());
         let href = self.client.issue(cmd).await?;
         let href = match href {
@@ -1162,7 +1181,7 @@ impl Element {
     }
 
     /// Find and click an `option` child element by its `value` attribute.
-    pub async fn select_by_value(mut self, value: &str) -> Result<Client, error::CmdError> {
+    pub async fn select_by_value(mut self, value: &str) -> Result<Client<C>, error::CmdError> {
         let locator = format!("option[value='{}']", value);
         let locator = webdriver::command::LocatorParameters {
             using: webdriver::common::LocatorStrategy::CSSSelector,
@@ -1174,6 +1193,7 @@ impl Element {
         Element {
             element: self.client.parse_lookup(v)?,
             client: self.client,
+            _marker: Default::default()
         }
         .click()
         .await
@@ -1189,7 +1209,7 @@ impl Element {
     /// in the form, or if it there are stray `<option>` in the form.
     ///
     /// The indexing in this method is 0-based.
-    pub async fn select_by_index(mut self, index: usize) -> Result<Client, error::CmdError> {
+    pub async fn select_by_index(mut self, index: usize) -> Result<Client<C>, error::CmdError> {
         let locator = format!("option:nth-of-type({})", index + 1);
 
         self.find(Locator::Css(&locator)).await?.click().await
@@ -1201,16 +1221,17 @@ impl Element {
     /// It also doesn't make any normalizations before match.
     ///
     /// [example]: https://github.com/SeleniumHQ/selenium/blob/941dc9c6b2e2aa4f701c1b72be8de03d4b7e996a/py/selenium/webdriver/support/select.py#L67
-    pub async fn select_by_label(mut self, label: &str) -> Result<Client, error::CmdError> {
+    pub async fn select_by_label(mut self, label: &str) -> Result<Client<C>, error::CmdError> {
         let locator = format!(r".//option[.='{}']", label);
         self.find(Locator::XPath(&locator)).await?.click().await
     }
 
     /// Switches to the frame contained within the element.
-    pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(self) -> Result<Client<C>, error::CmdError> {
         let Self {
             mut client,
             element,
+            ..
         } = self;
         let params = SwitchToFrameParameters {
             id: Some(FrameId::Element(element)),
@@ -1222,7 +1243,10 @@ impl Element {
     }
 }
 
-impl Form {
+impl<C> Form<C>
+where
+    C: NewConnector + connect::Connect,
+{
     /// Find a form input using the given `locator` and set its value to `value`.
     pub async fn set(
         &mut self,
@@ -1249,6 +1273,7 @@ impl Form {
             Ok(Form {
                 client: self.client.clone(),
                 form: self.form.clone(),
+                _marker: Default::default()
             })
         } else {
             Err(error::CmdError::NotW3C(res))
@@ -1265,7 +1290,7 @@ impl Form {
     /// Submit this form using the first available submit button.
     ///
     /// `false` is returned if no submit button was not found.
-    pub async fn submit(self) -> Result<Client, error::CmdError> {
+    pub async fn submit(self) -> Result<Client<C>, error::CmdError> {
         self.submit_with(Locator::Css("input[type=submit],button[type=submit]"))
             .await
     }
@@ -1273,7 +1298,7 @@ impl Form {
     /// Submit this form using the button matched by the given selector.
     ///
     /// `false` is returned if a matching button was not found.
-    pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client, error::CmdError> {
+    pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client<C>, error::CmdError> {
         let locator = WebDriverCommand::FindElementElement(self.form, button.into());
         let res = self.client.issue(locator).await?;
         let submit = self.client.parse_lookup(res)?;
@@ -1292,7 +1317,7 @@ impl Form {
     /// Submit this form using the form submit button with the given label (case-insensitive).
     ///
     /// `false` is returned if a matching button was not found.
-    pub async fn submit_using(self, button_label: &str) -> Result<Client, error::CmdError> {
+    pub async fn submit_using(self, button_label: &str) -> Result<Client<C>, error::CmdError> {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
         let btn = format!(
             "input[type=submit][value=\"{}\" i],\
@@ -1310,7 +1335,7 @@ impl Form {
     ///
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
-    pub async fn submit_direct(mut self) -> Result<Client, error::CmdError> {
+    pub async fn submit_direct(mut self) -> Result<Client<C>, error::CmdError> {
         let mut args = vec![via_json!(&self.form)];
         self.client.fixup_elements(&mut args);
         // some sites are silly, and name their submit button "submit". this ends up overwriting
@@ -1345,7 +1370,7 @@ impl Form {
         mut self,
         field: &str,
         value: &str,
-    ) -> Result<Client, error::CmdError> {
+    ) -> Result<Client<C>, error::CmdError> {
         let mut args = vec![via_json!(&self.form), Json::from(field), Json::from(value)];
         self.client.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
@@ -1368,6 +1393,7 @@ impl Form {
             Form {
                 form: self.form,
                 client: self.client,
+                _marker: Default::default()
             }
             .submit_direct()
             .await
@@ -1377,7 +1403,7 @@ impl Form {
     }
 
     /// Get back the [`Client`] hosting this `Form`.
-    pub fn client(self) -> Client {
+    pub fn client(self) -> Client<C> {
         self.client
     }
 }
