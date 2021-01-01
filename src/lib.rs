@@ -35,11 +35,13 @@
 //! # extern crate tokio;
 //! # extern crate fantoccini;
 //! use fantoccini::{Client, Locator};
+//! # use hyper::client::HttpConnector;
+//! # use hyper_rustls::HttpsConnector;
 //!
 //! // let's set up the sequence of steps we want the browser to take
 //! #[tokio::main]
 //! async fn main() -> Result<(), fantoccini::error::CmdError> {
-//!     let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     let mut c: Client<HttpsConnector<HttpConnector>> = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!
 //!     // first, go to the Wikipedia page for Foobar
 //!     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
@@ -66,9 +68,11 @@
 //! # extern crate tokio;
 //! # extern crate fantoccini;
 //! # use fantoccini::{Client, Locator};
+//! # use hyper_rustls::HttpsConnector;
+//! # use hyper::client::HttpConnector;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
-//! # let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let mut c: Client<HttpsConnector<HttpConnector>> = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go to the Wikipedia frontpage this time
 //! c.goto("https://www.wikipedia.org/").await?;
@@ -93,9 +97,11 @@
 //! # extern crate futures_util;
 //! # extern crate fantoccini;
 //! # use fantoccini::{Client, Locator};
+//! # use hyper_rustls::HttpsConnector;
+//! # use hyper::client::HttpConnector;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
-//! # let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let mut c: Client<HttpsConnector<HttpConnector>> = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go back to the frontpage
 //! c.goto("https://www.wikipedia.org/").await?;
