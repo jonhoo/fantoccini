@@ -134,10 +134,12 @@
 #![deny(missing_docs)]
 #![warn(missing_debug_implementations, rust_2018_idioms)]
 
+use hyper::client::connect;
 use serde::Serialize;
 use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
+use std::marker;
 use tokio::sync::oneshot;
 use traits::NewConnector;
 use webdriver::command::{
@@ -146,8 +148,6 @@ use webdriver::command::{
 };
 use webdriver::common::{FrameId, ELEMENT_KEY};
 use webdriver::error::WebDriverError;
-use hyper::client::connect;
-use std::marker;
 
 macro_rules! via_json {
     ($x:expr) => {{
@@ -162,7 +162,7 @@ pub mod error;
 
 /// The long-running session future we spawn for multiplexing onto a running WebDriver instance.
 mod session;
-mod traits;
+pub mod traits;
 
 use crate::session::{Cmd, Session};
 
@@ -259,8 +259,7 @@ where
     pub async fn new_with_connector(
         webdriver: &str,
         connector: C,
-    ) -> Result<Self, error::NewSessionError>
-    {
+    ) -> Result<Self, error::NewSessionError> {
         Self::with_capabilities_and_connector(
             webdriver,
             webdriver::capabilities::Capabilities::new(),
@@ -292,8 +291,7 @@ where
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
         connector: C,
-    ) -> Result<Self, error::NewSessionError>
-    {
+    ) -> Result<Self, error::NewSessionError> {
         Session::with_capabilities_and_connector(webdriver, cap, connector).await
     }
 
@@ -316,8 +314,7 @@ where
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
     ) -> Result<Self, error::NewSessionError> {
-        Session::<C>::with_capabilities(webdriver, cap)
-            .await
+        Session::<C>::with_capabilities(webdriver, cap).await
     }
 
     /// Get the session ID assigned by the WebDriver server to this client.
@@ -531,7 +528,7 @@ where
         Ok(Element {
             client: self.clone(),
             element: e,
-            _marker: Default::default()
+            _marker: Default::default(),
         })
     }
 
@@ -766,7 +763,10 @@ where
     }
 
     /// Find elements on the page.
-    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element<C>>, error::CmdError> {
+    pub async fn find_all(
+        &mut self,
+        search: Locator<'_>,
+    ) -> Result<Vec<Element<C>>, error::CmdError> {
         let res = self
             .issue(WebDriverCommand::FindElements(search.into()))
             .await?;
@@ -776,7 +776,7 @@ where
             .map(move |e| Element {
                 client: self.clone(),
                 element: e,
-                _marker: Default::default()
+                _marker: Default::default(),
             })
             .collect())
     }
@@ -802,7 +802,10 @@ where
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element<C>, error::CmdError> {
+    pub async fn wait_for_find(
+        &mut self,
+        search: Locator<'_>,
+    ) -> Result<Element<C>, error::CmdError> {
         let s: webdriver::command::LocatorParameters = search.into();
         loop {
             match self
@@ -853,7 +856,7 @@ where
         Ok(Form {
             client: self.clone(),
             form: f,
-            _marker: Default::default()
+            _marker: Default::default(),
         })
     }
 
@@ -952,7 +955,7 @@ where
         Ok(Element {
             client: self.clone(),
             element: e,
-            _marker: Default::default()
+            _marker: Default::default(),
         })
     }
 
@@ -1092,11 +1095,14 @@ where
         Ok(Element {
             client: self.client.clone(),
             element: e,
-            _marker: Default::default()
+            _marker: Default::default(),
         })
     }
     /// Find all matching descendant elements.
-    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element<C>>, error::CmdError> {
+    pub async fn find_all(
+        &mut self,
+        search: Locator<'_>,
+    ) -> Result<Vec<Element<C>>, error::CmdError> {
         let res = self
             .client
             .issue(WebDriverCommand::FindElementElements(
@@ -1110,7 +1116,7 @@ where
             .map(move |e| Element {
                 client: self.client.clone(),
                 element: e,
-                _marker: Default::default()
+                _marker: Default::default(),
             })
             .collect())
     }
@@ -1157,7 +1163,7 @@ where
     }
 
     /// Get back the [`Client`] hosting this `Element`.
-    pub fn client(self) -> Client<C>{
+    pub fn client(self) -> Client<C> {
         self.client
     }
 
@@ -1199,7 +1205,7 @@ where
         Element {
             element: self.client.parse_lookup(v)?,
             client: self.client,
-            _marker: Default::default()
+            _marker: Default::default(),
         }
         .click()
         .await
@@ -1279,7 +1285,7 @@ where
             Ok(Form {
                 client: self.client.clone(),
                 form: self.form.clone(),
-                _marker: Default::default()
+                _marker: Default::default(),
             })
         } else {
             Err(error::CmdError::NotW3C(res))
@@ -1399,7 +1405,7 @@ where
             Form {
                 form: self.form,
                 client: self.client,
-                _marker: Default::default()
+                _marker: Default::default(),
             }
             .submit_direct()
             .await
