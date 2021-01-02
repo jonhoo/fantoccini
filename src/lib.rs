@@ -162,6 +162,8 @@ pub mod error;
 
 /// The long-running session future we spawn for multiplexing onto a running WebDriver instance.
 mod session;
+
+/// Helper traits for WebDriver capabilities and HttpsConnectors
 pub mod traits;
 
 use crate::session::{Cmd, Session};
