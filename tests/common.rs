@@ -3,21 +3,21 @@
 extern crate fantoccini;
 extern crate futures_util;
 
-use fantoccini::{error, Client};
+use fantoccini::error;
 
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use warp::Filter;
-#[cfg(feature = "rustls-tls")]
-use hyper_rustls::HttpsConnector;
-
-#[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
-use hyper_tls::HttpsConnector;
 
 use hyper::client::HttpConnector;
+#[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
+pub type Client = fantoccini::Client<hyper_rustls::HttpsConnector<HttpConnector>>;
+#[cfg(any(all(feature = "rustls-tls", not(feature = "openssl-tls")), all(feature = "openssl-tls", not(feature = "rustls-tls"))))]
+use fantoccini::Client;
 
-pub async fn select_client_type(s: &str) -> Result<Client<HttpsConnector<HttpConnector>>, error::NewSessionError> {
+
+pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
     match s {
         "firefox" => {
             let mut caps = serde_json::map::Map::new();
@@ -42,7 +42,7 @@ pub async fn select_client_type(s: &str) -> Result<Client<HttpsConnector<HttpCon
                     }
             });
             caps.insert("goog:chromeOptions".to_string(), opts.clone());
-            Client::<HttpsConnector<HttpConnector>>::with_capabilities("http://localhost:9515", caps).await
+            Client::with_capabilities("http://localhost:9515", caps).await
         }
         browser => unimplemented!("unsupported browser backend {}", browser),
     }
@@ -111,7 +111,7 @@ macro_rules! tester {
 macro_rules! local_tester {
     ($f:ident, $endpoint:expr) => {{
         let port: u16 = common::setup_server();
-        let f = move |c: Client<HttpsConnector<HttpConnector>>| async move { $f(c, port).await };
+        let f = move |c: Client| async move { $f(c, port).await };
         tester!(f, $endpoint)
     }};
 }
