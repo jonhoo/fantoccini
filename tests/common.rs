@@ -8,7 +8,10 @@ use fantoccini::{error, Client};
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
-use warp::Filter;
+use std::convert::Infallible;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Server, Request, Response, Body, StatusCode};
+use tokio::fs::read_to_string;
 
 pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
     match s {
@@ -124,7 +127,7 @@ pub fn setup_server() -> u16 {
             let (socket_addr, server) = start_server();
             tx.send(socket_addr.port())
                 .expect("To be able to send port");
-            server.await
+            server.await.expect("To start the server")
         });
     });
 
@@ -132,19 +135,59 @@ pub fn setup_server() -> u16 {
 }
 
 /// Configures and starts the server
-fn start_server() -> (SocketAddr, impl Future<Output = ()> + 'static) {
+fn start_server() -> (SocketAddr, impl Future<Output = hyper::Result<()>> + 'static) {
     let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
+
     const ASSETS_DIR: &str = "tests/test_html";
-    let assets_dir: PathBuf = PathBuf::from(ASSETS_DIR);
-    let routes = fileserver(assets_dir);
-    warp::serve(routes).bind_ephemeral(socket_addr)
+
+    let server = Server::bind(&socket_addr)
+        .serve(make_service_fn(move |_| {
+            let assets_dir = PathBuf::from(ASSETS_DIR);
+            let new_service = service_fn(move |req| {
+                handle_file_request(req, assets_dir.clone())
+            });
+            async { Ok::<_, Infallible>(new_service) }
+        }));
+
+    let addr = server.local_addr();
+    (addr, server)
 }
 
-/// Serves files under this directory.
-fn fileserver(
-    assets_dir: PathBuf,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::get()
-        .and(warp::fs::dir(assets_dir))
-        .and(warp::path::end())
+/// Tries to return the requested html file
+async fn handle_file_request(
+    req: Request<Body>,
+    mut assets_dir: PathBuf
+) -> Result<Response<Body>, Infallible> {
+    let uri_path = req.uri().path().trim_matches(&['/', '\\'][..]);
+
+    // tests only contain html files
+    // needed because the content-type: text/html is returned
+    if !uri_path.ends_with(".html") {
+        return Ok(file_not_found())
+    }
+
+    // this does not protect against a directory traversal attack
+    // but in this case it's not a risk
+    assets_dir.push(uri_path);
+
+    let ctn = match read_to_string(assets_dir).await {
+        Ok(ctn) => ctn,
+        Err(_) => return Ok(file_not_found())
+    };
+
+    let res = Response::builder()
+        .header("content-type", "text/html")
+        .header("content-length", ctn.len())
+        .body(ctn.into())
+        .unwrap();
+
+    Ok(res)
+}
+
+/// Response returned when a file is not found or could not be read
+fn file_not_found() -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::empty())
+        .unwrap()
 }
