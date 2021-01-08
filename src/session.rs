@@ -212,7 +212,7 @@ ongoing: Ongoing,
 
 impl<C> Future for Session<C>
 where
-    C: NewConnector + connect::Connect,
+    C: NewConnector + connect::Connect + Unpin + 'static,
 {
     type Output = ();
 
@@ -295,7 +295,7 @@ where
 
 impl<C> Session<C>
 where
-    C: NewConnector + connect::Connect,
+    C: NewConnector + connect::Connect + Unpin + 'static,
 {
     fn shutdown(&mut self, ack: Option<Ack>) {
         // session was not created

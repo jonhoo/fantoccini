@@ -1,5 +1,5 @@
 /// Trait implemented for HttpsConnectors
-pub trait NewConnector: Clone + Sync + Send + Unpin + 'static {
+pub trait NewConnector: Clone + Sync + Send {
     /// Construct the HttpsConnector
     fn new() -> Self;
 }
