@@ -7,11 +7,13 @@ use fantoccini::{error, Client};
 
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::path::PathBuf;
+use std::path::Path;
 use std::convert::Infallible;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Server, Request, Response, Body, StatusCode};
 use tokio::fs::read_to_string;
+
+const ASSETS_DIR: &str = "tests/test_html";
 
 pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
     match s {
@@ -138,15 +140,9 @@ pub fn setup_server() -> u16 {
 fn start_server() -> (SocketAddr, impl Future<Output = hyper::Result<()>> + 'static) {
     let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
 
-    const ASSETS_DIR: &str = "tests/test_html";
-
     let server = Server::bind(&socket_addr)
-        .serve(make_service_fn(move |_| {
-            let assets_dir = PathBuf::from(ASSETS_DIR);
-            let new_service = service_fn(move |req| {
-                handle_file_request(req, assets_dir.clone())
-            });
-            async { Ok::<_, Infallible>(new_service) }
+        .serve(make_service_fn(move |_| async {
+             Ok::<_, Infallible>(service_fn(handle_file_request))
         }));
 
     let addr = server.local_addr();
@@ -154,10 +150,7 @@ fn start_server() -> (SocketAddr, impl Future<Output = hyper::Result<()>> + 'sta
 }
 
 /// Tries to return the requested html file
-async fn handle_file_request(
-    req: Request<Body>,
-    mut assets_dir: PathBuf
-) -> Result<Response<Body>, Infallible> {
+async fn handle_file_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
     let uri_path = req.uri().path().trim_matches(&['/', '\\'][..]);
 
     // tests only contain html files
@@ -168,9 +161,9 @@ async fn handle_file_request(
 
     // this does not protect against a directory traversal attack
     // but in this case it's not a risk
-    assets_dir.push(uri_path);
+    let asset_file = Path::new(ASSETS_DIR).join(uri_path);
 
-    let ctn = match read_to_string(assets_dir).await {
+    let ctn = match read_to_string(asset_file).await {
         Ok(ctn) => ctn,
         Err(_) => return Ok(file_not_found())
     };
