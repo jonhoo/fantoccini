@@ -5,12 +5,12 @@ extern crate futures_util;
 
 use fantoccini::{error, Client};
 
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, Server, StatusCode};
+use std::convert::Infallible;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::Path;
-use std::convert::Infallible;
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Server, Request, Response, Body, StatusCode};
 use tokio::fs::read_to_string;
 
 const ASSETS_DIR: &str = "tests/test_html";
@@ -84,9 +84,8 @@ macro_rules! tester {
         // run test in its own thread to catch panics
         let sid = session_id.clone();
         let res = thread::spawn(move || {
-            let mut rt = tokio::runtime::Builder::new()
+            let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
-                .basic_scheduler()
                 .build()
                 .unwrap();
             let mut c = rt.block_on(c).expect("failed to construct test client");
@@ -120,9 +119,8 @@ pub fn setup_server() -> u16 {
     let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
-        let mut rt = tokio::runtime::Builder::new()
+        let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .basic_scheduler()
             .build()
             .unwrap();
         let _ = rt.block_on(async {
@@ -137,13 +135,15 @@ pub fn setup_server() -> u16 {
 }
 
 /// Configures and starts the server
-fn start_server() -> (SocketAddr, impl Future<Output = hyper::Result<()>> + 'static) {
+fn start_server() -> (
+    SocketAddr,
+    impl Future<Output = hyper::Result<()>> + 'static,
+) {
     let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
 
-    let server = Server::bind(&socket_addr)
-        .serve(make_service_fn(move |_| async {
-             Ok::<_, Infallible>(service_fn(handle_file_request))
-        }));
+    let server = Server::bind(&socket_addr).serve(make_service_fn(move |_| async {
+        Ok::<_, Infallible>(service_fn(handle_file_request))
+    }));
 
     let addr = server.local_addr();
     (addr, server)
@@ -156,7 +156,7 @@ async fn handle_file_request(req: Request<Body>) -> Result<Response<Body>, Infal
     // tests only contain html files
     // needed because the content-type: text/html is returned
     if !uri_path.ends_with(".html") {
-        return Ok(file_not_found())
+        return Ok(file_not_found());
     }
 
     // this does not protect against a directory traversal attack
@@ -165,7 +165,7 @@ async fn handle_file_request(req: Request<Body>) -> Result<Response<Body>, Infal
 
     let ctn = match read_to_string(asset_file).await {
         Ok(ctn) => ctn,
-        Err(_) => return Ok(file_not_found())
+        Err(_) => return Ok(file_not_found()),
     };
 
     let res = Response::builder()

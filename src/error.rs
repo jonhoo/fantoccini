@@ -1,4 +1,4 @@
-use hyper::error as herror;
+use hyper::Error as HError;
 use std::error::Error;
 use std::fmt;
 use std::io::Error as IOError;
@@ -11,7 +11,7 @@ pub enum NewSessionError {
     /// The given WebDriver URL is invalid.
     BadWebdriverUrl(ParseError),
     /// The WebDriver server could not be reached.
-    Failed(herror::Error),
+    Failed(HError),
     /// The connection to the WebDriver server was lost.
     Lost(IOError),
     /// The server did not give a WebDriver-conforming response.
@@ -93,7 +93,7 @@ pub enum CmdError {
     BadUrl(ParseError),
 
     /// A request to the WebDriver server failed.
-    Failed(herror::Error),
+    Failed(HError),
 
     /// The connection to the WebDriver server was lost.
     Lost(IOError),
@@ -206,8 +206,8 @@ impl From<ParseError> for CmdError {
     }
 }
 
-impl From<herror::Error> for CmdError {
-    fn from(e: herror::Error) -> Self {
+impl From<HError> for CmdError {
+    fn from(e: HError) -> Self {
         CmdError::Failed(e)
     }
 }

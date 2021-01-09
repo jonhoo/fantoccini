@@ -177,7 +177,8 @@ impl Ongoing {
 pub(crate) struct Session {
     ongoing: Ongoing,
     rx: mpsc::UnboundedReceiver<Task>,
-    client: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
+    client:
+        hyper::client::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
     wdb: url::Url,
     session: Option<String>,
     is_legacy: bool,
@@ -338,8 +339,8 @@ impl Session {
         let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
 
         // We want a tls-enabled client
-        let client =
-            hyper::Client::builder().build::<_, hyper::Body>(hyper_tls::HttpsConnector::new());
+        let client = hyper::client::Client::builder()
+            .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new());
 
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
