@@ -6,10 +6,7 @@ use fantoccini::{error, Locator, Method};
 use futures_util::TryFutureExt;
 use std::time::Duration;
 use url::Url;
-#[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
 use common::Client;
-#[cfg(any(all(feature = "rustls-tls", not(feature = "openssl-tls")), all(feature = "openssl-tls", not(feature = "rustls-tls"))))]
-use fantoccini::Client;
 
 mod common;
 

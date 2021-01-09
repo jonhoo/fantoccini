@@ -34,20 +34,23 @@
 //! ```no_run
 //! # extern crate tokio;
 //! # extern crate fantoccini;
-//! use fantoccini::{Client, Locator};
-//! # use hyper::client::HttpConnector;
-//! # #[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
-//! # use hyper_rustls::HttpsConnector;
+//! # #[cfg(feature = "rustls-tls")]
+//! // With feature `rustls-tls`
+//! use fantoccini::RustlsClient;
+//! # #[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
+//! // With feature `openssl-tls`
+//! use fantoccini::OpenSslClient;
+//! use fantoccini::Locator;
 //!
 //! // let's set up the sequence of steps we want the browser to take
 //! #[tokio::main]
 //! async fn main() -> Result<(), fantoccini::error::CmdError> {
-//!     // With --all-features
-//!     # #[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
-//!     let mut c: Client<HttpsConnector<HttpConnector>> = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
-//!     // With either `rustls-tls` or `openssl-tls` enabled
-//!     # #[cfg(any(all(feature = "rustls-tls", not(feature = "openssl-tls")), all(feature = "openssl-tls", not(feature = "rustls-tls"))))]
-//!     let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     // With feature `rustls-tls`
+//!     # #[cfg(feature = "rustls-tls")]
+//!     let mut c = RustlsClient::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     // With `openssl-tls` enabled
+//!     # #[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
+//!     let mut c = OpenSslClient::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!
 //!     // first, go to the Wikipedia page for Foobar
 //!     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
@@ -74,15 +77,17 @@
 //! # extern crate tokio;
 //! # extern crate fantoccini;
 //! # use fantoccini::{Client, Locator};
-//! # #[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
-//! # use hyper_rustls::HttpsConnector;
-//! # use hyper::client::HttpConnector;
+//! # #[cfg(feature = "rustls-tls")]
+//! # use fantoccini::RustlsClient;
+//! # #[cfg(feature = "openssl-tls")]
+//! # use fantoccini::OpenSslClient;
+//!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
-//! # #[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
-//! # let mut c: Client<HttpsConnector<HttpConnector>> = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
-//! # #[cfg(any(all(feature = "rustls-tls", not(feature = "openssl-tls")), all(feature = "openssl-tls", not(feature = "rustls-tls"))))]
-//! # let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # #[cfg(feature = "rustls-tls")]
+//! # let mut c = RustlsClient::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # #[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
+//! # let mut c = OpenSslClient::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go to the Wikipedia frontpage this time
 //! c.goto("https://www.wikipedia.org/").await?;
@@ -106,16 +111,17 @@
 //! # extern crate tokio;
 //! # extern crate futures_util;
 //! # extern crate fantoccini;
-//! # use fantoccini::{Client, Locator};
-//! # #[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
-//! # use hyper_rustls::HttpsConnector;
-//! # use hyper::client::HttpConnector;
+//! # #[cfg(feature = "rustls-tls")]
+//! # use fantoccini::RustlsClient;
+//! # #[cfg(feature = "openssl-tls")]
+//! # use fantoccini::OpenSslClient;
+//! # use fantoccini::Locator;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
-//! # #[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
-//! # let mut c: Client<HttpsConnector<HttpConnector>> = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
-//! # #[cfg(any(all(feature = "rustls-tls", not(feature = "openssl-tls")), all(feature = "openssl-tls", not(feature = "rustls-tls"))))]
-//! # let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # #[cfg(feature = "rustls-tls")]
+//! # let mut c = RustlsClient::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # #[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
+//! # let mut c = OpenSslClient::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go back to the frontpage
 //! c.goto("https://www.wikipedia.org/").await?;
@@ -163,16 +169,15 @@ pub use traits::{NewConnector, CapabilitiesExt};
 
 /// Type alias for a Client with a Rustls connector
 ///
-/// Available when only one of the two Https features is enabled
-#[cfg(all(feature = "rustls-tls", not(feature = "openssl-tls")))]
-pub type Client =  session::Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
+#[cfg(feature = "rustls-tls")]
+pub type RustlsClient =  session::Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>;
 
 /// Type alias for a Client with an OpenSSL connector
 ///
-/// Available when only one of the two Https features is enabled
-#[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
-pub type Client = session::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>;
-#[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
+#[cfg(feature = "openssl-tls")]
+pub type OpenSslClient = session::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>;
+
+
 pub use session::Client;
 
 
@@ -248,7 +253,7 @@ impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
 #[derive(Clone, Debug, Serialize)]
 pub struct Element<C>
     where
-        C: NewConnector + connect::Connect,
+        C: connect::Connect + Send + Sync + Clone,
 {
     #[serde(skip_serializing)]
     client: session::Client<C>,
@@ -262,23 +267,22 @@ pub struct Element<C>
 #[derive(Clone, Debug)]
 pub struct Form<C>
     where
-        C: NewConnector + connect::Connect,
+        C: connect::Connect + Send + Sync + Clone,
 {
     client: session::Client<C>,
     form: webdriver::common::WebElement,
     _marker: marker::PhantomData<C>,
 }
-
-impl<C> session::Client<C>
-    where
-        C: NewConnector + connect::Connect + Unpin + 'static,
+impl<C> Client<C>
+where
+    C: connect::Connect + Unpin + 'static + Send + Sync + Clone + NewConnector,
 {
     /// Create a new [`Client`][crate::Client] associated with a new WebDriver session on the server at the given
-    /// URL.
-    ///
-    ///
-    ///
-    /// Calls `with_capabilities` with an empty capabilities list.
+ /// URL.
+ ///
+ ///
+ ///
+ /// Calls `with_capabilities` with an empty capabilities list.
     #[allow(clippy::new_ret_no_self)]
     pub async fn new(webdriver: &str) -> Result<Self, error::NewSessionError> {
         Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new()).await
@@ -325,8 +329,7 @@ impl<C> session::Client<C>
         webdriver: &str,
         cap: webdriver::capabilities::Capabilities,
         connector: C,
-    ) -> Result<Self, error::NewSessionError>
-    {
+    ) -> Result<Self, error::NewSessionError> {
         Session::with_capabilities_and_connector(webdriver, cap, connector).await
     }
 
@@ -352,6 +355,13 @@ impl<C> session::Client<C>
         Session::<C>::with_capabilities(webdriver, cap)
             .await
     }
+
+}
+
+impl<C> Client<C>
+    where
+        C: connect::Connect + Unpin + 'static + Send + Sync + Clone,
+{
 
     /// Get the session ID assigned by the WebDriver server to this client.
     pub async fn session_id(&mut self) -> Result<Option<String>, error::CmdError> {
@@ -1056,7 +1066,7 @@ impl<C> session::Client<C>
 
 impl<C> Element<C>
     where
-        C: NewConnector + connect::Connect + Unpin + 'static,
+        C: connect::Connect + Unpin + 'static + Send + Sync + Clone,
 {
     /// Look up an [attribute] value for this element by name.
     ///
@@ -1284,7 +1294,7 @@ impl<C> Element<C>
 
 impl<C> Form<C>
     where
-        C: NewConnector + connect::Connect + Unpin + 'static,
+        C: connect::Connect + Unpin + 'static + Send + Sync + Clone,
 {
     /// Find a form input using the given `locator` and set its value to `value`.
     pub async fn set(

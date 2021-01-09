@@ -6,10 +6,7 @@ extern crate futures_util;
 
 use fantoccini::{error, Locator};
 
-#[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
 use common::Client;
-#[cfg(any(all(feature = "rustls-tls", not(feature = "openssl-tls")), all(feature = "openssl-tls", not(feature = "rustls-tls"))))]
-use fantoccini::Client;
 
 mod common;
 

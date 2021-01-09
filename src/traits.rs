@@ -1,5 +1,7 @@
 /// Trait implemented for HttpsConnectors
-pub trait NewConnector: Clone + Sync + Send {
+///
+/// This trait is sealed
+pub trait NewConnector: private::Sealed {
     /// Construct the HttpsConnector
     fn new() -> Self;
 }
@@ -23,4 +25,13 @@ impl CapabilitiesExt for webdriver::capabilities::Capabilities {
         self.insert("goog:chromeOptions".to_string(), arg);
         self
     }
+}
+
+mod private {
+    pub trait Sealed {}
+    #[cfg(feature = "rustls-tls")]
+    impl Sealed for hyper_rustls::HttpsConnector<hyper::client::HttpConnector> {}
+    #[cfg(feature = "openssl-tls")]
+    impl Sealed for hyper_tls::HttpsConnector<hyper::client::HttpConnector> {}
+
 }

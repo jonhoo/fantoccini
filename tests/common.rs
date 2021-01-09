@@ -10,13 +10,11 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use warp::Filter;
 
-#[cfg(all(feature = "openssl-tls", feature = "rustls-tls"))]
-use hyper::client::HttpConnector;
+#[cfg(feature = "rustls-tls")]
+pub type Client = fantoccini::RustlsClient;
+#[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
+pub type Client = fantoccini::OpenSslClient;
 
-#[cfg(all(feature = "rustls-tls", feature = "openssl-tls"))]
-pub type Client = fantoccini::Client<hyper_rustls::HttpsConnector<HttpConnector>>;
-#[cfg(any(all(feature = "rustls-tls", not(feature = "openssl-tls")), all(feature = "openssl-tls", not(feature = "rustls-tls"))))]
-use fantoccini::Client;
 
 
 pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
