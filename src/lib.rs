@@ -287,6 +287,37 @@ where
     pub async fn new(webdriver: &str) -> Result<Self, error::NewSessionError> {
         Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new()).await
     }
+
+
+    /// Create a new `Client` associated with a new WebDriver session on the server at the given
+    /// URL.
+    ///
+    /// The given capabilities will be requested in `alwaysMatch` or `desiredCapabilities`
+    /// depending on the protocol version supported by the server.
+    ///
+    ///
+    /// Returns a future that resolves to a handle for issuing additional WebDriver tasks.
+    ///
+    /// Note that most callers should explicitly call `Client::close`, and wait for the returned
+    /// future before exiting. Not doing so may result in the WebDriver session not being cleanly
+    /// closed, which is particularly important for some drivers, such as geckodriver, where
+    /// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
+    /// session close request will be spawned on the given `handle` when the last instance of this
+    /// `Client` is dropped.
+    pub async fn with_capabilities(
+        webdriver: &str,
+        cap: webdriver::capabilities::Capabilities,
+    ) -> Result<Self, error::NewSessionError> {
+        Session::<C>::with_capabilities(webdriver, cap)
+            .await
+    }
+
+}
+
+impl<C> Client<C>
+    where
+        C: connect::Connect + Unpin + 'static + Send + Sync + Clone,
+{
     /// Create a new [`Client`][crate::Client] associated with a chosen HttpsConnector and a new WebDriver session on the server
     /// at the given URL.
     ///
@@ -332,36 +363,6 @@ where
     ) -> Result<Self, error::NewSessionError> {
         Session::with_capabilities_and_connector(webdriver, cap, connector).await
     }
-
-    /// Create a new `Client` associated with a new WebDriver session on the server at the given
-    /// URL.
-    ///
-    /// The given capabilities will be requested in `alwaysMatch` or `desiredCapabilities`
-    /// depending on the protocol version supported by the server.
-    ///
-    ///
-    /// Returns a future that resolves to a handle for issuing additional WebDriver tasks.
-    ///
-    /// Note that most callers should explicitly call `Client::close`, and wait for the returned
-    /// future before exiting. Not doing so may result in the WebDriver session not being cleanly
-    /// closed, which is particularly important for some drivers, such as geckodriver, where
-    /// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
-    /// session close request will be spawned on the given `handle` when the last instance of this
-    /// `Client` is dropped.
-    pub async fn with_capabilities(
-        webdriver: &str,
-        cap: webdriver::capabilities::Capabilities,
-    ) -> Result<Self, error::NewSessionError> {
-        Session::<C>::with_capabilities(webdriver, cap)
-            .await
-    }
-
-}
-
-impl<C> Client<C>
-    where
-        C: connect::Connect + Unpin + 'static + Send + Sync + Clone,
-{
 
     /// Get the session ID assigned by the WebDriver server to this client.
     pub async fn session_id(&mut self) -> Result<Option<String>, error::CmdError> {
