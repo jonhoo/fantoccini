@@ -2,11 +2,11 @@
 #[macro_use]
 extern crate serial_test_derive;
 
+use common::Client;
 use fantoccini::{error, Locator, Method};
 use futures_util::TryFutureExt;
 use std::time::Duration;
 use url::Url;
-use common::Client;
 
 mod common;
 

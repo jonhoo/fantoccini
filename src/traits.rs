@@ -1,10 +1,3 @@
-/// Trait implemented for HttpsConnectors
-///
-/// This trait is sealed
-pub trait NewConnector: private::Sealed {
-    /// Construct the HttpsConnector
-    fn new() -> Self;
-}
 
 /// Convenient methods for webdriver capabilities
 pub trait CapabilitiesExt {
@@ -27,11 +20,3 @@ impl CapabilitiesExt for webdriver::capabilities::Capabilities {
     }
 }
 
-mod private {
-    pub trait Sealed {}
-    #[cfg(feature = "rustls-tls")]
-    impl Sealed for hyper_rustls::HttpsConnector<hyper::client::HttpConnector> {}
-    #[cfg(feature = "openssl-tls")]
-    impl Sealed for hyper_tls::HttpsConnector<hyper::client::HttpConnector> {}
-
-}
