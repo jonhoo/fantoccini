@@ -284,6 +284,67 @@ impl<C> Session<C>
 where
     C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
 {
+    fn shutdown(&mut self, ack: Option<Ack>) {
+        // session was not created
+        if self.session.is_none() {
+            self.ongoing = Ongoing::Break;
+            return;
+        }
+
+        let url = {
+            self.wdb
+                .join(&format!("session/{}", self.session.as_ref().unwrap()))
+                .unwrap()
+        };
+
+        self.ongoing = Ongoing::Shutdown {
+            ack,
+            fut: self.client.request(
+                hyper::Request::delete(url.as_str())
+                    .body(hyper::Body::empty())
+                    .unwrap(),
+            ),
+        };
+    }
+
+    fn map_handshake_response(
+        response: Result<Json, error::CmdError>,
+    ) -> Result<(), error::NewSessionError> {
+        match response {
+            Ok(Json::Object(mut v)) => {
+                // TODO: not all impls are w3c compatible
+                // See https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L189
+                // and https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L200
+                // NOTE: remove so we can re-insert and return if something's wrong
+                if let Some(session_id) = v.remove("sessionId") {
+                    if session_id.is_string() {
+                        return Ok(());
+                    }
+                    v.insert("sessionId".to_string(), session_id);
+                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
+                } else {
+                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
+                }
+            }
+            Ok(v) | Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
+            Err(error::CmdError::Failed(e)) => Err(error::NewSessionError::Failed(e)),
+            Err(error::CmdError::Lost(e)) => Err(error::NewSessionError::Lost(e)),
+            Err(error::CmdError::NotJson(v)) => {
+                Err(error::NewSessionError::NotW3C(Json::String(v)))
+            }
+            Err(error::CmdError::Standard(
+                    e
+                    @
+                    WebDriverError {
+                        error: ErrorStatus::SessionNotCreated,
+                        ..
+                    },
+                )) => Err(error::NewSessionError::SessionNotCreated(e)),
+            Err(e) => {
+                panic!("unexpected webdriver error; {}", e);
+            }
+        }
+    }
     pub(crate) async fn with_capabilities_and_connector(
         webdriver: &str,
         mut cap: webdriver::capabilities::Capabilities,
@@ -397,67 +458,7 @@ where
             Err(e) => Err(e),
         }
     }
-    fn shutdown(&mut self, ack: Option<Ack>) {
-        // session was not created
-        if self.session.is_none() {
-            self.ongoing = Ongoing::Break;
-            return;
-        }
 
-        let url = {
-            self.wdb
-                .join(&format!("session/{}", self.session.as_ref().unwrap()))
-                .unwrap()
-        };
-
-        self.ongoing = Ongoing::Shutdown {
-            ack,
-            fut: self.client.request(
-                hyper::Request::delete(url.as_str())
-                    .body(hyper::Body::empty())
-                    .unwrap(),
-            ),
-        };
-    }
-
-    fn map_handshake_response(
-        response: Result<Json, error::CmdError>,
-    ) -> Result<(), error::NewSessionError> {
-        match response {
-            Ok(Json::Object(mut v)) => {
-                // TODO: not all impls are w3c compatible
-                // See https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L189
-                // and https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L200
-                // NOTE: remove so we can re-insert and return if something's wrong
-                if let Some(session_id) = v.remove("sessionId") {
-                    if session_id.is_string() {
-                        return Ok(());
-                    }
-                    v.insert("sessionId".to_string(), session_id);
-                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
-                } else {
-                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
-                }
-            }
-            Ok(v) | Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
-            Err(error::CmdError::Failed(e)) => Err(error::NewSessionError::Failed(e)),
-            Err(error::CmdError::Lost(e)) => Err(error::NewSessionError::Lost(e)),
-            Err(error::CmdError::NotJson(v)) => {
-                Err(error::NewSessionError::NotW3C(Json::String(v)))
-            }
-            Err(error::CmdError::Standard(
-                e
-                @
-                WebDriverError {
-                    error: ErrorStatus::SessionNotCreated,
-                    ..
-                },
-            )) => Err(error::NewSessionError::SessionNotCreated(e)),
-            Err(e) => {
-                panic!("unexpected webdriver error; {}", e);
-            }
-        }
-    }
 
     /// Helper for determining what URL endpoint to use for various requests.
     ///
