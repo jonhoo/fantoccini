@@ -438,7 +438,7 @@ where
                 // WebDriver protocol:
                 // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
                 let session_config = webdriver::capabilities::LegacyNewSessionParameters {
-                    desired: cap,
+                    desired: cap.to_owned(),
                     required: webdriver::capabilities::Capabilities::new(),
                 };
                 let spec = webdriver::command::NewSessionParameters::Legacy(session_config);

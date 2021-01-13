@@ -2,15 +2,18 @@
 #[macro_use]
 extern crate serial_test_derive;
 
-use common::Client;
-use fantoccini::{error, Locator, Method};
+use fantoccini::{Client, error, Locator, Method};
 use futures_util::TryFutureExt;
 use std::time::Duration;
 use url::Url;
+use hyper::client::connect::Connect;
 
 mod common;
 
-async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn works_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     // go to the Wikipedia page for Foobar
     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
     let mut e = c.find(Locator::Id("History_and_etymology")).await?;
@@ -31,7 +34,10 @@ async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
+async fn clicks_inner_by_locator<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -49,7 +55,10 @@ async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn clicks_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -65,7 +74,10 @@ async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn send_keys_and_clear_input_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -93,7 +105,10 @@ async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::Cmd
     c.close().await
 }
 
-async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn raw_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     // go back to the frontpage
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -116,7 +131,10 @@ async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_size_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(500, 400).await?;
     let (width, height) = c.get_window_size().await?;
@@ -126,7 +144,10 @@ async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_position_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(200, 100).await?;
     c.set_window_position(0, 0).await?;
@@ -138,7 +159,10 @@ async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_rect_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_rect(0, 0, 500, 400).await?;
     let (x, y) = c.get_window_position().await?;
@@ -158,7 +182,10 @@ async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn finds_all_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     // go to the Wikipedia frontpage this time
     c.goto("https://en.wikipedia.org/").await?;
     let es = c.find_all(Locator::Css("#p-interaction li")).await?;
@@ -181,7 +208,10 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
+async fn finds_sub_elements<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     // Go to the Wikipedia front page
     c.goto("https://en.wikipedia.org/").await?;
     // Get the main sidebar panel
@@ -215,14 +245,20 @@ async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn persist_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     c.goto("https://en.wikipedia.org/").await?;
     c.persist().await?;
 
     c.close().await
 }
 
-async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
+async fn simple_wait_test<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
         async move { Ok(true) }
@@ -232,7 +268,10 @@ async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> {
+async fn wait_for_navigation_test<C>(mut c: Client<C>) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let mut path = std::env::current_dir().unwrap();
     path.push("tests/redirect_test.html");
 
@@ -262,73 +301,112 @@ mod chrome {
 
     #[test]
     fn it_works() {
-        tester!(works_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(works_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(works_inner, "chrome")
     }
 
     #[test]
     fn it_clicks() {
-        tester!(clicks_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(clicks_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(clicks_inner, "chrome")
     }
 
     #[test]
     fn it_clicks_by_locator() {
-        tester!(clicks_inner_by_locator, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(clicks_inner_by_locator, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(clicks_inner_by_locator, "chrome")
     }
 
     #[test]
     fn it_sends_keys_and_clear_input() {
-        tester!(send_keys_and_clear_input_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(send_keys_and_clear_input_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(send_keys_and_clear_input_inner, "chrome")
     }
 
     #[test]
     fn it_can_be_raw() {
-        tester!(raw_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(raw_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(raw_inner, "chrome")
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_size() {
-        tester!(window_size_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(window_size_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(window_size_inner, "chrome")
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_position() {
-        tester!(window_position_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(window_position_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(window_position_inner, "chrome")
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
-        tester!(window_rect_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(window_rect_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(window_rect_inner, "chrome")
     }
 
     #[test]
     fn it_finds_all() {
-        tester!(finds_all_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(finds_all_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(finds_all_inner, "chrome")
     }
 
     #[test]
     fn it_finds_sub_elements() {
-        tester!(finds_sub_elements, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(finds_sub_elements, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(finds_sub_elements, "chrome")
     }
 
     #[test]
     #[ignore]
     fn it_persists() {
-        tester!(persist_inner, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(persist_inner, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(persist_inner, "chrome")
     }
 
     #[serial]
     #[test]
     fn it_simple_waits() {
-        tester!(simple_wait_test, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(simple_wait_test, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(simple_wait_test, "chrome")
     }
 
     #[serial]
     #[test]
     fn it_waits_for_navigation() {
-        tester!(wait_for_navigation_test, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(wait_for_navigation_test, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(wait_for_navigation_test, "chrome")
     }
 }
 
@@ -338,78 +416,117 @@ mod firefox {
     #[serial]
     #[test]
     fn it_works() {
-        tester!(works_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(works_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(works_inner, "firefox")
     }
 
     #[serial]
     #[test]
     fn it_clicks() {
-        tester!(clicks_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(clicks_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(clicks_inner, "firefox")
     }
 
     #[serial]
     #[test]
     fn it_clicks_by_locator() {
-        tester!(clicks_inner_by_locator, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(clicks_inner_by_locator, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(clicks_inner_by_locator, "firefox")
     }
 
     #[serial]
     #[test]
     fn it_sends_keys_and_clear_input() {
-        tester!(send_keys_and_clear_input_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(send_keys_and_clear_input_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(send_keys_and_clear_input_inner, "firefox")
     }
 
     #[serial]
     #[test]
     fn it_can_be_raw() {
-        tester!(raw_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(raw_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(raw_inner, "firefox")
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_size() {
-        tester!(window_size_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(window_size_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(window_size_inner, "firefox")
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_position() {
-        tester!(window_position_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(window_position_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(window_position_inner, "firefox")
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
-        tester!(window_rect_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(window_rect_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(window_rect_inner, "firefox")
     }
 
     #[serial]
     #[test]
     fn it_finds_all() {
-        tester!(finds_all_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(finds_all_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(finds_all_inner, "firefox")
     }
 
     #[serial]
     #[test]
     fn it_finds_sub_elements() {
-        tester!(finds_sub_elements, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(finds_sub_elements, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(finds_sub_elements, "firefox")
     }
 
     #[test]
     #[ignore]
     fn it_persists() {
-        tester!(persist_inner, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(persist_inner, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(persist_inner, "firefox")
     }
 
     #[serial]
     #[test]
     fn it_simple_waits() {
-        tester!(simple_wait_test, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(simple_wait_test, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(simple_wait_test, "firefox")
     }
 
     #[serial]
     #[test]
     fn it_waits_for_navigation() {
-        tester!(wait_for_navigation_test, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(wait_for_navigation_test, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(wait_for_navigation_test, "firefox")
     }
 }

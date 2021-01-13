@@ -9,20 +9,17 @@ use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 use warp::Filter;
+use fantoccini::ClientBuilder;
+use fantoccini::Client;
 
 #[cfg(feature = "rustls-tls")]
-pub type Client = fantoccini::RustlsClient;
-#[cfg(all(feature = "openssl-tls", not(feature = "rustls-tls")))]
-pub type Client = fantoccini::OpenSslClient;
-
-pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
+pub async fn rustls_type(s: &str) -> Result<Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
     match s {
         "firefox" => {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({ "args": ["--headless"] });
             caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-            #[cfg(feature = "rustls-tls")]
-            Client::rustls_with_capabilities("http://localhost:4444", caps).await
+            ClientBuilder::rustls().capabilities(caps).connect("http://localhost:4444").await
         }
         "chrome" => {
             let mut caps = serde_json::map::Map::new();
@@ -41,12 +38,44 @@ pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionErro
                     }
             });
             caps.insert("goog:chromeOptions".to_string(), opts.clone());
-            #[cfg(feature = "rustls-tls")]
-            Client::rustls_with_capabilities("http://localhost:9515", caps).await
+            ClientBuilder::rustls().capabilities(caps).connect("http://localhost:9515").await
         }
         browser => unimplemented!("unsupported browser backend {}", browser),
     }
 }
+
+#[cfg(feature = "openssl-tls")]
+pub async fn openssl_type(s: &str) -> Result<Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
+    match s {
+        "firefox" => {
+            let mut caps = serde_json::map::Map::new();
+            let opts = serde_json::json!({ "args": ["--headless"] });
+            caps.insert("moz:firefoxOptions".to_string(), opts.clone());
+            ClientBuilder::openssl().capabilities(caps).connect("http://localhost:4444").await
+        }
+        "chrome" => {
+            let mut caps = serde_json::map::Map::new();
+            let opts = serde_json::json!({
+                "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
+                "binary":
+                    if std::path::Path::new("/usr/bin/chromium-browser").exists() {
+                        // on Ubuntu, it's called chromium-browser
+                        "/usr/bin/chromium-browser"
+                    } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
+                        // macOS
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                    } else {
+                        // elsewhere, it's just called chromium
+                        "/usr/bin/chromium"
+                    }
+            });
+            caps.insert("goog:chromeOptions".to_string(), opts.clone());
+            ClientBuilder::openssl().capabilities(caps).connect("http://localhost:9515").await
+        }
+        browser => unimplemented!("unsupported browser backend {}", browser),
+    }
+}
+
 
 pub fn handle_test_error(
     res: Result<Result<(), fantoccini::error::CmdError>, Box<dyn std::any::Any + Send>>,
@@ -70,13 +99,15 @@ pub fn handle_test_error(
     }
 }
 
+
+#[cfg(feature = "rustls-tls")]
 #[macro_export]
-macro_rules! tester {
+macro_rules! rustls_tester {
     ($f:ident, $endpoint:expr) => {{
         use std::sync::{Arc, Mutex};
         use std::thread;
 
-        let c = common::select_client_type($endpoint);
+        let c = common::rustls_type($endpoint);
 
         // we'll need the session_id from the thread
         // NOTE: even if it panics, so can't just return it
@@ -107,12 +138,62 @@ macro_rules! tester {
     }};
 }
 
+
+#[cfg(feature = "openssl-tls")]
 #[macro_export]
-macro_rules! local_tester {
+macro_rules! openssl_tester {
+    ($f:ident, $endpoint:expr) => {{
+        use std::sync::{Arc, Mutex};
+        use std::thread;
+
+        let c = common::openssl_type($endpoint);
+
+        // we'll need the session_id from the thread
+        // NOTE: even if it panics, so can't just return it
+        let session_id = Arc::new(Mutex::new(None));
+
+        // run test in its own thread to catch panics
+        let sid = session_id.clone();
+        let res = thread::spawn(move || {
+            let mut rt = tokio::runtime::Builder::new()
+                .enable_all()
+                .basic_scheduler()
+                .build()
+                .unwrap();
+            let mut c = rt.block_on(c).expect("failed to construct test client");
+            *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
+            // make sure we close, even if an assertion fails
+            let x = rt.block_on(async move {
+                let r = tokio::spawn($f(c.clone())).await;
+                let _ = c.close().await;
+                r
+            });
+            drop(rt);
+            x.expect("test panicked")
+        })
+        .join();
+        let success = common::handle_test_error(res);
+        assert!(success);
+    }};
+}
+
+#[cfg(feature = "rustls-tls")]
+#[macro_export]
+macro_rules! rustls_local {
     ($f:ident, $endpoint:expr) => {{
         let port: u16 = common::setup_server();
-        let f = move |c: Client| async move { $f(c, port).await };
-        tester!(f, $endpoint)
+        let f = move |c: Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, port).await };
+        rustls_tester!(f, $endpoint)
+    }};
+}
+
+#[cfg(feature = "openssl-tls")]
+#[macro_export]
+macro_rules! openssl_local {
+    ($f:ident, $endpoint:expr) => {{
+        let port: u16 = common::setup_server();
+        let f = move |c: Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, port).await };
+        openssl_tester!(f, $endpoint)
     }};
 }
 

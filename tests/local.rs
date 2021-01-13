@@ -4,9 +4,11 @@ extern crate serial_test_derive;
 extern crate fantoccini;
 extern crate futures_util;
 
+use hyper::client::connect::Connect;
+
 use fantoccini::{error, Locator};
 
-use common::Client;
+use fantoccini::Client;
 
 mod common;
 
@@ -14,7 +16,10 @@ fn sample_page_url(port: u16) -> String {
     format!("http://localhost:{}/sample_page.html", port)
 }
 
-async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn goto<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let current_url = c.current_url().await?;
@@ -22,7 +27,10 @@ async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn find_and_click_link<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.find(Locator::Css("#other_page_id"))
@@ -37,7 +45,10 @@ async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdE
     c.close().await
 }
 
-async fn get_active_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn get_active_element<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError>
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.find(Locator::Css("#select1")).await?.click().await?;
@@ -48,7 +59,10 @@ async fn get_active_element(mut c: Client, port: u16) -> Result<(), error::CmdEr
     c.close().await
 }
 
-async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn serialize_element<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let elem = c.find(Locator::Css("#other_page_id")).await?;
@@ -72,7 +86,10 @@ async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdErr
     c.close().await
 }
 
-async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn iframe_switch<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static + std::fmt::Debug
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
     // Go to the page that holds the iframe
@@ -104,14 +121,20 @@ async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     c.close().await
 }
 
-async fn new_window(mut c: Client) -> Result<(), error::CmdError> {
+async fn new_window<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     c.new_window(false).await?;
     let windows = c.windows().await?;
     assert_eq!(windows.len(), 2);
     c.close().await
 }
 
-async fn new_window_switch(mut c: Client) -> Result<(), error::CmdError> {
+async fn new_window_switch<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let window_1 = c.window().await?;
     c.new_window(false).await?;
     let window_2 = c.window().await?;
@@ -138,7 +161,10 @@ async fn new_window_switch(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn new_tab_switch(mut c: Client) -> Result<(), error::CmdError> {
+async fn new_tab_switch<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let window_1 = c.window().await?;
     c.new_window(true).await?;
     let window_2 = c.window().await?;
@@ -165,7 +191,10 @@ async fn new_tab_switch(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn close_window(mut c: Client) -> Result<(), error::CmdError> {
+async fn close_window<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let window_1 = c.window().await?;
     c.new_window(true).await?;
     let window_2 = c.window().await?;
@@ -195,7 +224,10 @@ async fn close_window(mut c: Client) -> Result<(), error::CmdError> {
     Ok(())
 }
 
-async fn close_window_twice_errors(mut c: Client) -> Result<(), error::CmdError> {
+async fn close_window_twice_errors<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     c.close_window().await?;
     c.close_window()
         .await
@@ -203,7 +235,10 @@ async fn close_window_twice_errors(mut c: Client) -> Result<(), error::CmdError>
     Ok(())
 }
 
-async fn set_by_name_textarea(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn set_by_name_textarea<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
@@ -222,7 +257,10 @@ async fn set_by_name_textarea(mut c: Client, port: u16) -> Result<(), error::Cmd
     Ok(())
 }
 
-async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn stale_element<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let elem = c.find(Locator::Css("#other_page_id")).await?;
@@ -241,7 +279,10 @@ async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     }
 }
 
-async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn select_by_index<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
@@ -275,7 +316,10 @@ async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError
     Ok(())
 }
 
-async fn select_by_label(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn select_by_label<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
@@ -306,7 +350,10 @@ async fn select_by_label(mut c: Client, port: u16) -> Result<(), error::CmdError
     Ok(())
 }
 
-async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn resolve_execute_async_value<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
+where
+    C: Connect + Clone + Send + Sync + Unpin + 'static
+{
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
@@ -337,91 +384,136 @@ mod firefox {
     #[test]
     #[serial]
     fn navigate_to_other_page() {
-        local_tester!(goto, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(goto, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(goto, "firefox")
     }
 
     #[test]
     #[serial]
     fn find_and_click_link_test() {
-        local_tester!(find_and_click_link, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(find_and_click_link, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(find_and_click_link, "firefox")
     }
 
     #[test]
     #[serial]
     fn get_active_element_test() {
-        local_tester!(get_active_element, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(get_active_element, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(get_active_element, "firefox")
     }
 
     #[test]
     #[serial]
     fn serialize_element_test() {
-        local_tester!(serialize_element, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(serialize_element, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(serialize_element, "firefox")
     }
 
     #[test]
     #[serial]
     fn iframe_test() {
-        local_tester!(iframe_switch, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(iframe_switch, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(iframe_switch, "firefox")
     }
 
     #[test]
     #[serial]
     fn new_window_test() {
-        tester!(new_window, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(new_window, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(new_window, "firefox")
     }
 
     #[test]
     #[serial]
     fn new_window_switch_test() {
-        tester!(new_window_switch, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(new_window_switch, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(new_window_switch, "firefox")
     }
 
     #[test]
     #[serial]
     fn new_tab_switch_test() {
-        tester!(new_tab_switch, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(new_tab_switch, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(new_tab_switch, "firefox")
     }
 
     #[test]
     #[serial]
     fn close_window_test() {
-        tester!(close_window, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(close_window, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(close_window, "firefox")
     }
 
     #[test]
     #[serial]
     fn double_close_window_test() {
-        tester!(close_window_twice_errors, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(close_window_twice_errors, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(close_window_twice_errors, "firefox")
     }
 
     #[test]
     #[serial]
     fn set_by_name_textarea_test() {
-        local_tester!(set_by_name_textarea, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(set_by_name_textarea, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(set_by_name_textarea, "firefox")
     }
 
     #[test]
     #[serial]
     fn stale_element_test() {
-        local_tester!(stale_element, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(stale_element, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(stale_element, "firefox")
     }
 
     #[test]
     #[serial]
     fn select_by_index_test() {
-        local_tester!(select_by_index, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(select_by_index, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(select_by_index, "firefox")
     }
 
     #[test]
     #[serial]
     fn select_by_label_test() {
-        local_tester!(select_by_label, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(select_by_label, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(select_by_label, "firefox")
     }
 
     #[test]
     #[serial]
     fn resolve_execute_async_value_test() {
-        local_tester!(resolve_execute_async_value, "firefox")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(resolve_execute_async_value, "firefox");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(resolve_execute_async_value, "firefox")
     }
 }
 
@@ -429,67 +521,106 @@ mod chrome {
     use super::*;
     #[test]
     fn navigate_to_other_page() {
-        local_tester!(goto, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(goto, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(goto, "chrome")
     }
 
     #[test]
     fn find_and_click_link_test() {
-        local_tester!(find_and_click_link, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(find_and_click_link, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(find_and_click_link, "chrome")
     }
 
     #[test]
     fn get_active_element_test() {
-        local_tester!(get_active_element, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(get_active_element, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(get_active_element, "chrome")
     }
 
     #[test]
     fn serialize_element_test() {
-        local_tester!(serialize_element, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(serialize_element, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(serialize_element, "chrome")
     }
 
     #[test]
     fn iframe_test() {
-        local_tester!(iframe_switch, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(iframe_switch, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(iframe_switch, "chrome")
     }
 
     #[test]
     fn new_window_test() {
-        tester!(new_window, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(new_window, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(new_window, "chrome")
     }
 
     #[test]
     fn new_window_switch_test() {
-        tester!(new_window_switch, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(new_window_switch, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(new_window_switch, "chrome")
     }
 
     #[test]
     fn new_tab_test() {
-        tester!(new_tab_switch, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(new_tab_switch, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(new_tab_switch, "chrome")
     }
 
     #[test]
     fn close_window_test() {
-        tester!(close_window, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(close_window, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(close_window, "chrome")
     }
 
     #[test]
     fn double_close_window_test() {
-        tester!(close_window_twice_errors, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_tester!(close_window_twice_errors, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_tester!(close_window_twice_errors, "chrome")
     }
 
     #[test]
     fn set_by_name_textarea_test() {
-        local_tester!(set_by_name_textarea, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(set_by_name_textarea, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(set_by_name_textarea, "chrome")
     }
 
     #[test]
     #[serial]
     fn select_by_label_test() {
-        local_tester!(select_by_label, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(select_by_label, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(select_by_label, "chrome")
     }
 
     #[test]
     fn select_by_index_label() {
-        local_tester!(select_by_label, "chrome")
+        #[cfg(feature = "rustls-tls")]
+        rustls_local!(select_by_index, "chrome");
+        #[cfg(feature = "openssl-tls")]
+        openssl_local!(select_by_index, "chrome")
     }
 }

@@ -35,19 +35,16 @@
 //! # #![cfg(feature = "rustls-tls")]
 //! # extern crate tokio;
 //! # extern crate fantoccini;
-//! // With feature `rustls-tls`
-//! use fantoccini::RustlsClient;
-//! // With feature `openssl-tls`
-//! // use fantoccini::OpenSslClient;
+//! use fantoccini::ClientBuilder;
 //! use fantoccini::Locator;
 //!
 //! // let's set up the sequence of steps we want the browser to take
 //! #[tokio::main]
 //! async fn main() -> Result<(), fantoccini::error::CmdError> {
 //!     // With feature `rustls-tls`
-//!     let mut c = RustlsClient::new_rustls("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!     // With `openssl-tls` enabled
-//!     // let mut c = OpenSslClient::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     // let mut c = ClientBuilder::openssl().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!
 //!     // first, go to the Wikipedia page for Foobar
 //!     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
@@ -74,13 +71,12 @@
 //! # #![cfg(feature = "rustls-tls")]
 //! # extern crate tokio;
 //! # extern crate fantoccini;
-//! # use fantoccini::{Client, Locator};
-//! # use fantoccini::RustlsClient;
-//! // use fantoccini::OpenSslClient;
+//! # use fantoccini::Locator;
+//! # use fantoccini::ClientBuilder;
 //!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
-//! # let mut c = RustlsClient::new_rustls("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go to the Wikipedia frontpage this time
 //! c.goto("https://www.wikipedia.org/").await?;
@@ -105,11 +101,11 @@
 //! # extern crate tokio;
 //! # extern crate futures_util;
 //! # extern crate fantoccini;
-//! # use fantoccini::RustlsClient;
+//! # use fantoccini::ClientBuilder;
 //! # use fantoccini::Locator;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
-//! # let mut c = RustlsClient::new_rustls("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go back to the frontpage
 //! c.goto("https://www.wikipedia.org/").await?;
@@ -190,7 +186,7 @@ pub struct ClientBuilder<C>
 where
     C: connect::Connect + Send + Sync + Clone + Unpin
 {
-    capabalities: Option<webdriver::capabilities::Capabilities>,
+    capabilities: Option<webdriver::capabilities::Capabilities>,
     connector: C,
 }
 
@@ -219,23 +215,23 @@ where
     /// * `connector` - TLS connector for [`Client`][hyper::client::Client]
     pub fn new(connector: C) -> Self {
         Self {
-            capabalities: None,
+            capabilities: None,
             connector,
         }
     }
     /// Set chosen webdriver capabilities
-    pub fn capabilities(mut self, cap: webdriver::capabilities::Capabilities) -> Self {
-        self.capabalities = Some(cap);
+    pub fn capabilities(&mut self, cap: webdriver::capabilities::Capabilities) -> &mut Self {
+        self.capabilities = Some(cap);
         self
     }
     /// Connect to the webdriver session
     /// # Arguments
     /// * `webdriver` - webdriver url
-    pub async fn connect(self, webdriver: &str) -> Result<Client<C>, error::NewSessionError> {
-        return if let Some(cap) = self.capabalities {
-            Client::with_capabilities_and_connector(webdriver, cap, self.connector).await
+    pub async fn connect(&self, webdriver: &str) -> Result<Client<C>, error::NewSessionError> {
+        if let Some(cap) = self.capabilities.clone() {
+            Client::with_capabilities_and_connector(webdriver, &cap, self.connector.clone()).await
         } else {
-            Client::new_with_connector(webdriver, self.connector).await
+            Client::new_with_connector(webdriver, self.connector.clone()).await
         }
     }
 }
@@ -321,7 +317,7 @@ where
     ) -> Result<Self, error::NewSessionError> {
         Self::with_capabilities_and_connector(
             webdriver,
-            webdriver::capabilities::Capabilities::new(),
+            &mut webdriver::capabilities::Capabilities::new(),
             connector,
         )
         .await
@@ -348,10 +344,10 @@ where
     /// `Client` is dropped.
     pub async fn with_capabilities_and_connector(
         webdriver: &str,
-        cap: webdriver::capabilities::Capabilities,
+        cap: &webdriver::capabilities::Capabilities,
         connector: C,
     ) -> Result<Self, error::NewSessionError> {
-        Session::with_capabilities_and_connector(webdriver, cap, connector).await
+        Session::with_capabilities_and_connector(webdriver, cap.to_owned(), connector).await
     }
 
     /// Get the session ID assigned by the WebDriver server to this client.
