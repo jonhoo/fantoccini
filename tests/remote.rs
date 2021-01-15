@@ -298,235 +298,157 @@ where
 
 mod chrome {
     use super::*;
-
+    use common::*;
     #[test]
     fn it_works() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(works_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(works_inner, "chrome")
+        tester!(works_inner, "chrome");
     }
 
     #[test]
     fn it_clicks() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(clicks_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(clicks_inner, "chrome")
+        tester!(clicks_inner, "chrome");
     }
 
     #[test]
     fn it_clicks_by_locator() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(clicks_inner_by_locator, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(clicks_inner_by_locator, "chrome")
+        tester!(clicks_inner_by_locator, "chrome");
     }
 
     #[test]
     fn it_sends_keys_and_clear_input() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(send_keys_and_clear_input_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(send_keys_and_clear_input_inner, "chrome")
+        tester!(send_keys_and_clear_input_inner, "chrome");
     }
 
     #[test]
     fn it_can_be_raw() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(raw_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(raw_inner, "chrome")
+        tester!(raw_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_size() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(window_size_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(window_size_inner, "chrome")
+        tester!(window_size_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_position() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(window_position_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(window_position_inner, "chrome")
+        tester!(window_position_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(window_rect_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(window_rect_inner, "chrome")
+        tester!(window_rect_inner, "chrome");
     }
 
     #[test]
     fn it_finds_all() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(finds_all_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(finds_all_inner, "chrome")
+        tester!(finds_all_inner, "chrome");
     }
 
     #[test]
     fn it_finds_sub_elements() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(finds_sub_elements, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(finds_sub_elements, "chrome")
+        tester!(finds_sub_elements, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_persists() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(persist_inner, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(persist_inner, "chrome")
+        tester!(persist_inner, "chrome");
     }
 
     #[serial]
     #[test]
     fn it_simple_waits() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(simple_wait_test, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(simple_wait_test, "chrome")
+        tester!(simple_wait_test, "chrome");
     }
 
     #[serial]
     #[test]
     fn it_waits_for_navigation() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(wait_for_navigation_test, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(wait_for_navigation_test, "chrome")
+        tester!(wait_for_navigation_test, "chrome");
     }
 }
 
 mod firefox {
     use super::*;
-
+    use common::*;
     #[serial]
     #[test]
     fn it_works() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(works_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(works_inner, "firefox")
+        tester!(works_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_clicks() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(clicks_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(clicks_inner, "firefox")
+        tester!(clicks_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_clicks_by_locator() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(clicks_inner_by_locator, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(clicks_inner_by_locator, "firefox")
+        tester!(clicks_inner_by_locator, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_sends_keys_and_clear_input() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(send_keys_and_clear_input_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(send_keys_and_clear_input_inner, "firefox")
+        tester!(send_keys_and_clear_input_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_can_be_raw() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(raw_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(raw_inner, "firefox")
+        tester!(raw_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_size() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(window_size_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(window_size_inner, "firefox")
+        tester!(window_size_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_position() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(window_position_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(window_position_inner, "firefox")
+        tester!(window_position_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(window_rect_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(window_rect_inner, "firefox")
+        tester!(window_rect_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_finds_all() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(finds_all_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(finds_all_inner, "firefox")
+        tester!(finds_all_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_finds_sub_elements() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(finds_sub_elements, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(finds_sub_elements, "firefox")
+        tester!(finds_sub_elements, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_persists() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(persist_inner, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(persist_inner, "firefox")
+        tester!(persist_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_simple_waits() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(simple_wait_test, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(simple_wait_test, "firefox")
+        tester!(simple_wait_test, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_waits_for_navigation() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(wait_for_navigation_test, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(wait_for_navigation_test, "firefox")
+        tester!(wait_for_navigation_test, "firefox");
     }
 }

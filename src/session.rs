@@ -347,7 +347,7 @@ where
     }
     pub(crate) async fn with_capabilities_and_connector(
         webdriver: &str,
-        mut cap: webdriver::capabilities::Capabilities,
+        cap: &webdriver::capabilities::Capabilities,
         connector: C,
     ) -> Result<Client<C>, error::NewSessionError> {
         // Where is the WebDriver server?
@@ -356,6 +356,7 @@ where
         // We want a tls-enabled client
         let client = hyper::Client::builder().build::<_, hyper::Body>(connector);
 
+        let mut caps = cap.to_owned();
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
 
@@ -382,17 +383,17 @@ where
         // https://www.w3.org/TR/webdriver/#dfn-new-session
         // https://www.w3.org/TR/webdriver/#capabilities
         //  - we want the browser to wait for the page to load
-        cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
+        caps.insert("pageLoadStrategy".to_string(), Json::from("normal"));
 
         // make chrome comply with w3c
-        cap.entry("goog:chromeOptions".to_string())
+        caps.entry("goog:chromeOptions".to_string())
             .or_insert_with(|| Json::Object(serde_json::Map::new()))
             .as_object_mut()
             .expect("goog:chromeOptions wasn't a JSON object")
             .insert("w3c".to_string(), Json::from(true));
 
         let session_config = webdriver::capabilities::SpecNewSessionParameters {
-            alwaysMatch: cap.clone(),
+            alwaysMatch: caps.clone(),
             firstMatch: vec![webdriver::capabilities::Capabilities::new()],
         };
         let spec = webdriver::command::NewSessionParameters::Spec(session_config);
@@ -438,7 +439,7 @@ where
                 // WebDriver protocol:
                 // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
                 let session_config = webdriver::capabilities::LegacyNewSessionParameters {
-                    desired: cap.to_owned(),
+                    desired: caps.to_owned(),
                     required: webdriver::capabilities::Capabilities::new(),
                 };
                 let spec = webdriver::command::NewSessionParameters::Legacy(session_config);

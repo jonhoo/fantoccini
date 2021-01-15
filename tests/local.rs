@@ -381,246 +381,164 @@ where
 
 mod firefox {
     use super::*;
+    use common::*;
     #[test]
     #[serial]
     fn navigate_to_other_page() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(goto, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(goto, "firefox")
+        tester_local!(goto, "firefox");
     }
 
     #[test]
     #[serial]
     fn find_and_click_link_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(find_and_click_link, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(find_and_click_link, "firefox")
+        tester_local!(find_and_click_link, "firefox");
     }
 
     #[test]
     #[serial]
     fn get_active_element_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(get_active_element, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(get_active_element, "firefox")
+        tester_local!(get_active_element, "firefox");
     }
 
     #[test]
     #[serial]
     fn serialize_element_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(serialize_element, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(serialize_element, "firefox")
+        tester_local!(serialize_element, "firefox");
     }
 
     #[test]
     #[serial]
     fn iframe_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(iframe_switch, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(iframe_switch, "firefox")
+        tester_local!(iframe_switch, "firefox");
     }
 
     #[test]
     #[serial]
     fn new_window_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(new_window, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(new_window, "firefox")
+        tester!(new_window, "firefox");
     }
 
     #[test]
     #[serial]
     fn new_window_switch_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(new_window_switch, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(new_window_switch, "firefox")
+        tester!(new_window_switch, "firefox");
     }
 
     #[test]
     #[serial]
     fn new_tab_switch_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(new_tab_switch, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(new_tab_switch, "firefox")
+        tester!(new_tab_switch, "firefox");
     }
 
     #[test]
     #[serial]
     fn close_window_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(close_window, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(close_window, "firefox")
+        tester!(close_window, "firefox");
     }
 
     #[test]
     #[serial]
     fn double_close_window_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(close_window_twice_errors, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(close_window_twice_errors, "firefox")
+        tester!(close_window_twice_errors, "firefox");
     }
 
     #[test]
     #[serial]
     fn set_by_name_textarea_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(set_by_name_textarea, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(set_by_name_textarea, "firefox")
+        tester_local!(set_by_name_textarea, "firefox");
     }
 
     #[test]
     #[serial]
     fn stale_element_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(stale_element, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(stale_element, "firefox")
+        tester_local!(stale_element, "firefox");
     }
 
     #[test]
     #[serial]
     fn select_by_index_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(select_by_index, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(select_by_index, "firefox")
+        tester_local!(select_by_index, "firefox");
     }
 
     #[test]
     #[serial]
     fn select_by_label_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(select_by_label, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(select_by_label, "firefox")
+        tester_local!(select_by_label, "firefox");
     }
 
     #[test]
     #[serial]
     fn resolve_execute_async_value_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(resolve_execute_async_value, "firefox");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(resolve_execute_async_value, "firefox")
+        tester_local!(resolve_execute_async_value, "firefox");
     }
 }
 
 mod chrome {
     use super::*;
+    use common::*;
     #[test]
     fn navigate_to_other_page() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(goto, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(goto, "chrome")
+        tester_local!(goto, "chrome");
     }
 
     #[test]
     fn find_and_click_link_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(find_and_click_link, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(find_and_click_link, "chrome")
+        tester_local!(find_and_click_link, "chrome");
     }
 
     #[test]
     fn get_active_element_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(get_active_element, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(get_active_element, "chrome")
+        tester_local!(get_active_element, "chrome");
     }
 
     #[test]
     fn serialize_element_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(serialize_element, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(serialize_element, "chrome")
+        tester_local!(serialize_element, "chrome");
     }
 
     #[test]
     fn iframe_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(iframe_switch, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(iframe_switch, "chrome")
+        tester_local!(iframe_switch, "chrome");
     }
 
     #[test]
     fn new_window_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(new_window, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(new_window, "chrome")
+        tester!(new_window, "chrome");
     }
 
     #[test]
     fn new_window_switch_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(new_window_switch, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(new_window_switch, "chrome")
+        tester!(new_window_switch, "chrome");
     }
 
     #[test]
     fn new_tab_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(new_tab_switch, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(new_tab_switch, "chrome")
+        tester!(new_tab_switch, "chrome");
     }
 
     #[test]
     fn close_window_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(close_window, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(close_window, "chrome")
+        tester!(close_window, "chrome");
     }
 
     #[test]
     fn double_close_window_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_tester!(close_window_twice_errors, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_tester!(close_window_twice_errors, "chrome")
+        tester!(close_window_twice_errors, "chrome");
     }
 
     #[test]
     fn set_by_name_textarea_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(set_by_name_textarea, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(set_by_name_textarea, "chrome")
+        tester_local!(set_by_name_textarea, "chrome");
     }
 
     #[test]
     #[serial]
     fn select_by_label_test() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(select_by_label, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(select_by_label, "chrome")
+        tester_local!(select_by_label, "chrome");
     }
 
     #[test]
     fn select_by_index_label() {
-        #[cfg(feature = "rustls-tls")]
-        rustls_local!(select_by_index, "chrome");
-        #[cfg(feature = "openssl-tls")]
-        openssl_local!(select_by_index, "chrome")
+        tester_local!(select_by_index, "chrome");
     }
 }

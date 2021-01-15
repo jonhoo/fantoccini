@@ -11,15 +11,15 @@ use std::path::PathBuf;
 use warp::Filter;
 use fantoccini::ClientBuilder;
 use fantoccini::Client;
+use serde_json::map;
 
-#[cfg(feature = "rustls-tls")]
-pub async fn rustls_type(s: &str) -> Result<Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
+pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
     match s {
-        "firefox" => {
+         "firefox" => {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({ "args": ["--headless"] });
             caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-            ClientBuilder::rustls().capabilities(caps).connect("http://localhost:4444").await
+            caps
         }
         "chrome" => {
             let mut caps = serde_json::map::Map::new();
@@ -38,44 +38,33 @@ pub async fn rustls_type(s: &str) -> Result<Client<hyper_rustls::HttpsConnector<
                     }
             });
             caps.insert("goog:chromeOptions".to_string(), opts.clone());
-            ClientBuilder::rustls().capabilities(caps).connect("http://localhost:9515").await
+            caps
         }
         browser => unimplemented!("unsupported browser backend {}", browser),
     }
+}
+
+#[cfg(feature = "rustls-tls")]
+pub async fn rustls_type(s: &str) -> Result<Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
+    let caps = make_capabilities(s);
+    let url = match s {
+        "firefox" => "http://localhost:4444",
+        "chrome" => "http://localhost:9515",
+        browser => unimplemented!("unsupported browser backend {}", browser),
+    };
+    ClientBuilder::rustls().capabilities(caps).connect(url).await
 }
 
 #[cfg(feature = "openssl-tls")]
 pub async fn openssl_type(s: &str) -> Result<Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
-    match s {
-        "firefox" => {
-            let mut caps = serde_json::map::Map::new();
-            let opts = serde_json::json!({ "args": ["--headless"] });
-            caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-            ClientBuilder::openssl().capabilities(caps).connect("http://localhost:4444").await
-        }
-        "chrome" => {
-            let mut caps = serde_json::map::Map::new();
-            let opts = serde_json::json!({
-                "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
-                "binary":
-                    if std::path::Path::new("/usr/bin/chromium-browser").exists() {
-                        // on Ubuntu, it's called chromium-browser
-                        "/usr/bin/chromium-browser"
-                    } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
-                        // macOS
-                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-                    } else {
-                        // elsewhere, it's just called chromium
-                        "/usr/bin/chromium"
-                    }
-            });
-            caps.insert("goog:chromeOptions".to_string(), opts.clone());
-            ClientBuilder::openssl().capabilities(caps).connect("http://localhost:9515").await
-        }
+    let caps = make_capabilities(s);
+    let url = match s {
+        "firefox" => "http://localhost:4444",
+        "chrome" => "http://localhost:9515",
         browser => unimplemented!("unsupported browser backend {}", browser),
-    }
+    };
+    ClientBuilder::openssl().capabilities(caps).connect(url).await
 }
-
 
 pub fn handle_test_error(
     res: Result<Result<(), fantoccini::error::CmdError>, Box<dyn std::any::Any + Send>>,
@@ -100,14 +89,25 @@ pub fn handle_test_error(
 }
 
 
-#[cfg(feature = "rustls-tls")]
 #[macro_export]
-macro_rules! rustls_tester {
+macro_rules! tester {
     ($f:ident, $endpoint:expr) => {{
+        #[cfg(feature = "rustls-tls")]
+        tester_inner!($f, rustls_type($endpoint));
+        #[cfg(feature = "openssl-tls")]
+        tester_inner!($f, openssl_type($endpoint));
+    }};
+}
+
+
+
+#[macro_export]
+macro_rules! tester_inner {
+    ($f:ident, $connector:expr) => {{
         use std::sync::{Arc, Mutex};
         use std::thread;
 
-        let c = common::rustls_type($endpoint);
+        let c = $connector;
 
         // we'll need the session_id from the thread
         // NOTE: even if it panics, so can't just return it
@@ -139,63 +139,35 @@ macro_rules! rustls_tester {
 }
 
 
-#[cfg(feature = "openssl-tls")]
-#[macro_export]
-macro_rules! openssl_tester {
-    ($f:ident, $endpoint:expr) => {{
-        use std::sync::{Arc, Mutex};
-        use std::thread;
-
-        let c = common::openssl_type($endpoint);
-
-        // we'll need the session_id from the thread
-        // NOTE: even if it panics, so can't just return it
-        let session_id = Arc::new(Mutex::new(None));
-
-        // run test in its own thread to catch panics
-        let sid = session_id.clone();
-        let res = thread::spawn(move || {
-            let mut rt = tokio::runtime::Builder::new()
-                .enable_all()
-                .basic_scheduler()
-                .build()
-                .unwrap();
-            let mut c = rt.block_on(c).expect("failed to construct test client");
-            *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
-            // make sure we close, even if an assertion fails
-            let x = rt.block_on(async move {
-                let r = tokio::spawn($f(c.clone())).await;
-                let _ = c.close().await;
-                r
-            });
-            drop(rt);
-            x.expect("test panicked")
-        })
-        .join();
-        let success = common::handle_test_error(res);
-        assert!(success);
-    }};
-}
 
 #[cfg(feature = "rustls-tls")]
 #[macro_export]
-macro_rules! rustls_local {
-    ($f:ident, $endpoint:expr) => {{
-        let port: u16 = common::setup_server();
-        let f = move |c: Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, port).await };
-        rustls_tester!(f, $endpoint)
+macro_rules! local_rustls {
+    ($f:ident, $endpoint:expr, $port:expr) => {{
+        let f = move |c: Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, $port).await };
+        tester_inner!(f, rustls_type($endpoint))
     }};
 }
 
 #[cfg(feature = "openssl-tls")]
 #[macro_export]
-macro_rules! openssl_local {
-    ($f:ident, $endpoint:expr) => {{
-        let port: u16 = common::setup_server();
-        let f = move |c: Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, port).await };
-        openssl_tester!(f, $endpoint)
+macro_rules! local_openssl {
+    ($f:ident, $endpoint:expr, $port:expr) => {{
+        let f = move |c: Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, $port).await };
+        tester_inner!(f, openssl_type($endpoint))
     }};
 }
+#[macro_export]
+macro_rules! tester_local {
+    ($f:ident, $endpoint:expr) => {{
+        let port = common::setup_server();
+        #[cfg(feature = "rustls-tls")]
+        local_rustls!($f, $endpoint, port);
+        #[cfg(feature = "openssl-tls")]
+        local_openssl!($f, $endpoint, port);
+    }}
+}
+
 
 /// Sets up the server and returns the port it bound to.
 pub fn setup_server() -> u16 {

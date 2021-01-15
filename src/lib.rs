@@ -228,8 +228,8 @@ where
     /// # Arguments
     /// * `webdriver` - webdriver url
     pub async fn connect(&self, webdriver: &str) -> Result<Client<C>, error::NewSessionError> {
-        if let Some(cap) = self.capabilities.clone() {
-            Client::with_capabilities_and_connector(webdriver, &cap, self.connector.clone()).await
+        if let Some(ref cap) = self.capabilities {
+            Client::with_capabilities_and_connector(webdriver, cap, self.connector.clone()).await
         } else {
             Client::new_with_connector(webdriver, self.connector.clone()).await
         }
@@ -317,7 +317,7 @@ where
     ) -> Result<Self, error::NewSessionError> {
         Self::with_capabilities_and_connector(
             webdriver,
-            &mut webdriver::capabilities::Capabilities::new(),
+            &webdriver::capabilities::Capabilities::new(),
             connector,
         )
         .await
@@ -347,7 +347,7 @@ where
         cap: &webdriver::capabilities::Capabilities,
         connector: C,
     ) -> Result<Self, error::NewSessionError> {
-        Session::with_capabilities_and_connector(webdriver, cap.to_owned(), connector).await
+        Session::with_capabilities_and_connector(webdriver, cap, connector).await
     }
 
     /// Get the session ID assigned by the WebDriver server to this client.
