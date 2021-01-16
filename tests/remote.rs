@@ -298,7 +298,6 @@ where
 
 mod chrome {
     use super::*;
-    use common::*;
     #[test]
     fn it_works() {
         tester!(works_inner, "chrome");
@@ -373,7 +372,6 @@ mod chrome {
 
 mod firefox {
     use super::*;
-    use common::*;
     #[serial]
     #[test]
     fn it_works() {

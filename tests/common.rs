@@ -45,25 +45,21 @@ pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
 }
 
 #[cfg(feature = "rustls-tls")]
-pub async fn rustls_type(s: &str) -> Result<Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
-    let caps = make_capabilities(s);
-    let url = match s {
-        "firefox" => "http://localhost:4444",
-        "chrome" => "http://localhost:9515",
-        browser => unimplemented!("unsupported browser backend {}", browser),
-    };
-    ClientBuilder::rustls().capabilities(caps).connect(url).await
+pub async fn rustls_client(url: &str, caps: map::Map<String, serde_json::Value>) -> Result<Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
+    ClientBuilder::rustls().capabilities(caps.to_owned()).connect(&url).await
 }
 
 #[cfg(feature = "openssl-tls")]
-pub async fn openssl_type(s: &str) -> Result<Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
-    let caps = make_capabilities(s);
-    let url = match s {
+pub async fn openssl_client(url: &str, caps: map::Map<String, serde_json::Value>) -> Result<Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
+    ClientBuilder::openssl().capabilities(caps.to_owned()).connect(&url).await
+}
+
+pub fn make_url(s: &str) -> &'static str {
+    match s {
         "firefox" => "http://localhost:4444",
         "chrome" => "http://localhost:9515",
         browser => unimplemented!("unsupported browser backend {}", browser),
-    };
-    ClientBuilder::openssl().capabilities(caps).connect(url).await
+    }
 }
 
 pub fn handle_test_error(
@@ -92,10 +88,13 @@ pub fn handle_test_error(
 #[macro_export]
 macro_rules! tester {
     ($f:ident, $endpoint:expr) => {{
+        use common::{make_capabilities, make_url};
+        let url = make_url($endpoint);
+        let caps = make_capabilities($endpoint);
         #[cfg(feature = "rustls-tls")]
-        tester_inner!($f, rustls_type($endpoint));
+        tester_inner!($f, common::rustls_client(url, caps.clone()));
         #[cfg(feature = "openssl-tls")]
-        tester_inner!($f, openssl_type($endpoint));
+        tester_inner!($f, common::openssl_client(url, caps));
     }};
 }
 
@@ -144,8 +143,10 @@ macro_rules! tester_inner {
 #[macro_export]
 macro_rules! local_rustls {
     ($f:ident, $endpoint:expr, $port:expr) => {{
+        let url = common::make_url($endpoint);
+        let caps = common::make_capabilities($endpoint);
         let f = move |c: Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, $port).await };
-        tester_inner!(f, rustls_type($endpoint))
+        tester_inner!(f, common::rustls_client(url, caps))
     }};
 }
 
@@ -153,12 +154,14 @@ macro_rules! local_rustls {
 #[macro_export]
 macro_rules! local_openssl {
     ($f:ident, $endpoint:expr, $port:expr) => {{
+        let url = common::make_url($endpoint);
+        let caps = common::make_capabilities($endpoint);
         let f = move |c: Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, $port).await };
-        tester_inner!(f, openssl_type($endpoint))
+        tester_inner!(f, common::openssl_client(url, caps))
     }};
 }
 #[macro_export]
-macro_rules! tester_local {
+macro_rules! local_tester {
     ($f:ident, $endpoint:expr) => {{
         let port = common::setup_server();
         #[cfg(feature = "rustls-tls")]
