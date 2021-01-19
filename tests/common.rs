@@ -5,17 +5,22 @@ extern crate futures_util;
 
 use fantoccini::error;
 
+use fantoccini::Client;
+use fantoccini::ClientBuilder;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Request, Response, Server, StatusCode};
+use serde_json::map;
+use std::convert::Infallible;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-use std::path::PathBuf;
-use warp::Filter;
-use fantoccini::ClientBuilder;
-use fantoccini::Client;
-use serde_json::map;
+use std::path::Path;
+use tokio::fs::read_to_string;
+
+const ASSETS_DIR: &str = "tests/test_html";
 
 pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
     match s {
-         "firefox" => {
+        "firefox" => {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({ "args": ["--headless"] });
             caps.insert("moz:firefoxOptions".to_string(), opts.clone());
@@ -45,13 +50,29 @@ pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
 }
 
 #[cfg(feature = "rustls-tls")]
-pub async fn rustls_client(url: &str, caps: map::Map<String, serde_json::Value>) -> Result<Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
-    ClientBuilder::rustls().capabilities(caps.to_owned()).connect(&url).await
+pub async fn rustls_client(
+    url: &str,
+    caps: map::Map<String, serde_json::Value>,
+) -> Result<
+    Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>,
+    error::NewSessionError,
+> {
+    ClientBuilder::rustls()
+        .capabilities(caps.to_owned())
+        .connect(&url)
+        .await
 }
 
 #[cfg(feature = "openssl-tls")]
-pub async fn openssl_client(url: &str, caps: map::Map<String, serde_json::Value>) -> Result<Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError> {
-    ClientBuilder::openssl().capabilities(caps.to_owned()).connect(&url).await
+pub async fn openssl_client(
+    url: &str,
+    caps: map::Map<String, serde_json::Value>,
+) -> Result<Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError>
+{
+    ClientBuilder::openssl()
+        .capabilities(caps.to_owned())
+        .connect(&url)
+        .await
 }
 
 pub fn make_url(s: &str) -> &'static str {
@@ -84,7 +105,6 @@ pub fn handle_test_error(
     }
 }
 
-
 #[macro_export]
 macro_rules! tester {
     ($f:ident, $endpoint:expr) => {{
@@ -97,8 +117,6 @@ macro_rules! tester {
         tester_inner!($f, common::openssl_client(url, caps));
     }};
 }
-
-
 
 #[macro_export]
 macro_rules! tester_inner {
@@ -115,9 +133,8 @@ macro_rules! tester_inner {
         // run test in its own thread to catch panics
         let sid = session_id.clone();
         let res = thread::spawn(move || {
-            let mut rt = tokio::runtime::Builder::new()
+            let rt = tokio::runtime::Builder::new_current_thread()
                 .enable_all()
-                .basic_scheduler()
                 .build()
                 .unwrap();
             let mut c = rt.block_on(c).expect("failed to construct test client");
@@ -136,8 +153,6 @@ macro_rules! tester_inner {
         assert!(success);
     }};
 }
-
-
 
 #[cfg(feature = "rustls-tls")]
 #[macro_export]
@@ -168,25 +183,23 @@ macro_rules! local_tester {
         local_rustls!($f, $endpoint, port);
         #[cfg(feature = "openssl-tls")]
         local_openssl!($f, $endpoint, port);
-    }}
+    }};
 }
-
 
 /// Sets up the server and returns the port it bound to.
 pub fn setup_server() -> u16 {
     let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
-        let mut rt = tokio::runtime::Builder::new()
+        let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
-            .basic_scheduler()
             .build()
             .unwrap();
         let _ = rt.block_on(async {
             let (socket_addr, server) = start_server();
             tx.send(socket_addr.port())
                 .expect("To be able to send port");
-            server.await
+            server.await.expect("To start the server")
         });
     });
 
@@ -194,19 +207,52 @@ pub fn setup_server() -> u16 {
 }
 
 /// Configures and starts the server
-fn start_server() -> (SocketAddr, impl Future<Output = ()> + 'static) {
+fn start_server() -> (
+    SocketAddr,
+    impl Future<Output = hyper::Result<()>> + 'static,
+) {
     let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
-    const ASSETS_DIR: &str = "tests/test_html";
-    let assets_dir: PathBuf = PathBuf::from(ASSETS_DIR);
-    let routes = fileserver(assets_dir);
-    warp::serve(routes).bind_ephemeral(socket_addr)
+
+    let server = Server::bind(&socket_addr).serve(make_service_fn(move |_| async {
+        Ok::<_, Infallible>(service_fn(handle_file_request))
+    }));
+
+    let addr = server.local_addr();
+    (addr, server)
 }
 
-/// Serves files under this directory.
-fn fileserver(
-    assets_dir: PathBuf,
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::get()
-        .and(warp::fs::dir(assets_dir))
-        .and(warp::path::end())
+/// Tries to return the requested html file
+async fn handle_file_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    let uri_path = req.uri().path().trim_matches(&['/', '\\'][..]);
+
+    // tests only contain html files
+    // needed because the content-type: text/html is returned
+    if !uri_path.ends_with(".html") {
+        return Ok(file_not_found());
+    }
+
+    // this does not protect against a directory traversal attack
+    // but in this case it's not a risk
+    let asset_file = Path::new(ASSETS_DIR).join(uri_path);
+
+    let ctn = match read_to_string(asset_file).await {
+        Ok(ctn) => ctn,
+        Err(_) => return Ok(file_not_found()),
+    };
+
+    let res = Response::builder()
+        .header("content-type", "text/html")
+        .header("content-length", ctn.len())
+        .body(ctn.into())
+        .unwrap();
+
+    Ok(res)
+}
+
+/// Response returned when a file is not found or could not be read
+fn file_not_found() -> Response<Body> {
+    Response::builder()
+        .status(StatusCode::NOT_FOUND)
+        .body(Body::empty())
+        .unwrap()
 }

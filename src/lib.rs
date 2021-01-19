@@ -166,8 +166,6 @@ pub mod error;
 mod session;
 use crate::session::{Cmd, Session};
 
-
-
 /// Type alias for a Client with a Rustls connector
 ///
 #[cfg(feature = "rustls-tls")]
@@ -184,7 +182,7 @@ pub use session::Client;
 #[derive(Default, Clone, Debug)]
 pub struct ClientBuilder<C>
 where
-    C: connect::Connect + Send + Sync + Clone + Unpin
+    C: connect::Connect + Send + Sync + Clone + Unpin,
 {
     capabilities: Option<webdriver::capabilities::Capabilities>,
     connector: C,
@@ -194,7 +192,7 @@ where
 impl ClientBuilder<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
     /// Create a builder with Rustls connector, available with feature `rustls-tls`
     pub fn rustls() -> Self {
-        Self::new(hyper_rustls::HttpsConnector::new())
+        Self::new(hyper_rustls::HttpsConnector::with_native_roots())
     }
 }
 
@@ -207,9 +205,8 @@ impl ClientBuilder<hyper_tls::HttpsConnector<hyper::client::HttpConnector>> {
 }
 impl<C> ClientBuilder<C>
 where
-    C: connect::Connect + Send + Sync + Clone + Unpin + 'static
+    C: connect::Connect + Send + Sync + Clone + Unpin + 'static,
 {
-
     /// Create a new builder with TLS connector
     /// # Arguments
     /// * `connector` - TLS connector for [`Client`][hyper::client::Client]
@@ -775,10 +772,7 @@ where
     }
 
     /// Switches to the frame specified at the index.
-    pub async fn enter_frame(
-        mut self,
-        index: Option<u16>,
-    ) -> Result<Client<C>, error::CmdError> {
+    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client<C>, error::CmdError> {
         let params = SwitchToFrameParameters {
             id: index.map(FrameId::Short),
         };
@@ -1223,10 +1217,7 @@ where
     }
 
     /// Find and click an `option` child element by its `value` attribute.
-    pub async fn select_by_value(
-        mut self,
-        value: &str,
-    ) -> Result<Client<C>, error::CmdError> {
+    pub async fn select_by_value(mut self, value: &str) -> Result<Client<C>, error::CmdError> {
         let locator = format!("option[value='{}']", value);
         let locator = webdriver::command::LocatorParameters {
             using: webdriver::common::LocatorStrategy::CSSSelector,
@@ -1253,10 +1244,7 @@ where
     /// in the form, or if it there are stray `<option>` in the form.
     ///
     /// The indexing in this method is 0-based.
-    pub async fn select_by_index(
-        mut self,
-        index: usize,
-    ) -> Result<Client<C>, error::CmdError> {
+    pub async fn select_by_index(mut self, index: usize) -> Result<Client<C>, error::CmdError> {
         let locator = format!("option:nth-of-type({})", index + 1);
 
         self.find(Locator::Css(&locator)).await?.click().await
@@ -1268,10 +1256,7 @@ where
     /// It also doesn't make any normalizations before match.
     ///
     /// [example]: https://github.com/SeleniumHQ/selenium/blob/941dc9c6b2e2aa4f701c1b72be8de03d4b7e996a/py/selenium/webdriver/support/select.py#L67
-    pub async fn select_by_label(
-        mut self,
-        label: &str,
-    ) -> Result<Client<C>, error::CmdError> {
+    pub async fn select_by_label(mut self, label: &str) -> Result<Client<C>, error::CmdError> {
         let locator = format!(r".//option[.='{}']", label);
         self.find(Locator::XPath(&locator)).await?.click().await
     }
@@ -1347,10 +1332,7 @@ where
     /// Submit this form using the button matched by the given selector.
     ///
     /// `false` is returned if a matching button was not found.
-    pub async fn submit_with(
-        mut self,
-        button: Locator<'_>,
-    ) -> Result<Client<C>, error::CmdError> {
+    pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client<C>, error::CmdError> {
         let locator = WebDriverCommand::FindElementElement(self.form, button.into());
         let res = self.client.issue(locator).await?;
         let submit = self.client.parse_lookup(res)?;
@@ -1369,10 +1351,7 @@ where
     /// Submit this form using the form submit button with the given label (case-insensitive).
     ///
     /// `false` is returned if a matching button was not found.
-    pub async fn submit_using(
-        self,
-        button_label: &str,
-    ) -> Result<Client<C>, error::CmdError> {
+    pub async fn submit_using(self, button_label: &str) -> Result<Client<C>, error::CmdError> {
         let escaped = button_label.replace('\\', "\\\\").replace('"', "\\\"");
         let btn = format!(
             "input[type=submit][value=\"{}\" i],\

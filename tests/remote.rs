@@ -2,17 +2,17 @@
 #[macro_use]
 extern crate serial_test_derive;
 
-use fantoccini::{Client, error, Locator, Method};
+use fantoccini::{error, Client, Locator, Method};
 use futures_util::TryFutureExt;
+use hyper::client::connect::Connect;
 use std::time::Duration;
 use url::Url;
-use hyper::client::connect::Connect;
 
 mod common;
 
 async fn works_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     // go to the Wikipedia page for Foobar
     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
@@ -36,7 +36,7 @@ where
 
 async fn clicks_inner_by_locator<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
@@ -57,7 +57,7 @@ where
 
 async fn clicks_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
@@ -76,7 +76,7 @@ where
 
 async fn send_keys_and_clear_input_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
@@ -107,7 +107,7 @@ where
 
 async fn raw_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     // go back to the frontpage
     c.goto("https://www.wikipedia.org/").await?;
@@ -133,7 +133,7 @@ where
 
 async fn window_size_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(500, 400).await?;
@@ -146,7 +146,7 @@ where
 
 async fn window_position_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(200, 100).await?;
@@ -161,7 +161,7 @@ where
 
 async fn window_rect_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_rect(0, 0, 500, 400).await?;
@@ -184,7 +184,7 @@ where
 
 async fn finds_all_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     // go to the Wikipedia frontpage this time
     c.goto("https://en.wikipedia.org/").await?;
@@ -210,7 +210,7 @@ where
 
 async fn finds_sub_elements<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     // Go to the Wikipedia front page
     c.goto("https://en.wikipedia.org/").await?;
@@ -247,7 +247,7 @@ where
 
 async fn persist_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     c.goto("https://en.wikipedia.org/").await?;
     c.persist().await?;
@@ -257,7 +257,7 @@ where
 
 async fn simple_wait_test<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
@@ -270,7 +270,7 @@ where
 
 async fn wait_for_navigation_test<C>(mut c: Client<C>) -> Result<(), error::CmdError>
 where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
+    C: Connect + Clone + Send + Sync + Unpin + 'static,
 {
     let mut path = std::env::current_dir().unwrap();
     path.push("tests/redirect_test.html");
