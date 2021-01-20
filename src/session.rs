@@ -442,6 +442,41 @@ impl Session {
         }
     }
 
+    pub fn from_session_id(
+        webdriver: &str,
+        session_id: &str,
+    ) -> Result<Client, error::NewSessionError> {
+        // Where is the WebDriver server?
+        let wdb = webdriver.parse::<url::Url>();
+
+        let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
+
+        // We want a tls-enabled client
+        let client =
+            hyper::Client::builder().build::<_, hyper::Body>(hyper_tls::HttpsConnector::new());
+
+        // We're going to need a channel for sending requests to the WebDriver host
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        // Set up our WebDriver session.
+        tokio::spawn(Session {
+            rx,
+            ongoing: Ongoing::None,
+            client,
+            wdb,
+            session: Some(session_id.to_string()),
+            is_legacy: false,
+            ua: None,
+            persist: false,
+        });
+
+        // now that the session is running, let's do the handshake
+        Ok(Client {
+            tx,
+            is_legacy: false,
+        })
+    }
+
     /// Helper for determining what URL endpoint to use for various requests.
     ///
     /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
