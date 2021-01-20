@@ -120,7 +120,7 @@
 //! [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
 //! [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
-#![deny(missing_docs)]
+#![deny(missing_docs, unused_mut)]
 #![warn(missing_debug_implementations, rust_2018_idioms)]
 
 use serde::Serialize;
@@ -141,7 +141,7 @@ macro_rules! via_json {
     }};
 }
 
-pub use hyper::Method;
+pub use hyper::{self, Method};
 
 /// Error types.
 pub mod error;
@@ -567,6 +567,20 @@ impl Client {
             .await
     }
 
+    /// Issue an raw hyper::Request
+    pub async fn with_raw_client_request(
+        &self,
+        req: hyper::Request<hyper::Body>,
+    ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
+        let (tx, rx) = oneshot::channel();
+        self.issue(Cmd::Raw { req, rsp: tx }).await?;
+        match rx.await {
+            Ok(Ok(r)) => Ok(r),
+            Ok(Err(e)) => Err(e.into()),
+            Err(e) => unreachable!("Session ended prematurely: {:?}", e),
+        }
+    }
+
     /// Build and issue an HTTP request to the given `url` with all the same cookies as the current
     /// session.
     ///
@@ -656,18 +670,11 @@ impl Client {
         if let Some(s) = ua {
             req = req.header(hyper::header::USER_AGENT, s);
         }
-        let req = before(req);
-        let (tx, rx) = oneshot::channel();
-        self.issue(Cmd::Raw { req, rsp: tx }).await?;
-        match rx.await {
-            Ok(Ok(r)) => Ok(r),
-            Ok(Err(e)) => Err(e.into()),
-            Err(e) => unreachable!("Session ended prematurely: {:?}", e),
-        }
+        self.with_raw_client_request(before(req)).await
     }
 
     /// Switches to the frame specified at the index.
-    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(self, index: Option<u16>) -> Result<Client, error::CmdError> {
         let params = SwitchToFrameParameters {
             id: index.map(FrameId::Short),
         };
@@ -676,7 +683,7 @@ impl Client {
     }
 
     /// Switches to the parent of the frame the client is currently contained within.
-    pub async fn enter_parent_frame(mut self) -> Result<Client, error::CmdError> {
+    pub async fn enter_parent_frame(self) -> Result<Client, error::CmdError> {
         self.issue(WebDriverCommand::SwitchToParentFrame).await?;
         Ok(self)
     }
@@ -1031,7 +1038,7 @@ impl Element {
     /// Simulate the user clicking on this element.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
-    pub async fn click(mut self) -> Result<Client, error::CmdError> {
+    pub async fn click(self) -> Result<Client, error::CmdError> {
         let cmd = WebDriverCommand::ElementClick(self.element);
         let r = self.client.issue(cmd).await?;
         if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
@@ -1100,7 +1107,7 @@ impl Element {
     }
 
     /// Find and click an `option` child element by its `value` attribute.
-    pub async fn select_by_value(mut self, value: &str) -> Result<Client, error::CmdError> {
+    pub async fn select_by_value(self, value: &str) -> Result<Client, error::CmdError> {
         let locator = format!("option[value='{}']", value);
         let locator = webdriver::command::LocatorParameters {
             using: webdriver::common::LocatorStrategy::CSSSelector,
@@ -1146,10 +1153,7 @@ impl Element {
 
     /// Switches to the frame contained within the element.
     pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
-        let Self {
-            mut client,
-            element,
-        } = self;
+        let Self { client, element } = self;
         let params = SwitchToFrameParameters {
             id: Some(FrameId::Element(element)),
         };
@@ -1211,7 +1215,7 @@ impl Form {
     /// Submit this form using the button matched by the given selector.
     ///
     /// `false` is returned if a matching button was not found.
-    pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client, error::CmdError> {
+    pub async fn submit_with(self, button: Locator<'_>) -> Result<Client, error::CmdError> {
         let locator = WebDriverCommand::FindElementElement(self.form, button.into());
         let res = self.client.issue(locator).await?;
         let submit = self.client.parse_lookup(res)?;
@@ -1248,7 +1252,7 @@ impl Form {
     ///
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
-    pub async fn submit_direct(mut self) -> Result<Client, error::CmdError> {
+    pub async fn submit_direct(self) -> Result<Client, error::CmdError> {
         let mut args = vec![via_json!(&self.form)];
         self.client.fixup_elements(&mut args);
         // some sites are silly, and name their submit button "submit". this ends up overwriting
@@ -1279,11 +1283,7 @@ impl Form {
     /// However, it will *also* inject a hidden input element on the page that carries the given
     /// `field=value` mapping. This allows you to emulate the form data as it would have been *if*
     /// the submit button was indeed clicked.
-    pub async fn submit_sneaky(
-        mut self,
-        field: &str,
-        value: &str,
-    ) -> Result<Client, error::CmdError> {
+    pub async fn submit_sneaky(self, field: &str, value: &str) -> Result<Client, error::CmdError> {
         let mut args = vec![via_json!(&self.form), Json::from(field), Json::from(value)];
         self.client.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
