@@ -146,6 +146,9 @@ pub use hyper::Method;
 /// Error types.
 pub mod error;
 
+/// Wait logic
+pub mod wait;
+
 /// The long-running session future we spawn for multiplexing onto a running WebDriver instance.
 mod session;
 use crate::session::{Cmd, Session};
@@ -707,7 +710,7 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
+    pub async fn wait_for<'a, F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
     where
         F: FnMut(&mut Client) -> FF,
         FF: Future<Output = Result<bool, error::CmdError>>,
@@ -723,20 +726,31 @@ impl Client {
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
     pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        let s: webdriver::command::LocatorParameters = search.into();
-        loop {
-            match self
-                .by(webdriver::command::LocatorParameters {
-                    using: s.using,
-                    value: s.value.clone(),
-                })
-                .await
-            {
-                Ok(v) => break Ok(v),
-                Err(error::CmdError::NoSuchElement(_)) => {}
-                Err(e) => break Err(e),
+        fn closure(
+            s: Locator<'_>,
+            mut client: Client, // TODO: handle lifetime issues with &mut Client type
+        ) -> impl Future<Output = Option<Result<Element, error::CmdError>>> {
+            let s: webdriver::command::LocatorParameters = s.into();
+            async move {
+                match client
+                    .by(webdriver::command::LocatorParameters {
+                        using: s.using,
+                        value: s.value.clone(),
+                    })
+                    .await
+                {
+                    Ok(v) => Some(Ok(v)),
+                    Err(error::CmdError::NoSuchElement(_)) => None,
+                    Err(e) => Some(Err(e)),
+                }
             }
         }
+
+        const DEFAULT_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(500);
+        let mut wait = wait::Wait::new(self, DEFAULT_TIMEOUT);
+        wait.until(move |client| closure(search, client.clone()))
+            .await
+            .map_err(|timeout| error::CmdError::Timeout(timeout))?
     }
 
     /// Wait for the page to navigate to a new URL before proceeding.
