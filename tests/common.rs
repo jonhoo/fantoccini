@@ -18,7 +18,6 @@ use tokio::fs::read_to_string;
 
 const ASSETS_DIR: &str = "tests/test_html";
 
-
 pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
     match s {
         "firefox" => {
@@ -50,30 +49,28 @@ pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
     }
 }
 
-#[cfg(feature = "rustls-tls")]
-pub async fn rustls_client(
+pub async fn make_client(
     url: &str,
     caps: map::Map<String, serde_json::Value>,
-) -> Result<
-    Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>,
-    error::NewSessionError,
-> {
-    ClientBuilder::rustls()
-        .capabilities(caps.to_owned())
-        .connect(&url)
-        .await
-}
-
-#[cfg(feature = "openssl-tls")]
-pub async fn openssl_client(
-    url: &str,
-    caps: map::Map<String, serde_json::Value>,
-) -> Result<Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>, error::NewSessionError>
-{
-    ClientBuilder::openssl()
-        .capabilities(caps.to_owned())
-        .connect(&url)
-        .await
+    conn: &str,
+) -> Result<Client, error::NewSessionError> {
+    match conn {
+        #[cfg(feature = "rustls-tls")]
+        "rustls" => {
+            ClientBuilder::rustls()
+                .capabilities(caps)
+                .connect(url)
+                .await
+        }
+        #[cfg(feature = "openssl-tls")]
+        "openssl" => {
+            ClientBuilder::openssl()
+                .capabilities(caps)
+                .connect(url)
+                .await
+        }
+        other => unimplemented!("Unsupported connector type {}", other),
+    }
 }
 
 pub fn make_url(s: &str) -> &'static str {
@@ -113,9 +110,9 @@ macro_rules! tester {
         let url = make_url($endpoint);
         let caps = make_capabilities($endpoint);
         #[cfg(feature = "rustls-tls")]
-        tester_inner!($f, common::rustls_client(url, caps.clone()));
+        tester_inner!($f, common::make_client(url, caps.clone(), "rustls"));
         #[cfg(feature = "openssl-tls")]
-        tester_inner!($f, common::openssl_client(url, caps));
+        tester_inner!($f, common::make_client(url, caps, "openssl"));
     }};
 }
 
@@ -157,35 +154,39 @@ macro_rules! tester_inner {
 
 #[cfg(feature = "rustls-tls")]
 #[macro_export]
-macro_rules! local_rustls {
-    ($f:ident, $endpoint:expr, $port:expr) => {{
-        let url = common::make_url($endpoint);
-        let caps = common::make_capabilities($endpoint);
-        let f = move |c: Client<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, $port).await };
-        tester_inner!(f, common::rustls_client(url, caps))
-    }};
-}
-
-#[cfg(feature = "openssl-tls")]
-#[macro_export]
-macro_rules! local_openssl {
-    ($f:ident, $endpoint:expr, $port:expr) => {{
-        let url = common::make_url($endpoint);
-        let caps = common::make_capabilities($endpoint);
-        let f = move |c: Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>>| async move { $f(c, $port).await };
-        tester_inner!(f, common::openssl_client(url, caps))
-    }};
-}
-#[macro_export]
 macro_rules! local_tester {
     ($f:ident, $endpoint:expr) => {{
         let port = common::setup_server();
+        let url = common::make_url($endpoint);
+        let caps = common::make_capabilities($endpoint);
+        let f = move |c: Client| async move { $f(c, port).await };
         #[cfg(feature = "rustls-tls")]
-        local_rustls!($f, $endpoint, port);
+        tester_inner!(f, common::make_client(url, caps.clone(), "rustls"));
         #[cfg(feature = "openssl-tls")]
-        local_openssl!($f, $endpoint, port);
+        tester_inner!(f, common::make_client(url, caps, "openssl"))
     }};
 }
+
+// #[cfg(feature = "openssl-tls")]
+// #[macro_export]
+// macro_rules! local_openssl {
+//     ($f:ident, $endpoint:expr, $port:expr) => {{
+//         let url = common::make_url($endpoint);
+//         let caps = common::make_capabilities($endpoint);
+//         let f = move |c: Client| async move { $f(c, $port).await };
+//         tester_inner!(f, common::openssl_client(url, caps))
+//     }};
+// }
+// #[macro_export]
+// macro_rules! local_tester {
+//     ($f:ident, $endpoint:expr) => {{
+//         let port = common::setup_server();
+//         #[cfg(feature = "rustls-tls")]
+//         local_rustls!($f, $endpoint, port);
+//         #[cfg(feature = "openssl-tls")]
+//         local_openssl!($f, $endpoint, port);
+//     }};
+// }
 
 /// Sets up the server and returns the port it bound to.
 pub fn setup_server() -> u16 {

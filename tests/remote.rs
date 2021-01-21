@@ -4,16 +4,12 @@ extern crate serial_test_derive;
 
 use fantoccini::{error, Client, Locator, Method};
 use futures_util::TryFutureExt;
-use hyper::client::connect::Connect;
 use std::time::Duration;
 use url::Url;
 
 mod common;
 
-async fn works_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia page for Foobar
     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
     let mut e = c.find(Locator::Id("History_and_etymology")).await?;
@@ -34,10 +30,7 @@ where
     c.close().await
 }
 
-async fn clicks_inner_by_locator<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -55,10 +48,7 @@ where
     c.close().await
 }
 
-async fn clicks_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -74,10 +64,7 @@ where
     c.close().await
 }
 
-async fn send_keys_and_clear_input_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -105,10 +92,7 @@ where
     c.close().await
 }
 
-async fn raw_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go back to the frontpage
     c.goto("https://www.wikipedia.org/").await?;
 
@@ -131,10 +115,7 @@ where
     c.close().await
 }
 
-async fn window_size_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(500, 400).await?;
     let (width, height) = c.get_window_size().await?;
@@ -144,10 +125,7 @@ where
     c.close().await
 }
 
-async fn window_position_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(200, 100).await?;
     c.set_window_position(0, 0).await?;
@@ -159,10 +137,7 @@ where
     c.close().await
 }
 
-async fn window_rect_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_rect(0, 0, 500, 400).await?;
     let (x, y) = c.get_window_position().await?;
@@ -182,10 +157,7 @@ where
     c.close().await
 }
 
-async fn finds_all_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://en.wikipedia.org/").await?;
     let es = c.find_all(Locator::Css("#p-interaction li")).await?;
@@ -208,10 +180,7 @@ where
     c.close().await
 }
 
-async fn finds_sub_elements<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
     // Go to the Wikipedia front page
     c.goto("https://en.wikipedia.org/").await?;
     // Get the main sidebar panel
@@ -245,20 +214,14 @@ where
     c.close().await
 }
 
-async fn persist_inner<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.goto("https://en.wikipedia.org/").await?;
     c.persist().await?;
 
     c.close().await
 }
 
-async fn simple_wait_test<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
         async move { Ok(true) }
@@ -268,10 +231,7 @@ where
     c.close().await
 }
 
-async fn wait_for_navigation_test<C>(mut c: Client<C>) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static,
-{
+async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> {
     let mut path = std::env::current_dir().unwrap();
     path.push("tests/redirect_test.html");
 

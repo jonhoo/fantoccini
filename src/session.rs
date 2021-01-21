@@ -6,7 +6,6 @@ use hyper::client::connect;
 use serde_json::Value as Json;
 use std::future::Future;
 use std::io;
-use std::marker;
 use std::mem;
 use std::pin::Pin;
 use std::task::Context;
@@ -20,13 +19,9 @@ type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
 
 /// A WebDriver client tied to a single browser session.
 #[derive(Clone, Debug)]
-pub struct Client<C>
-where
-    C: hyper::client::connect::Connect + Send + Sync + Clone,
-{
+pub struct Client {
     tx: mpsc::UnboundedSender<Task>,
     is_legacy: bool,
-    _marker: marker::PhantomData<C>,
 }
 
 type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
@@ -58,10 +53,7 @@ pub(crate) struct Task {
     ack: Ack,
 }
 
-impl<T> Client<T>
-where
-    T: connect::Connect + Send + Sync + Clone,
-{
+impl Client {
     pub(crate) fn issue<C>(&mut self, cmd: C) -> impl Future<Output = Result<Json, error::CmdError>>
     where
         C: Into<Cmd>,
@@ -333,13 +325,13 @@ where
                 Err(error::NewSessionError::NotW3C(Json::String(v)))
             }
             Err(error::CmdError::Standard(
-                    e
-                    @
-                    WebDriverError {
-                        error: ErrorStatus::SessionNotCreated,
-                        ..
-                    },
-                )) => Err(error::NewSessionError::SessionNotCreated(e)),
+                e
+                @
+                WebDriverError {
+                    error: ErrorStatus::SessionNotCreated,
+                    ..
+                },
+            )) => Err(error::NewSessionError::SessionNotCreated(e)),
             Err(e) => {
                 panic!("unexpected webdriver error; {}", e);
             }
@@ -349,7 +341,7 @@ where
         webdriver: &str,
         cap: &webdriver::capabilities::Capabilities,
         connector: C,
-    ) -> Result<Client<C>, error::NewSessionError> {
+    ) -> Result<Client, error::NewSessionError> {
         // Where is the WebDriver server?
         let wdb = webdriver.parse::<url::Url>();
         let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
@@ -373,10 +365,9 @@ where
         });
 
         // now that the session is running, let's do the handshake
-        let mut client: Client<C> = Client {
+        let mut client: Client = Client {
             tx: tx.clone(),
             is_legacy: false,
-            _marker: Default::default(),
         };
 
         // Create a new session for this client
@@ -406,7 +397,6 @@ where
             Ok(_) => Ok(Client {
                 tx,
                 is_legacy: false,
-                _marker: Default::default(),
             }),
             Err(error::NewSessionError::NotW3C(json)) => {
                 // maybe try legacy mode?
@@ -453,13 +443,11 @@ where
                 Ok(Client {
                     tx,
                     is_legacy: true,
-                    _marker: Default::default(),
                 })
             }
             Err(e) => Err(e),
         }
     }
-
 
     /// Helper for determining what URL endpoint to use for various requests.
     ///

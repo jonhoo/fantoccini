@@ -4,21 +4,14 @@ extern crate serial_test_derive;
 extern crate fantoccini;
 extern crate futures_util;
 
-use hyper::client::connect::Connect;
-
 use fantoccini::{error, Client, Locator};
 
-
 mod common;
-
 fn sample_page_url(port: u16) -> String {
     format!("http://localhost:{}/sample_page.html", port)
 }
 
-async fn goto<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let current_url = c.current_url().await?;
@@ -26,10 +19,7 @@ where
     c.close().await
 }
 
-async fn find_and_click_link<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.find(Locator::Css("#other_page_id"))
@@ -44,10 +34,7 @@ where
     c.close().await
 }
 
-async fn get_active_element<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError>
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn get_active_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.find(Locator::Css("#select1")).await?.click().await?;
@@ -58,10 +45,7 @@ where
     c.close().await
 }
 
-async fn serialize_element<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let elem = c.find(Locator::Css("#other_page_id")).await?;
@@ -85,10 +69,7 @@ where
     c.close().await
 }
 
-async fn iframe_switch<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static + std::fmt::Debug
-{
+async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     // Go to the page that holds the iframe
@@ -120,20 +101,14 @@ where
     c.close().await
 }
 
-async fn new_window<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn new_window(mut c: Client) -> Result<(), error::CmdError> {
     c.new_window(false).await?;
     let windows = c.windows().await?;
     assert_eq!(windows.len(), 2);
     c.close().await
 }
 
-async fn new_window_switch<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn new_window_switch(mut c: Client) -> Result<(), error::CmdError> {
     let window_1 = c.window().await?;
     c.new_window(false).await?;
     let window_2 = c.window().await?;
@@ -160,10 +135,7 @@ where
     c.close().await
 }
 
-async fn new_tab_switch<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn new_tab_switch(mut c: Client) -> Result<(), error::CmdError> {
     let window_1 = c.window().await?;
     c.new_window(true).await?;
     let window_2 = c.window().await?;
@@ -190,10 +162,7 @@ where
     c.close().await
 }
 
-async fn close_window<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn close_window(mut c: Client) -> Result<(), error::CmdError> {
     let window_1 = c.window().await?;
     c.new_window(true).await?;
     let window_2 = c.window().await?;
@@ -223,10 +192,7 @@ where
     Ok(())
 }
 
-async fn close_window_twice_errors<C>(mut c: Client<C>) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn close_window_twice_errors(mut c: Client) -> Result<(), error::CmdError> {
     c.close_window().await?;
     c.close_window()
         .await
@@ -234,10 +200,7 @@ where
     Ok(())
 }
 
-async fn set_by_name_textarea<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn set_by_name_textarea(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
@@ -256,10 +219,7 @@ where
     Ok(())
 }
 
-async fn stale_element<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let elem = c.find(Locator::Css("#other_page_id")).await?;
@@ -278,10 +238,7 @@ where
     }
 }
 
-async fn select_by_index<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
@@ -315,10 +272,7 @@ where
     Ok(())
 }
 
-async fn select_by_label<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn select_by_label(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
@@ -349,10 +303,7 @@ where
     Ok(())
 }
 
-async fn resolve_execute_async_value<C>(mut c: Client<C>, port: u16) -> Result<(), error::CmdError> 
-where
-    C: Connect + Clone + Send + Sync + Unpin + 'static
-{
+async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
