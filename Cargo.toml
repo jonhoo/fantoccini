@@ -40,6 +40,6 @@ http = "0.2"
 
 [dev-dependencies]
 tokio = { version = "1", features = [ "full" ] }
-hyper = { version = "0.14",  features = ["server"] }
+hyper = { version = "0.14", features = [ "server" ] }
 serial_test = "0.5"
 serial_test_derive = "0.5"

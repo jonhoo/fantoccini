@@ -18,6 +18,7 @@ use tokio::fs::read_to_string;
 
 const ASSETS_DIR: &str = "tests/test_html";
 
+
 pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
     match s {
         "firefox" => {
