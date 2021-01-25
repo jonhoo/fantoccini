@@ -7,6 +7,7 @@ extern crate futures_util;
 use fantoccini::{error, Client, Locator};
 
 mod common;
+
 fn sample_page_url(port: u16) -> String {
     format!("http://localhost:{}/sample_page.html", port)
 }

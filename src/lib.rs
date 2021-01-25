@@ -166,8 +166,6 @@ pub mod error;
 mod session;
 use crate::session::{Cmd, Session};
 
-pub use session::Client;
-
 /// Builder pattern for Client
 #[derive(Default, Clone, Debug)]
 pub struct ClientBuilder<C>
@@ -266,6 +264,8 @@ impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
     }
 }
 
+pub use crate::session::Client;
+
 /// A single element on the current page.
 #[derive(Clone, Debug, Serialize)]
 pub struct Element {
@@ -286,8 +286,6 @@ impl Client {
     /// Create a new [`Client`][crate::Client] associated with a chosen HttpsConnector and a new WebDriver session on the server
     /// at the given URL.
     ///
-    ///
-    ///
     /// Calls `with_capabilities_and_connector` with an empty capabilities list.
     pub async fn new_with_connector<C>(
         webdriver: &str,
@@ -307,13 +305,9 @@ impl Client {
     /// Create a new `Client` associated with a chosen HttpsConnector and a new WebDriver session on the server
     /// at the given URL.
     ///
-    ///
-    ///
-    ///
     /// Calls `with_capabilities_and_connector` with an empty capabilities list.
     /// The given capabilities will be requested in `alwaysMatch` or `desiredCapabilities`
     /// depending on the protocol version supported by the server.
-    ///
     ///
     /// Returns a future that resolves to a handle for issuing additional WebDriver tasks.
     ///

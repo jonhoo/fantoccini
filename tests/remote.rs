@@ -258,6 +258,7 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
 
 mod chrome {
     use super::*;
+
     #[test]
     fn it_works() {
         tester!(works_inner, "chrome");
@@ -332,6 +333,7 @@ mod chrome {
 
 mod firefox {
     use super::*;
+
     #[serial]
     #[test]
     fn it_works() {

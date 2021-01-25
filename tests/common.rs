@@ -152,7 +152,6 @@ macro_rules! tester_inner {
     }};
 }
 
-#[cfg(feature = "rustls-tls")]
 #[macro_export]
 macro_rules! local_tester {
     ($f:ident, $endpoint:expr) => {{
@@ -166,27 +165,6 @@ macro_rules! local_tester {
         tester_inner!(f, common::make_client(url, caps, "openssl"))
     }};
 }
-
-// #[cfg(feature = "openssl-tls")]
-// #[macro_export]
-// macro_rules! local_openssl {
-//     ($f:ident, $endpoint:expr, $port:expr) => {{
-//         let url = common::make_url($endpoint);
-//         let caps = common::make_capabilities($endpoint);
-//         let f = move |c: Client| async move { $f(c, $port).await };
-//         tester_inner!(f, common::openssl_client(url, caps))
-//     }};
-// }
-// #[macro_export]
-// macro_rules! local_tester {
-//     ($f:ident, $endpoint:expr) => {{
-//         let port = common::setup_server();
-//         #[cfg(feature = "rustls-tls")]
-//         local_rustls!($f, $endpoint, port);
-//         #[cfg(feature = "openssl-tls")]
-//         local_openssl!($f, $endpoint, port);
-//     }};
-// }
 
 /// Sets up the server and returns the port it bound to.
 pub fn setup_server() -> u16 {
