@@ -3,10 +3,8 @@
 extern crate fantoccini;
 extern crate futures_util;
 
-use fantoccini::error;
+use fantoccini::{Client, ClientBuilder, error};
 
-use fantoccini::Client;
-use fantoccini::ClientBuilder;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
 use serde_json::map;
