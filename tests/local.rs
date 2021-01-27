@@ -1,6 +1,6 @@
 //! Tests that don't make use of external websites.
 #[macro_use]
-extern crate serial_test_derive;
+extern crate serial_test;
 extern crate fantoccini;
 extern crate futures_util;
 
