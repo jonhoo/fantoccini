@@ -61,14 +61,18 @@ pub async fn make_client(
                 .capabilities(caps)
                 .connect(url)
                 .await
-        }
+        },
+        #[cfg(not(feature = "rustls-tls"))]
+        "rustls" => panic!("Asked to run the rustls test, but the rustls-tls feature is not enabled"),
         #[cfg(feature = "openssl-tls")]
         "openssl" => {
             ClientBuilder::openssl()
                 .capabilities(caps)
                 .connect(url)
                 .await
-        }
+        },
+        #[cfg(not(feature = "openssl-tls"))]
+        "openssl" => panic!("Asked to run the openssl test, but the openssl-tls feature is not enabled"),
         other => unimplemented!("Unsupported connector type {}", other),
     }
 }

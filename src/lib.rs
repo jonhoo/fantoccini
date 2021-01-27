@@ -195,23 +195,19 @@ impl<C> ClientBuilder<C>
 where
     C: connect::Connect + Send + Sync + Clone + Unpin + 'static,
 {
-    /// Create a new builder with TLS connector
-    /// # Arguments
-    /// * `connector` - TLS connector for [`Client`][hyper::client::Client]
+    /// Create a new builder using `connector` as the TLS connector
     pub fn new(connector: C) -> Self {
         Self {
             capabilities: None,
             connector,
         }
     }
-    /// Set chosen webdriver capabilities
+    /// Pass the given WebDriver capabilities to the browser.
     pub fn capabilities(&mut self, cap: webdriver::capabilities::Capabilities) -> &mut Self {
         self.capabilities = Some(cap);
         self
     }
-    /// Connect to the webdriver session
-    /// # Arguments
-    /// * `webdriver` - webdriver url
+    /// Connect to the webdriver session at the `url`
     pub async fn connect(&self, webdriver: &str) -> Result<Client, error::NewSessionError> {
         if let Some(ref cap) = self.capabilities {
             Client::with_capabilities_and_connector(webdriver, cap, self.connector.clone()).await
@@ -283,8 +279,10 @@ pub struct Form {
 }
 
 impl Client {
-    /// Create a new [`Client`][crate::Client] associated with a chosen HttpsConnector and a new WebDriver session on the server
-    /// at the given URL.
+    /// Connect to the WebDriver host running the given address.
+    ///
+    /// The provided `connector` is used to establish the connection to the WebDriver host,
+    /// and should generally be one that supports HTTPS, as that is commonly required by WebDriver implementations.
     ///
     /// Calls `with_capabilities_and_connector` with an empty capabilities list.
     pub async fn new_with_connector<C>(
@@ -302,10 +300,8 @@ impl Client {
         .await
     }
 
-    /// Create a new `Client` associated with a chosen HttpsConnector and a new WebDriver session on the server
-    /// at the given URL.
+    /// Connect to the WebDriver host running the given address.
     ///
-    /// Calls `with_capabilities_and_connector` with an empty capabilities list.
     /// The given capabilities will be requested in `alwaysMatch` or `desiredCapabilities`
     /// depending on the protocol version supported by the server.
     ///
@@ -1235,7 +1231,6 @@ impl Element {
         let Self {
             mut client,
             element,
-            ..
         } = self;
         let params = SwitchToFrameParameters {
             id: Some(FrameId::Element(element)),
