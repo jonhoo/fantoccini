@@ -335,91 +335,91 @@ mod firefox {
     #[test]
     #[serial]
     fn navigate_to_other_page() {
-        local_tester!(goto, "firefox")
+        local_tester!(goto, "firefox");
     }
 
     #[test]
     #[serial]
     fn find_and_click_link_test() {
-        local_tester!(find_and_click_link, "firefox")
+        local_tester!(find_and_click_link, "firefox");
     }
 
     #[test]
     #[serial]
     fn get_active_element_test() {
-        local_tester!(get_active_element, "firefox")
+        local_tester!(get_active_element, "firefox");
     }
 
     #[test]
     #[serial]
     fn serialize_element_test() {
-        local_tester!(serialize_element, "firefox")
+        local_tester!(serialize_element, "firefox");
     }
 
     #[test]
     #[serial]
     fn iframe_test() {
-        local_tester!(iframe_switch, "firefox")
+        local_tester!(iframe_switch, "firefox");
     }
 
     #[test]
     #[serial]
     fn new_window_test() {
-        tester!(new_window, "firefox")
+        tester!(new_window, "firefox");
     }
 
     #[test]
     #[serial]
     fn new_window_switch_test() {
-        tester!(new_window_switch, "firefox")
+        tester!(new_window_switch, "firefox");
     }
 
     #[test]
     #[serial]
     fn new_tab_switch_test() {
-        tester!(new_tab_switch, "firefox")
+        tester!(new_tab_switch, "firefox");
     }
 
     #[test]
     #[serial]
     fn close_window_test() {
-        tester!(close_window, "firefox")
+        tester!(close_window, "firefox");
     }
 
     #[test]
     #[serial]
     fn double_close_window_test() {
-        tester!(close_window_twice_errors, "firefox")
+        tester!(close_window_twice_errors, "firefox");
     }
 
     #[test]
     #[serial]
     fn set_by_name_textarea_test() {
-        local_tester!(set_by_name_textarea, "firefox")
+        local_tester!(set_by_name_textarea, "firefox");
     }
 
     #[test]
     #[serial]
     fn stale_element_test() {
-        local_tester!(stale_element, "firefox")
+        local_tester!(stale_element, "firefox");
     }
 
     #[test]
     #[serial]
     fn select_by_index_test() {
-        local_tester!(select_by_index, "firefox")
+        local_tester!(select_by_index, "firefox");
     }
 
     #[test]
     #[serial]
     fn select_by_label_test() {
-        local_tester!(select_by_label, "firefox")
+        local_tester!(select_by_label, "firefox");
     }
 
     #[test]
     #[serial]
     fn resolve_execute_async_value_test() {
-        local_tester!(resolve_execute_async_value, "firefox")
+        local_tester!(resolve_execute_async_value, "firefox");
     }
 }
 
@@ -427,67 +427,67 @@ mod chrome {
     use super::*;
     #[test]
     fn navigate_to_other_page() {
-        local_tester!(goto, "chrome")
+        local_tester!(goto, "chrome");
     }
 
     #[test]
     fn find_and_click_link_test() {
-        local_tester!(find_and_click_link, "chrome")
+        local_tester!(find_and_click_link, "chrome");
     }
 
     #[test]
     fn get_active_element_test() {
-        local_tester!(get_active_element, "chrome")
+        local_tester!(get_active_element, "chrome");
     }
 
     #[test]
     fn serialize_element_test() {
-        local_tester!(serialize_element, "chrome")
+        local_tester!(serialize_element, "chrome");
     }
 
     #[test]
     fn iframe_test() {
-        local_tester!(iframe_switch, "chrome")
+        local_tester!(iframe_switch, "chrome");
     }
 
     #[test]
     fn new_window_test() {
-        tester!(new_window, "chrome")
+        tester!(new_window, "chrome");
     }
 
     #[test]
     fn new_window_switch_test() {
-        tester!(new_window_switch, "chrome")
+        tester!(new_window_switch, "chrome");
     }
 
     #[test]
     fn new_tab_test() {
-        tester!(new_tab_switch, "chrome")
+        tester!(new_tab_switch, "chrome");
     }
 
     #[test]
     fn close_window_test() {
-        tester!(close_window, "chrome")
+        tester!(close_window, "chrome");
     }
 
     #[test]
     fn double_close_window_test() {
-        tester!(close_window_twice_errors, "chrome")
+        tester!(close_window_twice_errors, "chrome");
     }
 
     #[test]
     fn set_by_name_textarea_test() {
-        local_tester!(set_by_name_textarea, "chrome")
+        local_tester!(set_by_name_textarea, "chrome");
     }
 
     #[test]
     #[serial]
     fn select_by_label_test() {
-        local_tester!(select_by_label, "chrome")
+        local_tester!(select_by_label, "chrome");
     }
 
     #[test]
     fn select_by_index_label() {
-        local_tester!(select_by_label, "chrome")
+        local_tester!(select_by_index, "chrome");
     }
 }

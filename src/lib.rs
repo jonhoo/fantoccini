@@ -13,6 +13,11 @@
 //! For low-level access to the page, `Client::source` can be used to fetch the full page HTML
 //! source code, and `Client::raw_client_for` to build a raw HTTP request for a particular URL.
 //!
+//! # Feature flags
+//! - `rustls-tls`: Use rustls for https, enabled by default
+//! - `openssl-tls`: Use openssl for https
+//!
+//!
 //! # Examples
 //!
 //! These examples all assume that you have a [WebDriver compatible] process running on port 4444.
@@ -27,14 +32,19 @@
 //! Let's start out clicking around on Wikipedia:
 //!
 //! ```no_run
+//! # #![cfg(feature = "rustls-tls")]
 //! # extern crate tokio;
 //! # extern crate fantoccini;
-//! use fantoccini::{Client, Locator};
+//! use fantoccini::ClientBuilder;
+//! use fantoccini::Locator;
 //!
 //! // let's set up the sequence of steps we want the browser to take
 //! #[tokio::main]
 //! async fn main() -> Result<(), fantoccini::error::CmdError> {
-//!     let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     // With feature `rustls-tls`
+//!     let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     // With `openssl-tls` enabled
+//!     // let mut c = ClientBuilder::openssl().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!
 //!     // first, go to the Wikipedia page for Foobar
 //!     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
@@ -58,12 +68,15 @@
 //! Let's make the program do that for us instead:
 //!
 //! ```no_run
+//! # #![cfg(feature = "rustls-tls")]
 //! # extern crate tokio;
 //! # extern crate fantoccini;
-//! # use fantoccini::{Client, Locator};
+//! # use fantoccini::Locator;
+//! # use fantoccini::ClientBuilder;
+//!
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
-//! # let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go to the Wikipedia frontpage this time
 //! c.goto("https://www.wikipedia.org/").await?;
@@ -84,13 +97,15 @@
 //! What if we want to download a raw file? Fantoccini has you covered:
 //!
 //! ```no_run
+//! # #![cfg(feature = "rustls-tls")]
 //! # extern crate tokio;
 //! # extern crate futures_util;
 //! # extern crate fantoccini;
-//! # use fantoccini::{Client, Locator};
+//! # use fantoccini::ClientBuilder;
+//! # use fantoccini::Locator;
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
-//! # let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! // -- snip wrapper code --
 //! // go back to the frontpage
 //! c.goto("https://www.wikipedia.org/").await?;
@@ -123,6 +138,7 @@
 #![deny(missing_docs)]
 #![warn(missing_debug_implementations, rust_2018_idioms)]
 
+use hyper::client::connect;
 use serde::Serialize;
 use serde_json::Value as Json;
 use std::convert::TryFrom;
@@ -149,6 +165,57 @@ pub mod error;
 /// The long-running session future we spawn for multiplexing onto a running WebDriver instance.
 mod session;
 use crate::session::{Cmd, Session};
+
+/// Builder pattern for Client
+#[derive(Default, Clone, Debug)]
+pub struct ClientBuilder<C>
+where
+    C: connect::Connect + Send + Sync + Clone + Unpin,
+{
+    capabilities: Option<webdriver::capabilities::Capabilities>,
+    connector: C,
+}
+
+#[cfg(feature = "rustls-tls")]
+impl ClientBuilder<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
+    /// Create a builder with Rustls connector, available with feature `rustls-tls`
+    pub fn rustls() -> Self {
+        Self::new(hyper_rustls::HttpsConnector::with_native_roots())
+    }
+}
+
+#[cfg(feature = "openssl-tls")]
+impl ClientBuilder<hyper_tls::HttpsConnector<hyper::client::HttpConnector>> {
+    /// Create a builder with OpenSSL connector, available with feature `openssl-tls`
+    pub fn openssl() -> Self {
+        Self::new(hyper_tls::HttpsConnector::new())
+    }
+}
+impl<C> ClientBuilder<C>
+where
+    C: connect::Connect + Send + Sync + Clone + Unpin + 'static,
+{
+    /// Create a new builder using `connector` as the TLS connector
+    pub fn new(connector: C) -> Self {
+        Self {
+            capabilities: None,
+            connector,
+        }
+    }
+    /// Pass the given WebDriver capabilities to the browser.
+    pub fn capabilities(&mut self, cap: webdriver::capabilities::Capabilities) -> &mut Self {
+        self.capabilities = Some(cap);
+        self
+    }
+    /// Connect to the session at the `webdriver` url
+    pub async fn connect(&self, webdriver: &str) -> Result<Client, error::NewSessionError> {
+        if let Some(ref cap) = self.capabilities {
+            Client::with_capabilities_and_connector(webdriver, cap, self.connector.clone()).await
+        } else {
+            Client::new_with_connector(webdriver, self.connector.clone()).await
+        }
+    }
+}
 
 /// An element locator.
 ///
@@ -212,17 +279,28 @@ pub struct Form {
 }
 
 impl Client {
-    /// Create a new `Client` associated with a new WebDriver session on the server at the given
-    /// URL.
+    /// Connect to the WebDriver host running the given address.
     ///
-    /// Calls `with_capabilities` with an empty capabilities list.
-    #[allow(clippy::new_ret_no_self)]
-    pub async fn new(webdriver: &str) -> Result<Self, error::NewSessionError> {
-        Self::with_capabilities(webdriver, webdriver::capabilities::Capabilities::new()).await
+    /// The provided `connector` is used to establish the connection to the WebDriver host,
+    /// and should generally be one that supports HTTPS, as that is commonly required by WebDriver implementations.
+    ///
+    /// Calls `with_capabilities_and_connector` with an empty capabilities list.
+    pub async fn new_with_connector<C>(
+        webdriver: &str,
+        connector: C,
+    ) -> Result<Self, error::NewSessionError>
+    where
+        C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
+    {
+        Self::with_capabilities_and_connector(
+            webdriver,
+            &webdriver::capabilities::Capabilities::new(),
+            connector,
+        )
+        .await
     }
 
-    /// Create a new `Client` associated with a new WebDriver session on the server at the given
-    /// URL.
+    /// Connect to the WebDriver host running the given address.
     ///
     /// The given capabilities will be requested in `alwaysMatch` or `desiredCapabilities`
     /// depending on the protocol version supported by the server.
@@ -235,11 +313,15 @@ impl Client {
     /// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
     /// session close request will be spawned on the given `handle` when the last instance of this
     /// `Client` is dropped.
-    pub async fn with_capabilities(
+    pub async fn with_capabilities_and_connector<C>(
         webdriver: &str,
-        cap: webdriver::capabilities::Capabilities,
-    ) -> Result<Self, error::NewSessionError> {
-        Session::with_capabilities(webdriver, cap).await
+        cap: &webdriver::capabilities::Capabilities,
+        connector: C,
+    ) -> Result<Self, error::NewSessionError>
+    where
+        C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
+    {
+        Session::with_capabilities_and_connector(webdriver, cap, connector).await
     }
 
     /// Get the session ID assigned by the WebDriver server to this client.

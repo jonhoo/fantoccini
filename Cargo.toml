@@ -17,6 +17,11 @@ categories = ["api-bindings", "development-tools::testing", "web-programming::ht
 
 license = "MIT/Apache-2.0"
 
+[features]
+default = ["rustls-tls"]
+rustls-tls = ["hyper-rustls"]
+openssl-tls = ["hyper-tls"]
+
 [dependencies]
 webdriver = { version = "0.43.0", default-features = false }
 url = "2.0.0"
@@ -25,10 +30,11 @@ serde_json = "1.0"
 futures-core = "0.3.0"
 futures-util = "0.3.0"
 tokio = { version = "1", features = [ "sync", "rt" ] }
-hyper = { version = "0.14", features = [ "stream", "client", "http1" ] }
-hyper-tls = "0.5.0"
+hyper = { version = "0.14", features = [ "stream", "client", "http1", "http2" ] }
 cookie = { version = "0.14", features = ["percent-encode"] }
 base64 = "0.13"
+hyper-rustls = { version = "0.22.1", optional = true }
+hyper-tls = { version = "0.5.0", optional = true }
 mime = "0.3.9"
 http = "0.2"
 

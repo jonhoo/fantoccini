@@ -2,6 +2,7 @@ use crate::error;
 use futures_core::ready;
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt};
+use hyper::client::connect;
 use serde_json::Value as Json;
 use std::future::Future;
 use std::io;
@@ -174,11 +175,13 @@ impl Ongoing {
     }
 }
 
-pub(crate) struct Session {
+pub(crate) struct Session<C>
+where
+    C: connect::Connect,
+{
     ongoing: Ongoing,
     rx: mpsc::UnboundedReceiver<Task>,
-    client:
-        hyper::client::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
+    client: hyper::Client<C>,
     wdb: url::Url,
     session: Option<String>,
     is_legacy: bool,
@@ -186,7 +189,10 @@ pub(crate) struct Session {
     persist: bool,
 }
 
-impl Future for Session {
+impl<C> Future for Session<C>
+where
+    C: connect::Connect + Unpin + 'static + Clone + Sync + Send,
+{
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -266,7 +272,10 @@ impl Future for Session {
     }
 }
 
-impl Session {
+impl<C> Session<C>
+where
+    C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
+{
     fn shutdown(&mut self, ack: Option<Ack>) {
         // session was not created
         if self.session.is_none() {
@@ -329,19 +338,18 @@ impl Session {
         }
     }
 
-    pub(crate) async fn with_capabilities(
+    pub(crate) async fn with_capabilities_and_connector(
         webdriver: &str,
-        mut cap: webdriver::capabilities::Capabilities,
+        cap: &webdriver::capabilities::Capabilities,
+        connector: C,
     ) -> Result<Client, error::NewSessionError> {
         // Where is the WebDriver server?
         let wdb = webdriver.parse::<url::Url>();
-
         let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
-
         // We want a tls-enabled client
-        let client = hyper::client::Client::builder()
-            .build::<_, hyper::Body>(hyper_tls::HttpsConnector::new());
+        let client = hyper::Client::builder().build::<_, hyper::Body>(connector);
 
+        let mut cap = cap.to_owned();
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
 

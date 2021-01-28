@@ -3,10 +3,11 @@
 extern crate fantoccini;
 extern crate futures_util;
 
-use fantoccini::{error, Client};
+use fantoccini::{Client, ClientBuilder, error};
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
+use serde_json::map;
 use std::convert::Infallible;
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
@@ -15,13 +16,13 @@ use tokio::fs::read_to_string;
 
 const ASSETS_DIR: &str = "tests/test_html";
 
-pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionError> {
+pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
     match s {
         "firefox" => {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({ "args": ["--headless"] });
             caps.insert("moz:firefoxOptions".to_string(), opts.clone());
-            Client::with_capabilities("http://localhost:4444", caps).await
+            caps
         }
         "chrome" => {
             let mut caps = serde_json::map::Map::new();
@@ -40,9 +41,44 @@ pub async fn select_client_type(s: &str) -> Result<Client, error::NewSessionErro
                     }
             });
             caps.insert("goog:chromeOptions".to_string(), opts.clone());
-
-            Client::with_capabilities("http://localhost:9515", caps).await
+            caps
         }
+        browser => unimplemented!("unsupported browser backend {}", browser),
+    }
+}
+
+pub async fn make_client(
+    url: &str,
+    caps: map::Map<String, serde_json::Value>,
+    conn: &str,
+) -> Result<Client, error::NewSessionError> {
+    match conn {
+        #[cfg(feature = "rustls-tls")]
+        "rustls" => {
+            ClientBuilder::rustls()
+                .capabilities(caps)
+                .connect(url)
+                .await
+        },
+        #[cfg(not(feature = "rustls-tls"))]
+        "rustls" => panic!("Asked to run the rustls test, but the rustls-tls feature is not enabled"),
+        #[cfg(feature = "openssl-tls")]
+        "openssl" => {
+            ClientBuilder::openssl()
+                .capabilities(caps)
+                .connect(url)
+                .await
+        },
+        #[cfg(not(feature = "openssl-tls"))]
+        "openssl" => panic!("Asked to run the openssl test, but the openssl-tls feature is not enabled"),
+        other => unimplemented!("Unsupported connector type {}", other),
+    }
+}
+
+pub fn make_url(s: &str) -> &'static str {
+    match s {
+        "firefox" => "http://localhost:4444",
+        "chrome" => "http://localhost:9515",
         browser => unimplemented!("unsupported browser backend {}", browser),
     }
 }
@@ -72,10 +108,23 @@ pub fn handle_test_error(
 #[macro_export]
 macro_rules! tester {
     ($f:ident, $endpoint:expr) => {{
+        use common::{make_capabilities, make_url};
+        let url = make_url($endpoint);
+        let caps = make_capabilities($endpoint);
+        #[cfg(feature = "rustls-tls")]
+        tester_inner!($f, common::make_client(url, caps.clone(), "rustls"));
+        #[cfg(feature = "openssl-tls")]
+        tester_inner!($f, common::make_client(url, caps, "openssl"));
+    }};
+}
+
+#[macro_export]
+macro_rules! tester_inner {
+    ($f:ident, $connector:expr) => {{
         use std::sync::{Arc, Mutex};
         use std::thread;
 
-        let c = common::select_client_type($endpoint);
+        let c = $connector;
 
         // we'll need the session_id from the thread
         // NOTE: even if it panics, so can't just return it
@@ -108,9 +157,14 @@ macro_rules! tester {
 #[macro_export]
 macro_rules! local_tester {
     ($f:ident, $endpoint:expr) => {{
-        let port: u16 = common::setup_server();
+        let port = common::setup_server();
+        let url = common::make_url($endpoint);
+        let caps = common::make_capabilities($endpoint);
         let f = move |c: Client| async move { $f(c, port).await };
-        tester!(f, $endpoint)
+        #[cfg(feature = "rustls-tls")]
+        tester_inner!(f, common::make_client(url, caps.clone(), "rustls"));
+        #[cfg(feature = "openssl-tls")]
+        tester_inner!(f, common::make_client(url, caps, "openssl"))
     }};
 }
 
