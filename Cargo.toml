@@ -18,9 +18,9 @@ categories = ["api-bindings", "development-tools::testing", "web-programming::ht
 license = "MIT/Apache-2.0"
 
 [features]
-default = ["rustls-tls"]
+default = ["native-tls"]
+native-tls = ["hyper-tls"]
 rustls-tls = ["hyper-rustls"]
-openssl-tls = ["hyper-tls"]
 
 [dependencies]
 webdriver = { version = "0.43.0", default-features = false }
@@ -42,3 +42,7 @@ http = "0.2"
 tokio = { version = "1", features = [ "full" ] }
 hyper = { version = "0.14", features = [ "server" ] }
 serial_test = "0.5"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

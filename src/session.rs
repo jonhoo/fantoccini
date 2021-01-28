@@ -1,4 +1,4 @@
-use crate::error;
+use crate::{error, Client};
 use futures_core::ready;
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt};
@@ -16,13 +16,6 @@ use webdriver::error::ErrorStatus;
 use webdriver::error::WebDriverError;
 
 type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
-
-/// A WebDriver client tied to a single browser session.
-#[derive(Clone, Debug)]
-pub struct Client {
-    tx: mpsc::UnboundedSender<Task>,
-    is_legacy: bool,
-}
 
 type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 
