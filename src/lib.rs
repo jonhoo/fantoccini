@@ -207,7 +207,7 @@ where
         self.capabilities = Some(cap);
         self
     }
-    /// Connect to the webdriver session at the `url`
+    /// Connect to the session at the `webdriver` url
     pub async fn connect(&self, webdriver: &str) -> Result<Client, error::NewSessionError> {
         if let Some(ref cap) = self.capabilities {
             Client::with_capabilities_and_connector(webdriver, cap, self.connector.clone()).await
