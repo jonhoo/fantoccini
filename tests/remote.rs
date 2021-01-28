@@ -1,9 +1,9 @@
 //! Tests that make use of external websites.
-#[macro_use]
-extern crate serial_test;
 
-use fantoccini::{error, Client, Locator, Method};
+use fantoccini::{error, Client, Locator};
 use futures_util::TryFutureExt;
+use hyper::Method;
+use serial_test::serial;
 use std::time::Duration;
 use url::Url;
 

@@ -3,7 +3,7 @@
 extern crate fantoccini;
 extern crate futures_util;
 
-use fantoccini::{Client, ClientBuilder, error};
+use fantoccini::{error, Client, ClientBuilder};
 
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Request, Response, Server, StatusCode};
@@ -59,18 +59,22 @@ pub async fn make_client(
                 .capabilities(caps)
                 .connect(url)
                 .await
-        },
+        }
         #[cfg(not(feature = "rustls-tls"))]
-        "rustls" => panic!("Asked to run the rustls test, but the rustls-tls feature is not enabled"),
-        #[cfg(feature = "openssl-tls")]
-        "openssl" => {
-            ClientBuilder::openssl()
+        "rustls" => {
+            panic!("Asked to run the rustls test, but the rustls-tls feature is not enabled")
+        }
+        #[cfg(feature = "native-tls")]
+        "native" => {
+            ClientBuilder::native()
                 .capabilities(caps)
                 .connect(url)
                 .await
-        },
-        #[cfg(not(feature = "openssl-tls"))]
-        "openssl" => panic!("Asked to run the openssl test, but the openssl-tls feature is not enabled"),
+        }
+        #[cfg(not(feature = "native-tls"))]
+        "native" => {
+            panic!("Asked to run the native test, but the native-tls feature is not enabled")
+        }
         other => unimplemented!("Unsupported connector type {}", other),
     }
 }
@@ -113,8 +117,8 @@ macro_rules! tester {
         let caps = make_capabilities($endpoint);
         #[cfg(feature = "rustls-tls")]
         tester_inner!($f, common::make_client(url, caps.clone(), "rustls"));
-        #[cfg(feature = "openssl-tls")]
-        tester_inner!($f, common::make_client(url, caps, "openssl"));
+        #[cfg(feature = "native-tls")]
+        tester_inner!($f, common::make_client(url, caps, "native"));
     }};
 }
 
@@ -163,8 +167,8 @@ macro_rules! local_tester {
         let f = move |c: Client| async move { $f(c, port).await };
         #[cfg(feature = "rustls-tls")]
         tester_inner!(f, common::make_client(url, caps.clone(), "rustls"));
-        #[cfg(feature = "openssl-tls")]
-        tester_inner!(f, common::make_client(url, caps, "openssl"))
+        #[cfg(feature = "native-tls")]
+        tester_inner!(f, common::make_client(url, caps, "native"))
     }};
 }
 
