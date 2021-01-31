@@ -11,6 +11,10 @@ use webdriver::command::{
 };
 use webdriver::common::{FrameId, ELEMENT_KEY};
 
+// Used only under `native-tls`
+#[cfg_attr(not(feature = "native-tls"), allow(unused_imports))]
+use crate::ClientBuilder;
+
 /// A WebDriver client tied to a single browser
 /// [session](https://www.w3.org/TR/webdriver1/#sessions).
 ///
@@ -29,6 +33,17 @@ pub struct Client {
 }
 
 impl Client {
+    /// Connect to the WebDriver host running the given address.
+    ///
+    /// This connects using a platform-native TLS library, and is only available with the
+    /// `native-tls` feature. To customize, use [`ClientBuilder`] instead.
+    #[cfg(feature = "native-tls")]
+    #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
+    #[deprecated(since = "0.17.1", note = "Prefer ClientBuilder::native")]
+    pub async fn new(webdriver: &str) -> Result<Self, error::NewSessionError> {
+        ClientBuilder::native().connect(webdriver).await
+    }
+
     /// Connect to the WebDriver host running the given address.
     ///
     /// The provided `connector` is used to establish the connection to the WebDriver host, and
