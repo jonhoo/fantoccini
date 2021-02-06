@@ -491,6 +491,9 @@ where
             WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
             WebDriverCommand::GetWindowRect => base.join("window/rect"),
             WebDriverCommand::TakeScreenshot => base.join("screenshot"),
+            WebDriverCommand::TakeElementScreenshot(ref we) => {
+                base.join(&format!("element/{}/screenshot", we.0))
+            }
             WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
             WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
             WebDriverCommand::GetWindowHandle => base.join("window"),

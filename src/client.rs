@@ -616,6 +616,26 @@ impl Client {
             Err(error::CmdError::NotW3C(src))
         }
     }
+
+    /// Get a PNG-encoded screenshot of an element.
+    ///
+    /// See [19.2 Take Element
+    /// Screenshot](https://www.w3.org/TR/webdriver1/#dfn-take-element-screenshot) of the WebDriver
+    /// standard.
+    #[cfg_attr(docsrs, doc(alias = "Take Element Screenshot"))]
+    pub async fn screenshot_element(
+        &mut self,
+        element: Element,
+    ) -> Result<Vec<u8>, error::CmdError> {
+        let src = self
+            .issue(WebDriverCommand::TakeElementScreenshot(element.element))
+            .await?;
+        if let Some(src) = src.as_str() {
+            base64::decode(src).map_err(error::CmdError::ImageDecodeError)
+        } else {
+            Err(error::CmdError::NotW3C(src))
+        }
+    }
 }
 
 /// Operations that wait for a change on the page.
