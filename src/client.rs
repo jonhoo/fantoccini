@@ -96,13 +96,13 @@ impl Client {
 
     /// Set the User Agent string to use for all subsequent requests.
     pub async fn set_ua<S: Into<String>>(&mut self, ua: S) -> Result<(), error::CmdError> {
-        self.issue(Cmd::SetUA(ua.into())).await?;
+        self.issue(Cmd::SetUa(ua.into())).await?;
         Ok(())
     }
 
     /// Get the current User Agent string.
     pub async fn get_ua(&mut self) -> Result<Option<String>, error::CmdError> {
-        match self.issue(Cmd::GetUA).await? {
+        match self.issue(Cmd::GetUa).await? {
             Json::String(s) => Ok(Some(s)),
             Json::Null => Ok(None),
             v => unreachable!("response to GetSessionId was not a string: {:?}", v),

@@ -22,11 +22,11 @@ type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Cmd {
-    SetUA(String),
+    SetUa(String),
     GetSessionId,
     Shutdown,
     Persist,
-    GetUA,
+    GetUa,
     Raw {
         req: hyper::Request<hyper::Body>,
         rsp: oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
@@ -213,11 +213,11 @@ where
                             .map(Json::String)
                             .unwrap_or(Json::Null)));
                     }
-                    Cmd::SetUA(ua) => {
+                    Cmd::SetUa(ua) => {
                         self.ua = Some(ua);
                         let _ = ack.send(Ok(Json::Null));
                     }
-                    Cmd::GetUA => {
+                    Cmd::GetUa => {
                         let _ =
                             ack.send(Ok(self.ua.clone().map(Json::String).unwrap_or(Json::Null)));
                     }
