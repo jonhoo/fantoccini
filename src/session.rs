@@ -464,7 +464,13 @@ where
             WebDriverCommand::GetPageSource => base.join("source"),
             WebDriverCommand::FindElement(..) => base.join("element"),
             WebDriverCommand::FindElements(..) => base.join("elements"),
-            WebDriverCommand::GetCookies => base.join("cookie"),
+            WebDriverCommand::GetCookies
+            | WebDriverCommand::AddCookie(_)
+            | WebDriverCommand::DeleteCookies => base.join("cookie"),
+            WebDriverCommand::GetNamedCookie(ref name)
+            | WebDriverCommand::DeleteCookie(ref name) => {
+                base.join(&format!("cookie/{}", name))
+            }
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),

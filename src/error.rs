@@ -104,6 +104,9 @@ pub enum CmdError {
     /// The WebDriver server responded to a command with an invalid JSON response.
     Json(serde_json::Error),
 
+    /// Unexpected JSON response
+    UnexpectedJson(String),
+
     /// The WebDriver server produced a response that does not conform to the [W3C WebDriver
     /// specification][spec].
     ///
@@ -151,6 +154,7 @@ impl Error for CmdError {
             CmdError::Lost(..) => "webdriver connection lost",
             CmdError::NotJson(..) => "webdriver returned invalid response",
             CmdError::Json(..) => "webdriver returned incoherent response",
+            CmdError::UnexpectedJson(..) => "webdriver returned unexpected JSON response",
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
             CmdError::ImageDecodeError(..) => "error decoding image",
@@ -167,7 +171,10 @@ impl Error for CmdError {
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
             CmdError::ImageDecodeError(ref e) => Some(e),
-            CmdError::NotJson(_) | CmdError::NotW3C(_) | CmdError::InvalidArgument(..) => None,
+            CmdError::NotJson(_)
+            | CmdError::UnexpectedJson(_)
+            | CmdError::NotW3C(_)
+            | CmdError::InvalidArgument(..) => None,
         }
     }
 }
@@ -185,6 +192,7 @@ impl fmt::Display for CmdError {
             CmdError::Lost(ref e) => write!(f, "{}", e),
             CmdError::NotJson(ref e) => write!(f, "{}", e),
             CmdError::Json(ref e) => write!(f, "{}", e),
+            CmdError::UnexpectedJson(ref e) => write!(f, "{}", e),
             CmdError::NotW3C(ref e) => write!(f, "{:?}", e),
             CmdError::ImageDecodeError(ref e) => write!(f, "{:?}", e),
             CmdError::InvalidArgument(ref arg, ref msg) => {

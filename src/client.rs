@@ -156,7 +156,7 @@ impl Client {
         let base = self.current_url_().await?;
         let url = base.join(&url)?;
         self.issue(WebDriverCommand::Get(webdriver::command::GetParameters {
-            url: url.into_string(),
+            url: url.into(),
         }))
         .await?;
         Ok(())
@@ -510,6 +510,82 @@ impl Client {
             client: self.clone(),
             form: f,
         })
+    }
+}
+
+/// [Cookies](https://www.w3.org/TR/webdriver2/#cookies)
+impl Client {
+    /// Get all cookies associated with the current document.
+    ///
+    /// See [16.1 Get All Cookies](https://www.w3.org/TR/webdriver2/#get-all-cookies) of the
+    /// WebDriver standard.
+    pub async fn get_all_cookies(&mut self) -> Result<Vec<Json>, error::CmdError> {
+        let resp = self.issue(WebDriverCommand::GetCookies).await?;
+        let raw_cookies = resp.as_array();
+
+        if raw_cookies.is_none() {
+            // We are expecting a JSON array of cookies at the top-level
+            let err =
+                error::CmdError::UnexpectedJson("expected a JSON array of cookie objects".to_string());
+            return Err(err);
+        }
+
+        let cookies = raw_cookies.unwrap().clone();
+
+        Ok(cookies)
+    }
+
+    /// Get a single named cookie associated with the current document.
+    ///
+    /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver2/#get-named-cookie) of the
+    /// WebDriver standard.
+    pub async fn get_named_cookie(&mut self, name: String) -> Result<Json, error::CmdError> {
+        self.issue(WebDriverCommand::GetNamedCookie(name)).await
+    }
+
+    /// Add a single cookie to the current document.
+    ///
+    /// See [16.3 Add Cookie](https://www.w3.org/TR/webdriver2/#add-cookie) of the
+    /// WebDriver standard.
+    pub async fn add_cookie(
+        &mut self,
+        name: String,
+        value: String,
+        path: Option<String>,
+        domain: Option<String>,
+        secure: bool,
+        http_only: bool,
+        expiry: Option<u64>,
+        same_site: Option<String>,
+    ) -> Result<Json, error::CmdError> {
+        let params = webdriver::command::AddCookieParameters {
+            name,
+            value,
+            path,
+            domain,
+            secure,
+            httpOnly: http_only,
+            expiry: expiry.map(|v| webdriver::common::Date(v)),
+            sameSite: same_site,
+        };
+
+        self.issue(WebDriverCommand::AddCookie(params)).await
+    }
+
+    /// Delete a single cookie from the current document.
+    ///
+    /// See [16.4 Delete Cookie](https://www.w3.org/TR/webdriver2/#delete-cookie) of the
+    /// WebDriver standard.
+    pub async fn delete_cookie(&mut self, name: String) -> Result<Json, error::CmdError> {
+        self.issue(WebDriverCommand::DeleteCookie(name)).await
+    }
+
+    /// Delete all cookies from the current document.
+    ///
+    /// See [16.5 Delete All Cookies](https://www.w3.org/TR/webdriver2/#delete-all-cookies) of the
+    /// WebDriver standard.
+    pub async fn delete_all_cookies(&mut self) -> Result<Json, error::CmdError> {
+        self.issue(WebDriverCommand::DeleteCookies).await
     }
 }
 
