@@ -256,30 +256,16 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
     c.close().await
 }
 
-/// Simple test to verify that cookie handling works
+// Verifies that basic cookie handling works
 async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
-    c.goto("https://en.wikipedia.org/").await?;
+    c.goto("https://google.com/").await?;
 
     let cookies = c.get_all_cookies().await?;
     assert!(cookies.len() > 0);
 
-    let (c1_name, c1_value) = ("fantoccini123", "test123");
-
-    c.add_cookie(
-        c1_name.into(),
-        c1_value.into(),
-        None,
-        None,
-        false,
-        false,
-        None,
-        None
-    ).await?;
-
-    // TODO: get this working
-    let cookie = c.get_named_cookie(c1_name.into()).await?;
-    let value = cookie.as_object().unwrap().get("value").unwrap().as_str().unwrap();
-    assert_eq!(value, c1_value);
+    c.delete_all_cookies().await?;
+    let cookies = c.get_all_cookies().await?;
+    assert!(cookies.len() == 0);
 
     c.close().await
 }
@@ -360,7 +346,7 @@ mod chrome {
 
     #[test]
     fn it_handles_cookies() {
-        tester!(handle_cookies_test, "firefox");
+        tester!(handle_cookies_test, "chrome");
     }
 }
 

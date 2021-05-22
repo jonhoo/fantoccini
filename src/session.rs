@@ -577,6 +577,10 @@ where
                 body = Some(serde_json::to_string(loc).unwrap());
                 method = Method::POST;
             }
+            WebDriverCommand::DeleteCookie(_)
+            | WebDriverCommand::DeleteCookies => {
+                method = Method::DELETE;
+            }
             WebDriverCommand::ExecuteScript(ref script) => {
                 body = Some(serde_json::to_string(script).unwrap());
                 method = Method::POST;

@@ -539,45 +539,16 @@ impl Client {
     ///
     /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver2/#get-named-cookie) of the
     /// WebDriver standard.
-    pub async fn get_named_cookie(&mut self, name: String) -> Result<Json, error::CmdError> {
-        self.issue(WebDriverCommand::GetNamedCookie(name)).await
-    }
-
-    /// Add a single cookie to the current document.
-    ///
-    /// See [16.3 Add Cookie](https://www.w3.org/TR/webdriver2/#add-cookie) of the
-    /// WebDriver standard.
-    pub async fn add_cookie(
-        &mut self,
-        name: String,
-        value: String,
-        path: Option<String>,
-        domain: Option<String>,
-        secure: bool,
-        http_only: bool,
-        expiry: Option<u64>,
-        same_site: Option<String>,
-    ) -> Result<Json, error::CmdError> {
-        let params = webdriver::command::AddCookieParameters {
-            name,
-            value,
-            path,
-            domain,
-            secure,
-            httpOnly: http_only,
-            expiry: expiry.map(|v| webdriver::common::Date(v)),
-            sameSite: same_site,
-        };
-
-        self.issue(WebDriverCommand::AddCookie(params)).await
+    pub async fn get_named_cookie(&mut self, name: &str) -> Result<Json, error::CmdError> {
+        self.issue(WebDriverCommand::GetNamedCookie(name.to_string())).await
     }
 
     /// Delete a single cookie from the current document.
     ///
     /// See [16.4 Delete Cookie](https://www.w3.org/TR/webdriver2/#delete-cookie) of the
     /// WebDriver standard.
-    pub async fn delete_cookie(&mut self, name: String) -> Result<Json, error::CmdError> {
-        self.issue(WebDriverCommand::DeleteCookie(name)).await
+    pub async fn delete_cookie(&mut self, name: &str) -> Result<Json, error::CmdError> {
+        self.issue(WebDriverCommand::DeleteCookie(name.to_string())).await
     }
 
     /// Delete all cookies from the current document.
