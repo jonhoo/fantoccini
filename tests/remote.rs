@@ -344,6 +344,7 @@ mod chrome {
         tester!(wait_for_navigation_test, "chrome");
     }
 
+    #[serial]
     #[test]
     fn it_handles_cookies() {
         tester!(handle_cookies_test, "chrome");
@@ -431,6 +432,7 @@ mod firefox {
         tester!(wait_for_navigation_test, "firefox");
     }
 
+    #[serial]
     #[test]
     fn it_handles_cookies() {
         tester!(handle_cookies_test, "firefox");

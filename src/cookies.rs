@@ -86,11 +86,11 @@ fn cookie_to_json(cookie: &cookie::Cookie<'_>) -> Json {
     raw_cookie
 }
 
-/// [Cookies](https://www.w3.org/TR/webdriver2/#cookies)
+/// [Cookies](https://www.w3.org/TR/webdriver1/#cookies)
 impl Client {
     /// Get all cookies associated with the current document.
     ///
-    /// See [16.1 Get All Cookies](https://www.w3.org/TR/webdriver2/#get-all-cookies) of the
+    /// See [16.1 Get All Cookies](https://www.w3.org/TR/webdriver1/#get-all-cookies) of the
     /// WebDriver standard.
     pub async fn get_all_cookies(&mut self) -> Result<Vec<Cookie>, error::CmdError> {
         let resp = self.issue(WebDriverCommand::GetCookies).await?;
@@ -121,7 +121,7 @@ impl Client {
 
     /// Get a single named cookie associated with the current document.
     ///
-    /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver2/#get-named-cookie) of the
+    /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver1/#get-named-cookie) of the
     /// WebDriver standard.
     pub async fn get_named_cookie(&mut self, name: &str) -> Result<Cookie, error::CmdError> {
         self.issue(WebDriverCommand::GetNamedCookie(name.to_string())).await
@@ -139,7 +139,7 @@ impl Client {
 
     /// Delete a single cookie from the current document.
     ///
-    /// See [16.4 Delete Cookie](https://www.w3.org/TR/webdriver2/#delete-cookie) of the
+    /// See [16.4 Delete Cookie](https://www.w3.org/TR/webdriver1/#delete-cookie) of the
     /// WebDriver standard.
     pub async fn delete_cookie(&mut self, name: &str) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::DeleteCookie(name.to_string()))
@@ -149,7 +149,7 @@ impl Client {
 
     /// Delete all cookies from the current document.
     ///
-    /// See [16.5 Delete All Cookies](https://www.w3.org/TR/webdriver2/#delete-all-cookies) of the
+    /// See [16.5 Delete All Cookies](https://www.w3.org/TR/webdriver1/#delete-all-cookies) of the
     /// WebDriver standard.
     pub async fn delete_all_cookies(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::DeleteCookies)
