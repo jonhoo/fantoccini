@@ -1,3 +1,4 @@
+//! Cookie-related functionality for WebDriver.
 use serde_json::Value as Json;
 use time::OffsetDateTime;
 use webdriver::command::WebDriverCommand;
@@ -5,7 +6,8 @@ use webdriver::command::WebDriverCommand;
 use crate::client::Client;
 use crate::error;
 
-type Cookie = cookie::Cookie<'static>;
+/// Type alias for a `cookie::Cookie`
+pub type Cookie<'a> = cookie::Cookie<'a>;
 
 /// Key names for cookie fields used by WebDriver JSON.
 const COOKIE_NAME: &str = "name";
@@ -17,7 +19,7 @@ const COOKIE_HTTP_ONLY: &str = "httpOnly";
 const COOKIE_EXPIRY: &str = "expiry";
 
 /// Build a `cookie::Cookie` from raw JSON.
-fn json_to_cookie(raw_cookie: &serde_json::Map<String, Json>) -> Cookie {
+fn json_to_cookie(raw_cookie: &serde_json::Map<String, Json>) -> Cookie<'static> {
     // Required keys
     let name = raw_cookie.get(COOKIE_NAME).and_then(|v| v.as_str()).unwrap().to_string();
     let value = raw_cookie.get(COOKIE_VALUE).and_then(|v| v.as_str()).unwrap().to_string();
@@ -92,7 +94,7 @@ impl Client {
     ///
     /// See [16.1 Get All Cookies](https://www.w3.org/TR/webdriver1/#get-all-cookies) of the
     /// WebDriver standard.
-    pub async fn get_all_cookies(&mut self) -> Result<Vec<Cookie>, error::CmdError> {
+    pub async fn get_all_cookies(&mut self) -> Result<Vec<Cookie<'static>>, error::CmdError> {
         let resp = self.issue(WebDriverCommand::GetCookies).await?;
 
         let raw_cookies = resp.as_array();
@@ -123,7 +125,7 @@ impl Client {
     ///
     /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver1/#get-named-cookie) of the
     /// WebDriver standard.
-    pub async fn get_named_cookie(&mut self, name: &str) -> Result<Cookie, error::CmdError> {
+    pub async fn get_named_cookie(&mut self, name: &str) -> Result<Cookie<'static>, error::CmdError> {
         self.issue(WebDriverCommand::GetNamedCookie(name.to_string())).await
             .and_then(|raw_cookie| {
                 match raw_cookie.as_object() {
