@@ -1,4 +1,5 @@
 use serde_json::Value as Json;
+use time::OffsetDateTime;
 use webdriver::command::WebDriverCommand;
 
 use crate::client::Client;
@@ -44,8 +45,9 @@ fn json_to_cookie(raw_cookie: &serde_json::Map<String, Json>) -> cookie::Cookie<
         cookie.set_http_only(http_only);
     }
 
-    if let Some(_expiry) = expiry {
-        todo!()
+    if let Some(expiry) = expiry {
+        let dt = OffsetDateTime::from_unix_timestamp(expiry as i64);
+        cookie.set_expires(dt);
     }
 
     cookie
@@ -54,31 +56,32 @@ fn json_to_cookie(raw_cookie: &serde_json::Map<String, Json>) -> cookie::Cookie<
 /// Serialize a `cookie::Cookie` to JSON.
 #[allow(unused)]
 fn cookie_to_json(cookie: &cookie::Cookie<'_>) -> Json {
-    let mut json = serde_json::json!(
+    let mut raw_cookie = serde_json::json!(
         { COOKIE_NAME: cookie.name(), COOKIE_VALUE: cookie.value() }
     );
 
     if let Some(path) = cookie.path() {
-        json[COOKIE_PATH] = Json::String(path.to_string());
+        raw_cookie[COOKIE_PATH] = Json::String(path.to_string());
     }
 
     if let Some(domain) = cookie.domain() {
-        json[COOKIE_DOMAIN] = Json::String(domain.to_string());
+        raw_cookie[COOKIE_DOMAIN] = Json::String(domain.to_string());
     }
 
     if let Some(secure) = cookie.secure() {
-        json[COOKIE_SECURE] = Json::Bool(secure);
+        raw_cookie[COOKIE_SECURE] = Json::Bool(secure);
     }
 
     if let Some(http_only) = cookie.http_only() {
-        json[COOKIE_HTTP_ONLY] = Json::Bool(http_only);
+        raw_cookie[COOKIE_HTTP_ONLY] = Json::Bool(http_only);
     }
 
-    if let Some(_expiry) = cookie.expires() {
-        todo!()
+    if let Some(expiry) = cookie.expires() {
+        let ts = expiry.unix_timestamp();
+        raw_cookie[COOKIE_EXPIRY] = Json::Number(ts.into());
     }
 
-    json
+    raw_cookie
 }
 
 /// [Cookies](https://www.w3.org/TR/webdriver2/#cookies)
@@ -92,8 +95,8 @@ impl Client {
 
         let raw_cookies = resp.as_array();
         if raw_cookies.is_none() {
-            let err =
-                error::CmdError::UnexpectedJson("expected a JSON array of cookie objects".to_string());
+            let msg = "expected a JSON array of cookie objects".to_string();
+            let err = error::CmdError::UnexpectedJson(msg);
             return Err(err);
         }
 
@@ -103,8 +106,8 @@ impl Client {
         for raw_cookie in raw_cookies {
             let raw_cookie = raw_cookie.as_object();
             if raw_cookie.is_none() {
-                let err =
-                    error::CmdError::UnexpectedJson("expected a JSON object for cookie".to_string());
+                let msg = "expected a JSON object for cookie".to_string();
+                let err = error::CmdError::UnexpectedJson(msg);
                 return Err(err);
             }
 
@@ -123,8 +126,8 @@ impl Client {
             .and_then(|raw_cookie| {
                 match raw_cookie.as_object() {
                     None => {
-                        let err =
-                            error::CmdError::UnexpectedJson("expected a JSON object".to_string());
+                        let msg = "expected a JSON object".to_string();
+                        let err = error::CmdError::UnexpectedJson(msg);
                         Err(err)
                     }
                     Some(v) => Ok(json_to_cookie(v)),
