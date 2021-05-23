@@ -5,6 +5,8 @@ use webdriver::command::WebDriverCommand;
 use crate::client::Client;
 use crate::error;
 
+type Cookie = cookie::Cookie<'static>;
+
 /// Key names for cookie fields used by WebDriver JSON.
 const COOKIE_NAME: &str = "name";
 const COOKIE_VALUE: &str = "value";
@@ -15,7 +17,7 @@ const COOKIE_HTTP_ONLY: &str = "httpOnly";
 const COOKIE_EXPIRY: &str = "expiry";
 
 /// Build a `cookie::Cookie` from raw JSON.
-fn json_to_cookie(raw_cookie: &serde_json::Map<String, Json>) -> cookie::Cookie<'static> {
+fn json_to_cookie(raw_cookie: &serde_json::Map<String, Json>) -> Cookie {
     // Required keys
     let name = raw_cookie.get(COOKIE_NAME).and_then(|v| v.as_str()).unwrap().to_string();
     let value = raw_cookie.get(COOKIE_VALUE).and_then(|v| v.as_str()).unwrap().to_string();
@@ -90,7 +92,7 @@ impl Client {
     ///
     /// See [16.1 Get All Cookies](https://www.w3.org/TR/webdriver2/#get-all-cookies) of the
     /// WebDriver standard.
-    pub async fn get_all_cookies(&mut self) -> Result<Vec<cookie::Cookie<'_>>, error::CmdError> {
+    pub async fn get_all_cookies(&mut self) -> Result<Vec<Cookie>, error::CmdError> {
         let resp = self.issue(WebDriverCommand::GetCookies).await?;
 
         let raw_cookies = resp.as_array();
@@ -121,7 +123,7 @@ impl Client {
     ///
     /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver2/#get-named-cookie) of the
     /// WebDriver standard.
-    pub async fn get_named_cookie(&mut self, name: &str) -> Result<cookie::Cookie<'_>, error::CmdError> {
+    pub async fn get_named_cookie(&mut self, name: &str) -> Result<Cookie, error::CmdError> {
         self.issue(WebDriverCommand::GetNamedCookie(name.to_string())).await
             .and_then(|raw_cookie| {
                 match raw_cookie.as_object() {
@@ -139,15 +141,19 @@ impl Client {
     ///
     /// See [16.4 Delete Cookie](https://www.w3.org/TR/webdriver2/#delete-cookie) of the
     /// WebDriver standard.
-    pub async fn delete_cookie(&mut self, name: &str) -> Result<Json, error::CmdError> {
-        self.issue(WebDriverCommand::DeleteCookie(name.to_string())).await
+    pub async fn delete_cookie(&mut self, name: &str) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::DeleteCookie(name.to_string()))
+            .await
+            .map(|_| ())
     }
 
     /// Delete all cookies from the current document.
     ///
     /// See [16.5 Delete All Cookies](https://www.w3.org/TR/webdriver2/#delete-all-cookies) of the
     /// WebDriver standard.
-    pub async fn delete_all_cookies(&mut self) -> Result<Json, error::CmdError> {
-        self.issue(WebDriverCommand::DeleteCookies).await
+    pub async fn delete_all_cookies(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::DeleteCookies)
+            .await
+            .map(|_| ())
     }
 }
