@@ -1,5 +1,5 @@
 //! Cookie-related functionality for WebDriver.
-use serde_json::Value as Json;
+use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use webdriver::command::WebDriverCommand;
 
@@ -9,83 +9,68 @@ use crate::error;
 /// Type alias for a `cookie::Cookie`
 pub type Cookie<'a> = cookie::Cookie<'a>;
 
-/// Key names for cookie fields used by WebDriver JSON.
-const COOKIE_NAME: &str = "name";
-const COOKIE_VALUE: &str = "value";
-const COOKIE_PATH: &str = "path";
-const COOKIE_DOMAIN: &str = "domain";
-const COOKIE_SECURE: &str = "secure";
-const COOKIE_HTTP_ONLY: &str = "httpOnly";
-const COOKIE_EXPIRY: &str = "expiry";
-
-/// Build a `cookie::Cookie` from raw JSON.
-fn json_to_cookie(raw_cookie: &serde_json::Map<String, Json>) -> Cookie<'static> {
-    // Required keys
-    let name = raw_cookie.get(COOKIE_NAME).and_then(|v| v.as_str()).unwrap().to_string();
-    let value = raw_cookie.get(COOKIE_VALUE).and_then(|v| v.as_str()).unwrap().to_string();
-
-    let mut cookie = cookie::Cookie::new(name, value);
-
-    // Optional keys
-    let path = raw_cookie.get(COOKIE_PATH).and_then(|v| v.as_str()).map(String::from);
-    let domain = raw_cookie.get(COOKIE_DOMAIN).and_then(|v| v.as_str()).map(String::from);
-    let secure = raw_cookie.get(COOKIE_SECURE).and_then(|v| v.as_bool());
-    let http_only = raw_cookie.get(COOKIE_HTTP_ONLY).and_then(|v| v.as_bool());
-    let expiry = raw_cookie.get(COOKIE_EXPIRY).and_then(|v| v.as_u64());
-
-    if let Some(path) = path {
-        cookie.set_path(path);
-    }
-
-    if let Some(domain) = domain {
-        cookie.set_domain(domain);
-    }
-
-    if let Some(secure) = secure {
-        cookie.set_secure(secure);
-    }
-
-    if let Some(http_only) = http_only {
-        cookie.set_http_only(http_only);
-    }
-
-    if let Some(expiry) = expiry {
-        let dt = OffsetDateTime::from_unix_timestamp(expiry as i64);
-        cookie.set_expires(dt);
-    }
-
-    cookie
+/// JSON representation of a cookie as [defined by WebDriver](https://www.w3.org/TR/webdriver1/#cookies).
+#[derive(Debug, Deserialize, Serialize)]
+struct JsonCookie {
+    name: String,
+    value: String,
+    path: Option<String>,
+    domain: Option<String>,
+    secure: Option<bool>,
+    #[serde(rename = "httpOnly")]
+    http_only: Option<bool>,
+    expiry: Option<u64>,
 }
 
-/// Serialize a `cookie::Cookie` to JSON.
-#[allow(unused)]
-fn cookie_to_json(cookie: &cookie::Cookie<'_>) -> Json {
-    let mut raw_cookie = serde_json::json!(
-        { COOKIE_NAME: cookie.name(), COOKIE_VALUE: cookie.value() }
-    );
+impl Into<Cookie<'static>> for JsonCookie {
+    fn into(self) -> Cookie<'static> {
+        let mut cookie = cookie::Cookie::new(self.name, self.value);
 
-    if let Some(path) = cookie.path() {
-        raw_cookie[COOKIE_PATH] = Json::String(path.to_string());
+        if let Some(path) = self.path {
+            cookie.set_path(path);
+        }
+
+        if let Some(domain) = self.domain {
+            cookie.set_domain(domain);
+        }
+
+        if let Some(secure) = self.secure {
+            cookie.set_secure(secure);
+        }
+
+        if let Some(http_only) = self.http_only {
+            cookie.set_http_only(http_only);
+        }
+
+        if let Some(expiry) = self.expiry {
+            let dt = OffsetDateTime::from_unix_timestamp(expiry as i64);
+            cookie.set_expires(dt);
+        }
+
+        cookie
     }
+}
 
-    if let Some(domain) = cookie.domain() {
-        raw_cookie[COOKIE_DOMAIN] = Json::String(domain.to_string());
+impl From<Cookie<'static>> for JsonCookie {
+    fn from(cookie: Cookie<'static>) -> Self {
+        let name = cookie.name().to_string();
+        let value = cookie.value().to_string();
+        let path = cookie.path().map(String::from);
+        let domain = cookie.domain().map(String::from);
+        let secure = cookie.secure();
+        let http_only = cookie.http_only();
+        let expiry = cookie.expires().map(|dt| dt.unix_timestamp() as u64);
+
+        Self {
+            name,
+            value,
+            path,
+            domain,
+            secure,
+            http_only,
+            expiry,
+        }
     }
-
-    if let Some(secure) = cookie.secure() {
-        raw_cookie[COOKIE_SECURE] = Json::Bool(secure);
-    }
-
-    if let Some(http_only) = cookie.http_only() {
-        raw_cookie[COOKIE_HTTP_ONLY] = Json::Bool(http_only);
-    }
-
-    if let Some(expiry) = cookie.expires() {
-        let ts = expiry.unix_timestamp();
-        raw_cookie[COOKIE_EXPIRY] = Json::Number(ts.into());
-    }
-
-    raw_cookie
 }
 
 /// [Cookies](https://www.w3.org/TR/webdriver1/#cookies)
@@ -97,26 +82,11 @@ impl Client {
     pub async fn get_all_cookies(&mut self) -> Result<Vec<Cookie<'static>>, error::CmdError> {
         let resp = self.issue(WebDriverCommand::GetCookies).await?;
 
-        let raw_cookies = resp.as_array();
-        if raw_cookies.is_none() {
-            let msg = "expected a JSON array of cookie objects".to_string();
-            let err = error::CmdError::UnexpectedJson(msg);
-            return Err(err);
-        }
-
-        let raw_cookies = raw_cookies.unwrap();
-        let mut cookies = Vec::new();
-
-        for raw_cookie in raw_cookies {
-            let raw_cookie = raw_cookie.as_object();
-            if raw_cookie.is_none() {
-                let msg = "expected a JSON object for cookie".to_string();
-                let err = error::CmdError::UnexpectedJson(msg);
-                return Err(err);
-            }
-
-            cookies.push(json_to_cookie(raw_cookie.unwrap()));
-        }
+        let json_cookies: Vec<JsonCookie> = serde_json::from_value(resp)?;
+        let cookies: Vec<Cookie<'static>> = json_cookies
+            .into_iter()
+            .map(|raw_cookie| raw_cookie.into())
+            .collect();
 
         Ok(cookies)
     }
@@ -126,17 +96,9 @@ impl Client {
     /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver1/#get-named-cookie) of the
     /// WebDriver standard.
     pub async fn get_named_cookie(&mut self, name: &str) -> Result<Cookie<'static>, error::CmdError> {
-        self.issue(WebDriverCommand::GetNamedCookie(name.to_string())).await
-            .and_then(|raw_cookie| {
-                match raw_cookie.as_object() {
-                    None => {
-                        let msg = "expected a JSON object".to_string();
-                        let err = error::CmdError::UnexpectedJson(msg);
-                        Err(err)
-                    }
-                    Some(v) => Ok(json_to_cookie(v)),
-                }
-            })
+        let resp = self.issue(WebDriverCommand::GetNamedCookie(name.to_string())).await?;
+        let json_cookie: JsonCookie = serde_json::from_value(resp)?;
+        Ok(json_cookie.into())
     }
 
     /// Delete a single cookie from the current document.
