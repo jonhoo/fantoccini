@@ -263,6 +263,16 @@ async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
     let cookies = c.get_all_cookies().await?;
     assert!(cookies.len() > 0);
 
+    let first_cookie = &cookies[0];
+    assert_eq!(
+        c.get_named_cookie(first_cookie.name()).await?.value(),
+        first_cookie.value()
+    );
+
+    // Delete a cookie and make sure it's gone
+    c.delete_cookie(first_cookie.name()).await?;
+    assert!(c.get_named_cookie(first_cookie.name()).await.is_err());
+
     c.delete_all_cookies().await?;
     let cookies = c.get_all_cookies().await?;
     assert!(cookies.len() == 0);
