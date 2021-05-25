@@ -256,6 +256,30 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
     c.close().await
 }
 
+// Verifies that basic cookie handling works
+async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
+    c.goto("https://google.com/").await?;
+
+    let cookies = c.get_all_cookies().await?;
+    assert!(cookies.len() > 0);
+
+    let first_cookie = &cookies[0];
+    assert_eq!(
+        c.get_named_cookie(first_cookie.name()).await?.value(),
+        first_cookie.value()
+    );
+
+    // Delete a cookie and make sure it's gone
+    c.delete_cookie(first_cookie.name()).await?;
+    assert!(c.get_named_cookie(first_cookie.name()).await.is_err());
+
+    c.delete_all_cookies().await?;
+    let cookies = c.get_all_cookies().await?;
+    assert!(cookies.len() == 0);
+
+    c.close().await
+}
+
 mod chrome {
     use super::*;
 
@@ -328,6 +352,12 @@ mod chrome {
     #[test]
     fn it_waits_for_navigation() {
         tester!(wait_for_navigation_test, "chrome");
+    }
+
+    #[serial]
+    #[test]
+    fn it_handles_cookies() {
+        tester!(handle_cookies_test, "chrome");
     }
 }
 
@@ -410,5 +440,11 @@ mod firefox {
     #[test]
     fn it_waits_for_navigation() {
         tester!(wait_for_navigation_test, "firefox");
+    }
+
+    #[serial]
+    #[test]
+    fn it_handles_cookies() {
+        tester!(handle_cookies_test, "firefox");
     }
 }

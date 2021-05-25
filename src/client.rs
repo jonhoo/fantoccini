@@ -156,7 +156,7 @@ impl Client {
         let base = self.current_url_().await?;
         let url = base.join(&url)?;
         self.issue(WebDriverCommand::Get(webdriver::command::GetParameters {
-            url: url.into_string(),
+            url: url.into(),
         }))
         .await?;
         Ok(())

@@ -295,3 +295,4 @@ mod client;
 pub use client::Client;
 
 pub mod elements;
+pub mod cookies;
