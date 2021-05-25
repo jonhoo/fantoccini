@@ -28,6 +28,17 @@ pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({
                 "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
+                "binary":
+                    if std::path::Path::new("/usr/bin/chromium-browser").exists() {
+                        // on Ubuntu, it's called chromium-browser
+                        "/usr/bin/chromium-browser"
+                    } else if std::path::Path::new("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome").exists() {
+                        // macOS
+                        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+                    } else {
+                        // elsewhere, it's just called chromium
+                        "/usr/bin/chromium"
+                    }
             });
             caps.insert("goog:chromeOptions".to_string(), opts.clone());
             caps
