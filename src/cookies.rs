@@ -6,12 +6,12 @@ use webdriver::command::WebDriverCommand;
 use crate::client::Client;
 use crate::error;
 
-/// Type alias for a `cookie::Cookie`
+/// Type alias for a [cookie::Cookie]
 pub type Cookie<'a> = cookie::Cookie<'a>;
 
-/// JSON representation of a cookie as [defined by WebDriver](https://www.w3.org/TR/webdriver1/#cookies).
+/// Representation of a cookie as [defined by WebDriver](https://www.w3.org/TR/webdriver1/#cookies).
 #[derive(Debug, Deserialize, Serialize)]
-struct JsonCookie {
+struct WebDriverCookie {
     name: String,
     value: String,
     path: Option<String>,
@@ -22,27 +22,27 @@ struct JsonCookie {
     expiry: Option<u64>,
 }
 
-impl Into<Cookie<'static>> for JsonCookie {
-    fn into(self) -> Cookie<'static> {
-        let mut cookie = cookie::Cookie::new(self.name, self.value);
+impl From<WebDriverCookie> for Cookie<'static> {
+    fn from(webdriver_cookie: WebDriverCookie) -> Self {
+        let mut cookie = cookie::Cookie::new(webdriver_cookie.name, webdriver_cookie.value);
 
-        if let Some(path) = self.path {
+        if let Some(path) = webdriver_cookie.path {
             cookie.set_path(path);
         }
 
-        if let Some(domain) = self.domain {
+        if let Some(domain) = webdriver_cookie.domain {
             cookie.set_domain(domain);
         }
 
-        if let Some(secure) = self.secure {
+        if let Some(secure) = webdriver_cookie.secure {
             cookie.set_secure(secure);
         }
 
-        if let Some(http_only) = self.http_only {
+        if let Some(http_only) = webdriver_cookie.http_only {
             cookie.set_http_only(http_only);
         }
 
-        if let Some(expiry) = self.expiry {
+        if let Some(expiry) = webdriver_cookie.expiry {
             let dt = OffsetDateTime::from_unix_timestamp(expiry as i64);
             cookie.set_expires(dt);
         }
@@ -51,8 +51,8 @@ impl Into<Cookie<'static>> for JsonCookie {
     }
 }
 
-impl From<Cookie<'static>> for JsonCookie {
-    fn from(cookie: Cookie<'static>) -> Self {
+impl<'a> From<Cookie<'a>> for WebDriverCookie {
+    fn from(cookie: Cookie<'a>) -> Self {
         let name = cookie.name().to_string();
         let value = cookie.value().to_string();
         let path = cookie.path().map(String::from);
@@ -82,8 +82,8 @@ impl Client {
     pub async fn get_all_cookies(&mut self) -> Result<Vec<Cookie<'static>>, error::CmdError> {
         let resp = self.issue(WebDriverCommand::GetCookies).await?;
 
-        let json_cookies: Vec<JsonCookie> = serde_json::from_value(resp)?;
-        let cookies: Vec<Cookie<'static>> = json_cookies
+        let webdriver_cookies: Vec<WebDriverCookie> = serde_json::from_value(resp)?;
+        let cookies: Vec<Cookie<'static>> = webdriver_cookies
             .into_iter()
             .map(|raw_cookie| raw_cookie.into())
             .collect();
@@ -97,8 +97,8 @@ impl Client {
     /// WebDriver standard.
     pub async fn get_named_cookie(&mut self, name: &str) -> Result<Cookie<'static>, error::CmdError> {
         let resp = self.issue(WebDriverCommand::GetNamedCookie(name.to_string())).await?;
-        let json_cookie: JsonCookie = serde_json::from_value(resp)?;
-        Ok(json_cookie.into())
+        let webdriver_cookie: WebDriverCookie = serde_json::from_value(resp)?;
+        Ok(webdriver_cookie.into())
     }
 
     /// Delete a single cookie from the current document.
