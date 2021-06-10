@@ -7,10 +7,11 @@ use webdriver::command::WebDriverCommand;
 use crate::error;
 use crate::Client;
 
-/// `UserPrompt` enumerates the different ways a `Client` can respond to a user prompt, or alert in
-/// the browser window.
+/// `PromptAction` enumerates the different actions a `Client` can take in response to a user prompt
+/// or alert in the browser window.
 #[derive(Debug, Clone)]
-pub enum UserPrompt {
+#[non_exhaustive]
+pub enum PromptAction {
     /// `Accept` is equivalent to a user clicking the `OK` button in the prompt.
     Accept,
     /// `Dismiss` is equivalent to a user clicking the `Cancel` or `OK` button in the prompt,
@@ -20,14 +21,17 @@ pub enum UserPrompt {
 
 impl Client {
     /// Sends a response to the user prompt. For the different values you can provide, see
-    /// [`UserPrompt`].
+    /// [`PromptAction`].
     ///
     /// See [18. User Prompts](https://www.w3.org/TR/webdriver1/#user-prompts) of the WebDriver
     /// standard.
-    pub async fn handle_user_prompt(&mut self, prompt: &UserPrompt) -> Result<(), error::CmdError> {
-        let cmd = match prompt {
-            UserPrompt::Accept => WebDriverCommand::AcceptAlert,
-            UserPrompt::Dismiss => WebDriverCommand::DismissAlert,
+    pub async fn handle_user_prompt(
+        &mut self,
+        action: &PromptAction,
+    ) -> Result<(), error::CmdError> {
+        let cmd = match action {
+            PromptAction::Accept => WebDriverCommand::AcceptAlert,
+            PromptAction::Dismiss => WebDriverCommand::DismissAlert,
         };
         self.issue(cmd).await?;
         Ok(())
