@@ -20,7 +20,7 @@ pub enum UserPrompt {
 
 impl Client {
     /// Sends a response to the user prompt. For the different values you can provide, see
-    /// [UserPrompt](/UserPrompt).
+    /// [`UserPrompt`].
     ///
     /// See [18. User Prompts](https://www.w3.org/TR/webdriver1/#user-prompts) of the WebDriver
     /// standard.
