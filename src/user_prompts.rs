@@ -13,7 +13,7 @@ use crate::Client;
 pub enum UserPrompt {
     /// `Accept` is equivalent to a user clicking the `OK` button in the prompt.
     Accept,
-    /// `Accept` is equivalent to a user clicking the `Cancel` or `OK` button in the prompt,
+    /// `Dismiss` is equivalent to a user clicking the `Cancel` or `OK` button in the prompt,
     /// whichever is present and appears first.
     Dismiss,
 }
