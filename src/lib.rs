@@ -294,5 +294,6 @@ impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
 mod client;
 pub use client::Client;
 
-pub mod elements;
 pub mod cookies;
+pub mod elements;
+pub mod user_prompts;

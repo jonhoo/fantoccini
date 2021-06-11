@@ -468,9 +468,7 @@ where
             | WebDriverCommand::AddCookie(_)
             | WebDriverCommand::DeleteCookies => base.join("cookie"),
             WebDriverCommand::GetNamedCookie(ref name)
-            | WebDriverCommand::DeleteCookie(ref name) => {
-                base.join(&format!("cookie/{}", name))
-            }
+            | WebDriverCommand::DeleteCookie(ref name) => base.join(&format!("cookie/{}", name)),
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
@@ -508,6 +506,8 @@ where
             WebDriverCommand::SwitchToWindow(..) => base.join("window"),
             WebDriverCommand::CloseWindow => base.join("window"),
             WebDriverCommand::GetActiveElement => base.join("element/active"),
+            WebDriverCommand::DismissAlert => base.join("alert/dismiss"),
+            WebDriverCommand::AcceptAlert => base.join("alert/accept"),
             _ => unimplemented!(),
         }
     }
@@ -577,8 +577,7 @@ where
                 body = Some(serde_json::to_string(loc).unwrap());
                 method = Method::POST;
             }
-            WebDriverCommand::DeleteCookie(_)
-            | WebDriverCommand::DeleteCookies => {
+            WebDriverCommand::DeleteCookie(_) | WebDriverCommand::DeleteCookies => {
                 method = Method::DELETE;
             }
             WebDriverCommand::ExecuteScript(ref script) => {
@@ -622,6 +621,10 @@ where
             }
             WebDriverCommand::CloseWindow => {
                 method = Method::DELETE;
+            }
+            WebDriverCommand::AcceptAlert | WebDriverCommand::DismissAlert => {
+                body = Some("{}".to_string());
+                method = Method::POST;
             }
             _ => {}
         }
