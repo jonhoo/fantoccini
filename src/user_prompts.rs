@@ -12,10 +12,10 @@ use crate::Client;
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum PromptAction {
-    /// `Accept` is equivalent to a user clicking the `OK` button in the prompt.
+    /// `Accept` is equivalent to a user clicking the _OK_ button in the prompt.
     Accept,
-    /// `Dismiss` is equivalent to a user clicking the `Cancel` or `OK` button in the prompt,
-    /// whichever is present and appears first.
+    /// `Dismiss` is equivalent to a user clicking the _Cancel_ or _OK_ button in the prompt,
+    /// whichever is present on the prompt, in that order.
     Dismiss,
 }
 
