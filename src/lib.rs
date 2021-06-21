@@ -296,3 +296,6 @@ pub use client::Client;
 
 pub mod elements;
 pub mod cookies;
+
+/// Allow to wait for things
+pub mod wait;
