@@ -1,5 +1,6 @@
 use crate::elements::{Element, Form};
 use crate::session::{Cmd, Session, Task};
+use crate::wait::Wait;
 use crate::{error, Locator};
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
@@ -814,6 +815,14 @@ impl Client {
             Ok(Err(e)) => Err(e.into()),
             Err(e) => unreachable!("Session ended prematurely: {:?}", e),
         }
+    }
+}
+
+/// Allow to wait for conditions.
+impl Client {
+    /// Start a new wait
+    pub fn wait(&mut self) -> Wait<'_> {
+        Wait::new(self)
     }
 }
 

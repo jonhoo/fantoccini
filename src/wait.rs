@@ -102,18 +102,6 @@ impl<'c> Wait<'c> {
     }
 }
 
-/// Allow creating a wait operation.
-pub trait CanWait {
-    /// Create a new wait operation.
-    fn wait(&mut self) -> Wait<'_>;
-}
-
-impl CanWait for Client {
-    fn wait(&mut self) -> Wait<'_> {
-        Wait::new(self)
-    }
-}
-
 /// An error that can occur when waiting.
 #[derive(Debug)]
 pub enum WaitError {
