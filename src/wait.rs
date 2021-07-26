@@ -30,7 +30,7 @@ impl<'c> Wait<'c> {
     }
 
     /// Set the timeout until the operation should wait.
-    pub fn until(mut self, timeout: Duration) -> Self {
+    pub fn at_most(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
