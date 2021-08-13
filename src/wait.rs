@@ -18,17 +18,22 @@
 //! Once configured, you can start waiting on some condition by using the [`Wait::on`] method. It
 //! accepts any type implementing the [`WaitCondition`] trait. For example:
 //!
-//! ```
-//! # use fantoccini::Locator;
+//! ```no_run
+//! # use fantoccini::{ClientBuilder, Locator};
 //! # #[tokio::main]
-//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let mut client = ClientBuilder::native()
-//!     .connect("http://localhost:4444")
-//!     .await?;
-//!
+//! # async fn main() -> Result<(), fantoccini::error::CmdError> {
+//! # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
+//! # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # #[cfg(feature = "rustls-tls")]
+//! # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
+//! # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+//! // -- snip wrapper code --
 //! let button = client.wait().on(Locator::Css(
 //!     r#"a.button-download[href="/learn/get-started"]"#,
 //! )).await?;
+//! // -- snip wrapper code --
+//! # client.close().await
 //! # }
 //! ```
 //!
@@ -73,14 +78,22 @@ impl<'c> Wait<'c> {
     /// This only starts the process of building a new wait operation. Waiting, and checking, will
     /// only begin once one of the `on_*` methods has been called.
     ///
-    /// ```
-    /// # use fantoccini::Locator;
+    /// ```no_run
+    /// # use fantoccini::{ClientBuilder, Locator};
     /// # #[tokio::main]
-    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let mut client = ClientBuilder::native().connect("http://localhost:4444").await?;
+    /// # async fn main() -> Result<(), fantoccini::error::CmdError> {
+    /// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
+    /// # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # #[cfg(feature = "rustls-tls")]
+    /// # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
+    /// # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+    /// // -- snip wrapper code --
     /// let button = client.wait().on(Locator::Css(
     ///     r#"a.button-download[href="/learn/get-started"]"#,
     /// )).await?;
+    /// // -- snip wrapper code --
+    /// # client.close().await
     /// # }
     /// ```
     pub fn new(client: &'c mut Client) -> Self {
@@ -173,7 +186,7 @@ impl<'a> WaitCondition<'a, Element> for Locator<'_> {
         &'a mut self,
         client: &'a mut Client,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Element>, CmdError>> + 'a + Send>> {
-        let locator: webdriver::command::LocatorParameters = self.clone().into();
+        let locator: webdriver::command::LocatorParameters = (*self).into();
         Box::pin(async move {
             match client.by(locator).await {
                 Ok(element) => Ok(Some(element)),
