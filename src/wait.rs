@@ -1,8 +1,56 @@
+//! Sometimes it is necessary to wait for a browser to achieve a certain state. For example,
+//! navigating to a page may be take bit of time. And the time may vary between different
+//! environments and test runs. Static delays can work around this issue, but also prolong the
+//! test runs unnecessarily. Longer delays have less flaky tests, but even more unnecessary wait
+//! time.
+//!
+//! To wait as optimal as possible, you can use asynchronous wait operations, which periodically
+//! check for the expected state, re-try if necessary, but also fail after a certain time and still
+//! allow you to fail the test. Allow for longer grace periods, and only spending the time waiting
+//! when necessary.
+//!
+//! # Basic usage
+//!
+//! By default all wait operations will time-out after 30 seconds and will re-check every
+//! 250 milliseconds. You can configure this using the [`Wait::at_most`] and [`Wait::every`]
+//! methods.
+//!
+//! Once configured, you can start waiting on some condition by using the [`Wait::on`] method. It
+//! accepts any type implementing the [`WaitCondition`] trait. For example:
+//!
+//! ```
+//! # use fantoccini::Locator;
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut client = ClientBuilder::native()
+//!     .connect("http://localhost:4444")
+//!     .await?;
+//!
+//! let button = client.wait().on(Locator::Css(
+//!     r#"a.button-download[href="/learn/get-started"]"#,
+//! )).await?;
+//! # }
+//! ```
+//!
+//! # Error handling
+//!
+//! When a wait operation times out, it will return a [`CmdError::WaitTimeout`]. When a wait
+//! condition check returns an error, the wait operation will be aborted, and the error returned.
+//!
+//! # Custom conditions
+//!
+//! You can implement custom conditions either by implementing the [`WaitCondition`] trait or by
+//! using closures. Due to lifetime and async trait difficulties, two newtypes and two dedicated
+//! functions exists to simplify the usage of closures. Also see: [`Closure`], [`Predicate`].
+//!
+//! # Waiting indefinitely
+//!
+//! Previous `wait_*` functions on the client waited indefinitely. While this may case some
+//! problems, you can still get this behavior be calling the [`Wait::forver`] method.
+use crate::error::CmdError;
 use crate::{elements::Element, error, Client, Locator};
-use core::fmt;
 use futures_util::TryFutureExt;
 use std::{
-    error::Error,
     future::Future,
     pin::Pin,
     time::{Duration, Instant},
@@ -21,6 +69,20 @@ pub struct Wait<'c> {
 
 impl<'c> Wait<'c> {
     /// Create a new wait operation from a client.
+    ///
+    /// This only starts the process of building a new wait operation. Waiting, and checking, will
+    /// only begin once one of the `on_*` methods has been called.
+    ///
+    /// ```
+    /// # use fantoccini::Locator;
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// # let mut client = ClientBuilder::native().connect("http://localhost:4444").await?;
+    /// let button = client.wait().on(Locator::Css(
+    ///     r#"a.button-download[href="/learn/get-started"]"#,
+    /// )).await?;
+    /// # }
+    /// ```
     pub fn new(client: &'c mut Client) -> Self {
         Self {
             client,
@@ -48,20 +110,31 @@ impl<'c> Wait<'c> {
     }
 
     /// Wait until a condition exists or a timeout is hit.
-    pub async fn on<T, F>(self, mut f: F) -> Result<T, WaitError>
+    pub async fn on_condition<T, F>(self, f: F) -> Result<T, error::CmdError>
     where
         F: for<'f> FnMut(
             &'f mut Client,
-        )
-            -> Pin<Box<dyn Future<Output = Result<Option<T>, error::CmdError>> + 'f>>,
+        ) -> Pin<
+            Box<dyn Future<Output = Result<Option<T>, error::CmdError>> + 'f + Send>,
+        >,
+    {
+        self.on(Condition(f)).await
+    }
+
+    /// Wait until a condition exists or a timeout is hit.
+    pub async fn on<C, T>(self, mut condition: C) -> Result<T, error::CmdError>
+    where
+        C: for<'a> WaitCondition<'a, T>,
     {
         let start = Instant::now();
         loop {
             match self.timeout {
-                Some(timeout) if start.elapsed() > timeout => break Err(WaitError::Timeout),
+                Some(timeout) if start.elapsed() > timeout => {
+                    break Err(error::CmdError::WaitTimeout)
+                }
                 _ => {}
             }
-            match f(self.client).await? {
+            match condition.ready(self.client).await? {
                 Some(result) => break Ok(result),
                 None => {
                     tokio::time::sleep(self.period).await;
@@ -70,74 +143,133 @@ impl<'c> Wait<'c> {
         }
     }
 
-    /// Wait for an element.
-    pub async fn on_element(self, locator: Locator<'static>) -> Result<Element, WaitError> {
-        self.on(move |client| {
-            Box::pin(async move {
-                match client.find(locator).await {
-                    Ok(element) => Ok(Some(element)),
-                    Err(error::CmdError::NoSuchElement(_)) => Ok(None),
-                    Err(err) => Err(err),
-                }
-            })
-        })
-        .await
-    }
-
     /// Wait for a predicate.
-    pub async fn on_predicate<F>(self, mut predicate: F) -> Result<(), WaitError>
+    pub async fn on_predicate<F>(self, predicate: F) -> Result<(), error::CmdError>
     where
         F: for<'f> FnMut(
             &'f mut Client,
-        )
-            -> Pin<Box<dyn Future<Output = Result<bool, error::CmdError>> + 'f>>,
+        ) -> Pin<
+            Box<dyn Future<Output = Result<bool, error::CmdError>> + 'f + Send>,
+        >,
     {
-        self.on(|client| {
-            Box::pin(predicate(client).map_ok(|result| match result {
+        self.on(Predicate(predicate)).await
+    }
+}
+
+/// A condition to wait for.
+///
+/// This is implemented by different types directly, like [`Locator`]. But you can also use
+/// custom logic, using the [`Condition`] and [`Predicate`] newtypes.
+pub trait WaitCondition<'a, T> {
+    /// Check if the condition is ready. If it is, return `Some(...)`, otherwise return `None`.
+    fn ready(
+        &'a mut self,
+        client: &'a mut Client,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<T>, error::CmdError>> + 'a + Send>>;
+}
+
+impl<'a> WaitCondition<'a, Element> for Locator<'_> {
+    fn ready(
+        &'a mut self,
+        client: &'a mut Client,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<Element>, CmdError>> + 'a + Send>> {
+        let locator: webdriver::command::LocatorParameters = self.clone().into();
+        Box::pin(async move {
+            match client.by(locator).await {
+                Ok(element) => Ok(Some(element)),
+                Err(error::CmdError::NoSuchElement(_)) => Ok(None),
+                Err(err) => Err(err),
+            }
+        })
+    }
+}
+
+impl<'a> WaitCondition<'a, ()> for url::Url {
+    fn ready(
+        &'a mut self,
+        client: &'a mut Client,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<()>, CmdError>> + 'a + Send>> {
+        Box::pin(async move {
+            Ok(match &client.current_url().await? == self {
                 true => Some(()),
                 false => None,
-            }))
+            })
         })
-        .await
     }
 }
 
-/// An error that can occur when waiting.
+impl<'a, F, Fut, T> WaitCondition<'a, T> for F
+where
+    F: FnMut(&'a mut Client) -> Pin<Box<Fut>>,
+    Fut: Future<Output = Result<Option<T>, error::CmdError>> + 'a + Send,
+{
+    fn ready(
+        &'a mut self,
+        client: &'a mut Client,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<T>, CmdError>> + 'a + Send>> {
+        self(client)
+    }
+}
+
+/// Newtype for condition functions.
+///
+/// A condition is successful once it returns some value. It will be re-tried as long as it
+/// returns [`None`].
+///
+/// Instead of using the newtype, you can also use the [`Wait::on_condition`] method.
 #[derive(Debug)]
-pub enum WaitError {
-    /// The wait operation timed out
-    Timeout,
-    /// The client reported an error
-    Client(error::CmdError),
-}
+pub struct Condition<F, T>(pub F)
+where
+    F: for<'a> FnMut(
+        &'a mut Client,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<Option<T>, error::CmdError>> + 'a + Send>,
+    >;
 
-impl Error for WaitError {
-    fn description(&self) -> &str {
-        match self {
-            Self::Timeout => "timeout waiting on condition",
-            Self::Client(..) => "webdriver returned error",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        match self {
-            Self::Timeout => None,
-            Self::Client(err) => Some(err),
-        }
-    }
-}
-
-impl fmt::Display for WaitError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Timeout => write!(f, "Timeout"),
-            Self::Client(cmd) => write!(f, "Client error: {}", cmd),
-        }
+impl<'a, F, T> WaitCondition<'a, T> for Condition<F, T>
+where
+    F: for<'f> FnMut(
+        &'f mut Client,
+    ) -> Pin<
+        Box<dyn Future<Output = Result<Option<T>, error::CmdError>> + 'f + Send>,
+    >,
+{
+    fn ready(
+        &'a mut self,
+        client: &'a mut Client,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<T>, CmdError>> + 'a + Send>> {
+        self.0(client)
     }
 }
 
-impl From<error::CmdError> for WaitError {
-    fn from(err: error::CmdError) -> Self {
-        Self::Client(err)
+/// Newtype for predicate functions.
+///
+/// A condition is successful once it returns `true`. It will be re-tried as long as it
+/// returns `false`.
+///
+/// Instead of using the newtype, you can also use the [`Wait::on_predicate`] method.
+#[derive(Debug)]
+pub struct Predicate<F>(pub F)
+where
+    F: for<'a> FnMut(
+        &'a mut Client,
+    )
+        -> Pin<Box<dyn Future<Output = Result<bool, error::CmdError>> + 'a + Send>>;
+
+impl<'a, F> WaitCondition<'a, ()> for Predicate<F>
+where
+    F: for<'f> FnMut(
+        &'f mut Client,
+    )
+        -> Pin<Box<dyn Future<Output = Result<bool, error::CmdError>> + 'f + Send>>,
+{
+    fn ready(
+        &'a mut self,
+        client: &'a mut Client,
+    ) -> Pin<Box<dyn Future<Output = Result<Option<()>, CmdError>> + 'a + Send>> {
+        Box::pin(self.0(client).map_ok(|result| match result {
+            true => Some(()),
+            false => None,
+        }))
     }
 }

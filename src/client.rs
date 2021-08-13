@@ -647,6 +647,10 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
+    #[deprecated(
+        since = "0.17.5",
+        note = "This method might block forever. Please use client.wait().on(...) instead. You can still wait forever using: client.wait().forever().on(...)"
+    )]
     pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
     where
         F: FnMut(&mut Client) -> FF,
@@ -662,19 +666,16 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
+    #[deprecated(
+        since = "0.17.5",
+        note = "This method might block forever. Please use client.wait().on(locator) instead. You can still wait forever using: client.wait().forever().on(locator)"
+    )]
     pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        let s: webdriver::command::LocatorParameters = search.into();
         loop {
-            match self
-                .by(webdriver::command::LocatorParameters {
-                    using: s.using,
-                    value: s.value.clone(),
-                })
-                .await
-            {
-                Ok(v) => break Ok(v),
-                Err(error::CmdError::NoSuchElement(_)) => {}
-                Err(e) => break Err(e),
+            match self.wait().forever().on(search).await {
+                Ok(ele) => break Ok(ele),
+                Err(error::CmdError::WaitTimeout) => continue,
+                Err(err) => break Err(err),
             }
         }
     }
@@ -684,6 +685,10 @@ impl Client {
     /// If the `current` URL is not provided, `self.current_url()` will be used. Note however that
     /// this introduces a race condition: the browser could finish navigating *before* we call
     /// `current_url()`, which would lead to an eternal wait.
+    #[deprecated(
+        since = "0.17.5",
+        note = "This method might block forever and has a chance of randomly blocking. Please use client.wait().on(url) instead, to check if you navigated successfully to the new URL."
+    )]
     pub async fn wait_for_navigation(
         &mut self,
         current: Option<url::Url>,
@@ -693,6 +698,7 @@ impl Client {
             None => self.current_url_().await?,
         };
 
+        #[allow(deprecated)]
         self.wait_for(move |c| {
             // TODO: get rid of this clone
             let current = current.clone();
@@ -828,7 +834,7 @@ impl Client {
 
 /// Helper methods
 impl Client {
-    async fn by(
+    pub(crate) async fn by(
         &mut self,
         locator: webdriver::command::LocatorParameters,
     ) -> Result<Element, error::CmdError> {

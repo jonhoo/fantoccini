@@ -120,6 +120,9 @@ pub enum CmdError {
 
     /// Could not decode a base64 image
     ImageDecodeError(::base64::DecodeError),
+
+    /// Timeout of a wait condition
+    WaitTimeout,
 }
 
 impl CmdError {
@@ -154,6 +157,7 @@ impl Error for CmdError {
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
             CmdError::ImageDecodeError(..) => "error decoding image",
+            CmdError::WaitTimeout => "timeout waiting on condition",
         }
     }
 
@@ -169,7 +173,8 @@ impl Error for CmdError {
             CmdError::ImageDecodeError(ref e) => Some(e),
             CmdError::NotJson(_)
             | CmdError::NotW3C(_)
-            | CmdError::InvalidArgument(..) => None,
+            | CmdError::InvalidArgument(..)
+            | CmdError::WaitTimeout => None,
         }
     }
 }
@@ -192,6 +197,7 @@ impl fmt::Display for CmdError {
             CmdError::InvalidArgument(ref arg, ref msg) => {
                 write!(f, "Invalid argument `{}`: {}", arg, msg)
             }
+            CmdError::WaitTimeout => Ok(()),
         }
     }
 }

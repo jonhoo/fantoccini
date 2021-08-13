@@ -39,7 +39,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Click the "Get Started" button.
     let button = client
         .wait()
-        .on_element(Locator::Css(
+        .on(Locator::Css(
             r#"a.button-download[href="/learn/get-started"]"#,
         ))
         .await?;
@@ -47,21 +47,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Click the "Try Rust Without Installing" button (using XPath this time).
     let button = r#"//a[@class="button button-secondary" and @href="https://play.rust-lang.org/"]"#;
-    let button = client.wait().on_element(Locator::XPath(button)).await?;
+    let button = client.wait().on(Locator::XPath(button)).await?;
     button.click().await?;
 
     // Find the big textarea.
-    let mut code_area = client
-        .wait()
-        .on_element(Locator::Css(".ace_text-input"))
-        .await?;
+    let mut code_area = client.wait().on(Locator::Css(".ace_text-input")).await?;
 
     // And write in some code.
     code_area.send_keys("// Hello from Fantoccini\n").await?;
 
     // Now, let's run it!
     let button = r#"//div[@class="segmented-button"]/button[1]"#;
-    let button = client.wait().on_element(Locator::XPath(button)).await?;
+    let button = client.wait().on(Locator::XPath(button)).await?;
     button.click().await?;
 
     // Let the user marvel at what we achieved.
