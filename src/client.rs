@@ -671,13 +671,7 @@ impl Client {
         note = "This method might block forever. Please use client.wait().on(locator) instead. You can still wait forever using: client.wait().forever().on(locator)"
     )]
     pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        loop {
-            match self.wait().forever().on(search).await {
-                Ok(ele) => break Ok(ele),
-                Err(error::CmdError::WaitTimeout) => continue,
-                Err(err) => break Err(err),
-            }
-        }
+        self.wait().forever().on(search).await
     }
 
     /// Wait for the page to navigate to a new URL before proceeding.
