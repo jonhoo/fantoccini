@@ -119,7 +119,7 @@ impl<'c> Wait<'c> {
     }
 
     /// Wait until a condition exists or a timeout is hit.
-    pub async fn on_condition<T, F>(self, f: F) -> Result<T, error::CmdError>
+    pub async fn until_some<T, F>(self, f: F) -> Result<T, error::CmdError>
     where
         F: for<'f> FnMut(
             &'f mut Client,
