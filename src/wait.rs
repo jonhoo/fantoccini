@@ -13,7 +13,7 @@
 //!
 //! By default all wait operations will time-out after 30 seconds and will re-check every
 //! 250 milliseconds. You can configure this using the [`Wait::at_most`] and [`Wait::every`]
-//! methods.
+//! methods or use [`Wait::forver`] to wait indefinitely.
 //!
 //! Once configured, you can start waiting on some condition by using the [`Wait::on`] method. It
 //! accepts any type implementing the [`WaitCondition`] trait. For example:
@@ -47,11 +47,7 @@
 //! You can implement custom conditions either by implementing the [`WaitCondition`] trait or by
 //! using closures. Due to lifetime and async trait difficulties, two newtypes and two dedicated
 //! functions exists to simplify the usage of closures. Also see: [`Closure`], [`Predicate`].
-//!
-//! # Waiting indefinitely
-//!
-//! Previous `wait_*` functions on the client waited indefinitely. While this may case some
-//! problems, you can still get this behavior be calling the [`Wait::forver`] method.
+
 use crate::error::CmdError;
 use crate::{elements::Element, error, Client, Locator};
 use futures_util::TryFutureExt;

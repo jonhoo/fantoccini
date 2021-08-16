@@ -121,7 +121,11 @@ pub enum CmdError {
     /// Could not decode a base64 image
     ImageDecodeError(::base64::DecodeError),
 
-    /// Timeout of a wait condition
+    /// Timeout of a wait condition.
+    ///
+    /// When waiting for a for a condition using [`Client::wait`], any of the consuming methods,
+    /// waiting on some condition, may return this error, indicating that the timeout waiting
+    /// for the condition occurred.
     WaitTimeout,
 }
 

@@ -820,7 +820,29 @@ impl Client {
 
 /// Allow to wait for conditions.
 impl Client {
-    /// Start a new wait
+    /// Starting building a new wait operation. This can be used to wait for a certain condition, by
+    /// periodically checking the state and optionally returning a value:
+    ///
+    /// ```no_run
+    /// # use fantoccini::{ClientBuilder, Locator};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), fantoccini::error::CmdError> {
+    /// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
+    /// # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # #[cfg(feature = "rustls-tls")]
+    /// # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
+    /// # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+    /// // -- snip wrapper code --
+    /// let button = client.wait().on(Locator::Css(
+    ///     r#"a.button-download[href="/learn/get-started"]"#,
+    /// )).await?;
+    /// // -- snip wrapper code --
+    /// # client.close().await
+    /// # }
+    /// ```
+    ///
+    /// Also see: [`crate::wait`].
     pub fn wait(&mut self) -> Wait<'_> {
         Wait::new(self)
     }
