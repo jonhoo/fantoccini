@@ -45,8 +45,7 @@
 //! # Custom conditions
 //!
 //! You can implement custom conditions either by implementing the [`WaitCondition`] trait or by
-//! using closures. Due to lifetime and async trait difficulties, two newtypes and two dedicated
-//! functions exists to simplify the usage of closures. Also see: [`Closure`], [`Predicate`].
+//! using closures. If you just want a closure, use [`Wait::until`] and [`Wait::until_some`].
 
 use crate::error::CmdError;
 use crate::{elements::Element, error, Client, Locator};
