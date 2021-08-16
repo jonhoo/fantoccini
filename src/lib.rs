@@ -297,5 +297,5 @@ pub use client::Client;
 pub mod cookies;
 pub mod elements;
 
-/// Allow to wait for things
+/// Allow to wait for conditions.
 pub mod wait;

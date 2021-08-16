@@ -13,6 +13,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Go to the Rust website.
     client.goto("https://www.rust-lang.org/").await?;
 
+    // The explicit return types in following code is just to illustrate the type returned.
+    // You can omit them in your code.
+
     // You can wait on anything that implements `WaitCondition`
 
     // Wait for a URL
@@ -56,7 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Wait for a condition, using a dedicated method to avoid using the newtype.
     let _: String = client
         .wait()
-        .on_condition(|client| Box::pin(async move { Ok(client.get_ua().await?) }))
+        .until_some(|client| Box::pin(async move { Ok(client.get_ua().await?) }))
         .await?;
 
     // Instead of a condition, returning a value, you can also wait for a boolean outcome.
@@ -72,7 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Wait for a predicate (true or false), using a dedicated method.
     let _: () = client
         .wait()
-        .on_predicate(|client| Box::pin(async move { Ok(client.source().await?.contains("Rust")) }))
+        .until(|client| Box::pin(async move { Ok(client.source().await?.contains("Rust")) }))
         .await?;
 
     // Then close the browser window.

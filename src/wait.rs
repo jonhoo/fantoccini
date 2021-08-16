@@ -72,7 +72,7 @@ impl<'c> Wait<'c> {
     /// Create a new wait operation from a client.
     ///
     /// This only starts the process of building a new wait operation. Waiting, and checking, will
-    /// only begin once one of the `on_*` methods has been called.
+    /// only begin once one of the consuming methods has been called.
     ///
     /// ```no_run
     /// # use fantoccini::{ClientBuilder, Locator};
@@ -153,7 +153,7 @@ impl<'c> Wait<'c> {
     }
 
     /// Wait for a predicate.
-    pub async fn on_predicate<F>(self, predicate: F) -> Result<(), error::CmdError>
+    pub async fn until<F>(self, predicate: F) -> Result<(), error::CmdError>
     where
         F: for<'f> FnMut(
             &'f mut Client,
