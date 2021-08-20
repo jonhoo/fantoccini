@@ -132,7 +132,7 @@ impl<'c> Wait<'c> {
     /// Wait until a condition exists or a timeout is hit.
     pub async fn on<C, T>(self, mut condition: C) -> Result<T, error::CmdError>
     where
-        C: for<'a> WaitCondition<'a, T>,
+        C: WaitCondition<T>,
     {
         let start = Instant::now();
         loop {
@@ -168,16 +168,16 @@ impl<'c> Wait<'c> {
 ///
 /// This is implemented by different types directly, like [`Locator`]. But you can also use
 /// custom logic, using the [`Condition`] and [`Predicate`] newtypes.
-pub trait WaitCondition<'a, T> {
+pub trait WaitCondition<T> {
     /// Check if the condition is ready. If it is, return `Some(...)`, otherwise return `None`.
-    fn ready(
+    fn ready<'a>(
         &'a mut self,
         client: &'a mut Client,
     ) -> Pin<Box<dyn Future<Output = Result<Option<T>, error::CmdError>> + 'a + Send>>;
 }
 
-impl<'a> WaitCondition<'a, Element> for Locator<'_> {
-    fn ready(
+impl WaitCondition<Element> for Locator<'_> {
+    fn ready<'a>(
         &'a mut self,
         client: &'a mut Client,
     ) -> Pin<Box<dyn Future<Output = Result<Option<Element>, CmdError>> + 'a + Send>> {
@@ -192,8 +192,8 @@ impl<'a> WaitCondition<'a, Element> for Locator<'_> {
     }
 }
 
-impl<'a> WaitCondition<'a, ()> for url::Url {
-    fn ready(
+impl WaitCondition<()> for url::Url {
+    fn ready<'a>(
         &'a mut self,
         client: &'a mut Client,
     ) -> Pin<Box<dyn Future<Output = Result<Option<()>, CmdError>> + 'a + Send>> {
@@ -203,19 +203,6 @@ impl<'a> WaitCondition<'a, ()> for url::Url {
                 false => None,
             })
         })
-    }
-}
-
-impl<'a, F, Fut, T> WaitCondition<'a, T> for F
-where
-    F: FnMut(&'a mut Client) -> Pin<Box<Fut>>,
-    Fut: Future<Output = Result<Option<T>, error::CmdError>> + 'a + Send,
-{
-    fn ready(
-        &'a mut self,
-        client: &'a mut Client,
-    ) -> Pin<Box<dyn Future<Output = Result<Option<T>, CmdError>> + 'a + Send>> {
-        self(client)
     }
 }
 
@@ -234,7 +221,7 @@ where
         Box<dyn Future<Output = Result<Option<T>, error::CmdError>> + 'a + Send>,
     >;
 
-impl<'a, F, T> WaitCondition<'a, T> for Condition<F, T>
+impl<F, T> WaitCondition<T> for Condition<F, T>
 where
     F: for<'f> FnMut(
         &'f mut Client,
@@ -242,7 +229,7 @@ where
         Box<dyn Future<Output = Result<Option<T>, error::CmdError>> + 'f + Send>,
     >,
 {
-    fn ready(
+    fn ready<'a>(
         &'a mut self,
         client: &'a mut Client,
     ) -> Pin<Box<dyn Future<Output = Result<Option<T>, CmdError>> + 'a + Send>> {
@@ -264,14 +251,14 @@ where
     )
         -> Pin<Box<dyn Future<Output = Result<bool, error::CmdError>> + 'a + Send>>;
 
-impl<'a, F> WaitCondition<'a, ()> for Predicate<F>
+impl<F> WaitCondition<()> for Predicate<F>
 where
     F: for<'f> FnMut(
         &'f mut Client,
     )
         -> Pin<Box<dyn Future<Output = Result<bool, error::CmdError>> + 'f + Send>>,
 {
-    fn ready(
+    fn ready<'a>(
         &'a mut self,
         client: &'a mut Client,
     ) -> Pin<Box<dyn Future<Output = Result<Option<()>, CmdError>> + 'a + Send>> {
