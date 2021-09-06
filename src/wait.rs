@@ -1,3 +1,5 @@
+//! Allow to wait for conditions.
+//!
 //! Sometimes it is necessary to wait for a browser to achieve a certain state. For example,
 //! navigating to a page may be take bit of time. And the time may vary between different
 //! environments and test runs. Static delays can work around this issue, but also prolong the
@@ -13,7 +15,7 @@
 //!
 //! By default all wait operations will time-out after 30 seconds and will re-check every
 //! 250 milliseconds. You can configure this using the [`Wait::at_most`] and [`Wait::every`]
-//! methods or use [`Wait::forver`] to wait indefinitely.
+//! methods or use [`Wait::forever`] to wait indefinitely.
 //!
 //! Once configured, you can start waiting on some condition by using the `Wait::for_*` methods.
 //! For example:
