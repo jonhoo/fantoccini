@@ -69,7 +69,7 @@ async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::Cmd
     c.goto("https://www.wikipedia.org/").await?;
 
     // find search input element
-    let mut e = c.wait_for_find(Locator::Id("searchInput")).await?;
+    let mut e = c.wait().on(Locator::Id("searchInput")).await?;
     e.send_keys("foobar").await?;
     assert_eq!(
         e.prop("value")
@@ -222,6 +222,7 @@ async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
 }
 
 async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
+    #[allow(deprecated)]
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
         async move { Ok(true) }
@@ -241,6 +242,7 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
 
     c.goto(url.as_str()).await?;
 
+    #[allow(deprecated)]
     loop {
         let wait_for = c.wait_for_navigation(Some(url)).await;
         assert!(wait_for.is_ok());

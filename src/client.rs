@@ -1,5 +1,6 @@
 use crate::elements::{Element, Form};
 use crate::session::{Cmd, Session, Task};
+use crate::wait::Wait;
 use crate::{error, Locator};
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
@@ -646,6 +647,10 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
+    #[deprecated(
+        since = "0.17.5",
+        note = "This method might block forever. Please use client.wait().on(...) instead. You can still wait forever using: client.wait().forever().on(...)"
+    )]
     pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
     where
         F: FnMut(&mut Client) -> FF,
@@ -661,21 +666,12 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
+    #[deprecated(
+        since = "0.17.5",
+        note = "This method might block forever. Please use client.wait().on(locator) instead. You can still wait forever using: client.wait().forever().on(locator)"
+    )]
     pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        let s: webdriver::command::LocatorParameters = search.into();
-        loop {
-            match self
-                .by(webdriver::command::LocatorParameters {
-                    using: s.using,
-                    value: s.value.clone(),
-                })
-                .await
-            {
-                Ok(v) => break Ok(v),
-                Err(error::CmdError::NoSuchElement(_)) => {}
-                Err(e) => break Err(e),
-            }
-        }
+        self.wait().forever().on(search).await
     }
 
     /// Wait for the page to navigate to a new URL before proceeding.
@@ -683,6 +679,10 @@ impl Client {
     /// If the `current` URL is not provided, `self.current_url()` will be used. Note however that
     /// this introduces a race condition: the browser could finish navigating *before* we call
     /// `current_url()`, which would lead to an eternal wait.
+    #[deprecated(
+        since = "0.17.5",
+        note = "This method might block forever and has a chance of randomly blocking. Please use client.wait().on(url) instead, to check if you navigated successfully to the new URL."
+    )]
     pub async fn wait_for_navigation(
         &mut self,
         current: Option<url::Url>,
@@ -692,6 +692,7 @@ impl Client {
             None => self.current_url_().await?,
         };
 
+        #[allow(deprecated)]
         self.wait_for(move |c| {
             // TODO: get rid of this clone
             let current = current.clone();
@@ -817,9 +818,39 @@ impl Client {
     }
 }
 
+/// Allow to wait for conditions.
+impl Client {
+    /// Starting building a new wait operation. This can be used to wait for a certain condition, by
+    /// periodically checking the state and optionally returning a value:
+    ///
+    /// ```no_run
+    /// # use fantoccini::{ClientBuilder, Locator};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), fantoccini::error::CmdError> {
+    /// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
+    /// # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # #[cfg(feature = "rustls-tls")]
+    /// # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
+    /// # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+    /// // -- snip wrapper code --
+    /// let button = client.wait().on(Locator::Css(
+    ///     r#"a.button-download[href="/learn/get-started"]"#,
+    /// )).await?;
+    /// // -- snip wrapper code --
+    /// # client.close().await
+    /// # }
+    /// ```
+    ///
+    /// Also see: [`crate::wait`].
+    pub fn wait(&mut self) -> Wait<'_> {
+        Wait::new(self)
+    }
+}
+
 /// Helper methods
 impl Client {
-    async fn by(
+    pub(crate) async fn by(
         &mut self,
         locator: webdriver::command::LocatorParameters,
     ) -> Result<Element, error::CmdError> {

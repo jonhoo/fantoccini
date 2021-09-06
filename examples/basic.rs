@@ -36,34 +36,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Go to the Rust website.
     client.goto("https://www.rust-lang.org/").await?;
 
-    // This sleep is just used to make the browser's actions visible.
-    sleep(Duration::from_millis(1000)).await;
-
     // Click the "Get Started" button.
     let button = client
-        .find(Locator::Css(
+        .wait()
+        .on(Locator::Css(
             r#"a.button-download[href="/learn/get-started"]"#,
         ))
         .await?;
     button.click().await?;
-    sleep(Duration::from_millis(1000)).await;
 
     // Click the "Try Rust Without Installing" button (using XPath this time).
     let button = r#"//a[@class="button button-secondary" and @href="https://play.rust-lang.org/"]"#;
-    let button = client.find(Locator::XPath(button)).await?;
+    let button = client.wait().on(Locator::XPath(button)).await?;
     button.click().await?;
-    sleep(Duration::from_millis(1000)).await;
 
     // Find the big textarea.
-    let mut code_area = client.find(Locator::Css(".ace_text-input")).await?;
+    let mut code_area = client.wait().on(Locator::Css(".ace_text-input")).await?;
 
     // And write in some code.
     code_area.send_keys("// Hello from Fantoccini\n").await?;
-    sleep(Duration::from_millis(1000)).await;
 
     // Now, let's run it!
     let button = r#"//div[@class="segmented-button"]/button[1]"#;
-    let button = client.find(Locator::XPath(button)).await?;
+    let button = client.wait().on(Locator::XPath(button)).await?;
     button.click().await?;
 
     // Let the user marvel at what we achieved.
