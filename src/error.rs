@@ -123,9 +123,9 @@ pub enum CmdError {
 
     /// Timeout of a wait condition.
     ///
-    /// When waiting for a for a condition using [`Client::wait`], any of the consuming methods,
-    /// waiting on some condition, may return this error, indicating that the timeout waiting
-    /// for the condition occurred.
+    /// When waiting for a for a condition using [`Client::wait`](crate::Client::wait), any of the
+    /// consuming methods, waiting on some condition, may return this error, indicating that the
+    /// timeout waiting for the condition occurred.
     WaitTimeout,
 }
 

@@ -138,11 +138,8 @@
 //! [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 //! [`geckodriver`]: https://github.com/mozilla/geckodriver
 #![deny(missing_docs)]
-#![warn(
-    missing_debug_implementations,
-    rust_2018_idioms,
-    broken_intra_doc_links
-)]
+#![warn(missing_debug_implementations, rust_2018_idioms, rustdoc::all)]
+#![allow(rustdoc::missing_doc_code_examples, rustdoc::private_doc_tests)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use hyper::client::connect;

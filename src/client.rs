@@ -671,7 +671,7 @@ impl Client {
         note = "This method might block forever. Please use client.wait().on(locator) instead. You can still wait forever using: client.wait().forever().on(locator)"
     )]
     pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        self.wait().forever().on(search).await
+        self.wait().forever().for_element(search).await
     }
 
     /// Wait for the page to navigate to a new URL before proceeding.
@@ -834,7 +834,7 @@ impl Client {
     /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
     /// # let mut client: fantoccini::Client = unreachable!("no tls provider available");
     /// // -- snip wrapper code --
-    /// let button = client.wait().on(Locator::Css(
+    /// let button = client.wait().for_element(Locator::Css(
     ///     r#"a.button-download[href="/learn/get-started"]"#,
     /// )).await?;
     /// // -- snip wrapper code --
