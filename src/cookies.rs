@@ -95,8 +95,13 @@ impl Client {
     ///
     /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver1/#get-named-cookie) of the
     /// WebDriver standard.
-    pub async fn get_named_cookie(&mut self, name: &str) -> Result<Cookie<'static>, error::CmdError> {
-        let resp = self.issue(WebDriverCommand::GetNamedCookie(name.to_string())).await?;
+    pub async fn get_named_cookie(
+        &mut self,
+        name: &str,
+    ) -> Result<Cookie<'static>, error::CmdError> {
+        let resp = self
+            .issue(WebDriverCommand::GetNamedCookie(name.to_string()))
+            .await?;
         let webdriver_cookie: WebDriverCookie = serde_json::from_value(resp)?;
         Ok(webdriver_cookie.into())
     }
