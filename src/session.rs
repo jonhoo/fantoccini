@@ -1,7 +1,8 @@
-use crate::error;
+use crate::{error, Client};
 use futures_core::ready;
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt};
+use hyper::client::connect;
 use serde_json::Value as Json;
 use std::future::Future;
 use std::io;
@@ -16,23 +17,16 @@ use webdriver::error::WebDriverError;
 
 type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
 
-/// A WebDriver client tied to a single browser session.
-#[derive(Clone, Debug)]
-pub struct Client {
-    tx: mpsc::UnboundedSender<Task>,
-    is_legacy: bool,
-}
-
 type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Cmd {
-    SetUA(String),
+    SetUa(String),
     GetSessionId,
     Shutdown,
     Persist,
-    GetUA,
+    GetUa,
     Raw {
         req: hyper::Request<hyper::Body>,
         rsp: oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
@@ -174,10 +168,13 @@ impl Ongoing {
     }
 }
 
-pub(crate) struct Session {
+pub(crate) struct Session<C>
+where
+    C: connect::Connect,
+{
     ongoing: Ongoing,
     rx: mpsc::UnboundedReceiver<Task>,
-    client: hyper::Client<hyper_tls::HttpsConnector<hyper::client::HttpConnector>, hyper::Body>,
+    client: hyper::Client<C>,
     wdb: url::Url,
     session: Option<String>,
     is_legacy: bool,
@@ -185,7 +182,10 @@ pub(crate) struct Session {
     persist: bool,
 }
 
-impl Future for Session {
+impl<C> Future for Session<C>
+where
+    C: connect::Connect + Unpin + 'static + Clone + Sync + Send,
+{
     type Output = ();
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
@@ -213,11 +213,11 @@ impl Future for Session {
                             .map(Json::String)
                             .unwrap_or(Json::Null)));
                     }
-                    Cmd::SetUA(ua) => {
+                    Cmd::SetUa(ua) => {
                         self.ua = Some(ua);
                         let _ = ack.send(Ok(Json::Null));
                     }
-                    Cmd::GetUA => {
+                    Cmd::GetUa => {
                         let _ =
                             ack.send(Ok(self.ua.clone().map(Json::String).unwrap_or(Json::Null)));
                     }
@@ -265,7 +265,10 @@ impl Future for Session {
     }
 }
 
-impl Session {
+impl<C> Session<C>
+where
+    C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
+{
     fn shutdown(&mut self, ack: Option<Ack>) {
         // session was not created
         if self.session.is_none() {
@@ -328,19 +331,18 @@ impl Session {
         }
     }
 
-    pub(crate) async fn with_capabilities(
+    pub(crate) async fn with_capabilities_and_connector(
         webdriver: &str,
-        mut cap: webdriver::capabilities::Capabilities,
+        cap: &webdriver::capabilities::Capabilities,
+        connector: C,
     ) -> Result<Client, error::NewSessionError> {
         // Where is the WebDriver server?
         let wdb = webdriver.parse::<url::Url>();
-
         let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
-
         // We want a tls-enabled client
-        let client =
-            hyper::Client::builder().build::<_, hyper::Body>(hyper_tls::HttpsConnector::new());
+        let client = hyper::Client::builder().build::<_, hyper::Body>(connector);
 
+        let mut cap = cap.to_owned();
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
 
@@ -462,7 +464,13 @@ impl Session {
             WebDriverCommand::GetPageSource => base.join("source"),
             WebDriverCommand::FindElement(..) => base.join("element"),
             WebDriverCommand::FindElements(..) => base.join("elements"),
-            WebDriverCommand::GetCookies => base.join("cookie"),
+            WebDriverCommand::GetCookies
+            | WebDriverCommand::AddCookie(_)
+            | WebDriverCommand::DeleteCookies => base.join("cookie"),
+            WebDriverCommand::GetNamedCookie(ref name)
+            | WebDriverCommand::DeleteCookie(ref name) => {
+                base.join(&format!("cookie/{}", name))
+            }
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
@@ -489,6 +497,9 @@ impl Session {
             WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
             WebDriverCommand::GetWindowRect => base.join("window/rect"),
             WebDriverCommand::TakeScreenshot => base.join("screenshot"),
+            WebDriverCommand::TakeElementScreenshot(ref we) => {
+                base.join(&format!("element/{}/screenshot", we.0))
+            }
             WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
             WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
             WebDriverCommand::GetWindowHandle => base.join("window"),
@@ -565,6 +576,10 @@ impl Session {
             | WebDriverCommand::FindElementElements(_, ref loc) => {
                 body = Some(serde_json::to_string(loc).unwrap());
                 method = Method::POST;
+            }
+            WebDriverCommand::DeleteCookie(_)
+            | WebDriverCommand::DeleteCookies => {
+                method = Method::DELETE;
             }
             WebDriverCommand::ExecuteScript(ref script) => {
                 body = Some(serde_json::to_string(script).unwrap());
@@ -802,6 +817,7 @@ impl Session {
                             "unknown error" => ErrorStatus::UnknownError,
                             "script timeout" => ErrorStatus::ScriptTimeout,
                             "unsupported operation" => ErrorStatus::UnsupportedOperation,
+                            "timeout" => ErrorStatus::Timeout,
                             _ => unreachable!(
                                 "received unknown error ({}) for INTERNAL_SERVER_ERROR status code",
                                 error

@@ -1,9 +1,9 @@
 //! Tests that make use of external websites.
-#[macro_use]
-extern crate serial_test_derive;
 
-use fantoccini::{error, Client, Locator, Method};
+use fantoccini::{error, Client, Locator};
 use futures_util::TryFutureExt;
+use hyper::Method;
+use serial_test::serial;
 use std::time::Duration;
 use url::Url;
 
@@ -69,7 +69,7 @@ async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::Cmd
     c.goto("https://www.wikipedia.org/").await?;
 
     // find search input element
-    let mut e = c.wait_for_find(Locator::Id("searchInput")).await?;
+    let mut e = c.wait().for_element(Locator::Id("searchInput")).await?;
     e.send_keys("foobar").await?;
     assert_eq!(
         e.prop("value")
@@ -222,6 +222,7 @@ async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
 }
 
 async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
+    #[allow(deprecated)]
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
         async move { Ok(true) }
@@ -241,6 +242,7 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
 
     c.goto(url.as_str()).await?;
 
+    #[allow(deprecated)]
     loop {
         let wait_for = c.wait_for_navigation(Some(url)).await;
         assert!(wait_for.is_ok());
@@ -256,78 +258,108 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
     c.close().await
 }
 
+// Verifies that basic cookie handling works
+async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
+    c.goto("https://google.com/").await?;
+
+    let cookies = c.get_all_cookies().await?;
+    assert!(cookies.len() > 0);
+
+    let first_cookie = &cookies[0];
+    assert_eq!(
+        c.get_named_cookie(first_cookie.name()).await?.value(),
+        first_cookie.value()
+    );
+
+    // Delete a cookie and make sure it's gone
+    c.delete_cookie(first_cookie.name()).await?;
+    assert!(c.get_named_cookie(first_cookie.name()).await.is_err());
+
+    c.delete_all_cookies().await?;
+    let cookies = c.get_all_cookies().await?;
+    assert!(cookies.len() == 0);
+
+    c.close().await
+}
+
 mod chrome {
     use super::*;
 
     #[test]
     fn it_works() {
-        tester!(works_inner, "chrome")
+        tester!(works_inner, "chrome");
     }
 
     #[test]
     fn it_clicks() {
-        tester!(clicks_inner, "chrome")
+        tester!(clicks_inner, "chrome");
     }
 
     #[test]
     fn it_clicks_by_locator() {
-        tester!(clicks_inner_by_locator, "chrome")
+        tester!(clicks_inner_by_locator, "chrome");
     }
 
     #[test]
     fn it_sends_keys_and_clear_input() {
-        tester!(send_keys_and_clear_input_inner, "chrome")
+        tester!(send_keys_and_clear_input_inner, "chrome");
     }
 
     #[test]
     fn it_can_be_raw() {
-        tester!(raw_inner, "chrome")
+        tester!(raw_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_size() {
-        tester!(window_size_inner, "chrome")
+        tester!(window_size_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_position() {
-        tester!(window_position_inner, "chrome")
+        tester!(window_position_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
-        tester!(window_rect_inner, "chrome")
+        tester!(window_rect_inner, "chrome");
     }
 
     #[test]
     fn it_finds_all() {
-        tester!(finds_all_inner, "chrome")
+        tester!(finds_all_inner, "chrome");
     }
 
     #[test]
     fn it_finds_sub_elements() {
-        tester!(finds_sub_elements, "chrome")
+        tester!(finds_sub_elements, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_persists() {
-        tester!(persist_inner, "chrome")
+        tester!(persist_inner, "chrome");
     }
 
     #[serial]
     #[test]
     fn it_simple_waits() {
-        tester!(simple_wait_test, "chrome")
+        tester!(simple_wait_test, "chrome");
     }
 
     #[serial]
     #[test]
     fn it_waits_for_navigation() {
-        tester!(wait_for_navigation_test, "chrome")
+        tester!(wait_for_navigation_test, "chrome");
+    }
+
+    #[serial]
+    #[test]
+    fn it_handles_cookies() {
+        tester!(handle_cookies_test, "chrome");
     }
 }
 
@@ -337,78 +369,84 @@ mod firefox {
     #[serial]
     #[test]
     fn it_works() {
-        tester!(works_inner, "firefox")
+        tester!(works_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_clicks() {
-        tester!(clicks_inner, "firefox")
+        tester!(clicks_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_clicks_by_locator() {
-        tester!(clicks_inner_by_locator, "firefox")
+        tester!(clicks_inner_by_locator, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_sends_keys_and_clear_input() {
-        tester!(send_keys_and_clear_input_inner, "firefox")
+        tester!(send_keys_and_clear_input_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_can_be_raw() {
-        tester!(raw_inner, "firefox")
+        tester!(raw_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_size() {
-        tester!(window_size_inner, "firefox")
+        tester!(window_size_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_position() {
-        tester!(window_position_inner, "firefox")
+        tester!(window_position_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
-        tester!(window_rect_inner, "firefox")
+        tester!(window_rect_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_finds_all() {
-        tester!(finds_all_inner, "firefox")
+        tester!(finds_all_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_finds_sub_elements() {
-        tester!(finds_sub_elements, "firefox")
+        tester!(finds_sub_elements, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_persists() {
-        tester!(persist_inner, "firefox")
+        tester!(persist_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_simple_waits() {
-        tester!(simple_wait_test, "firefox")
+        tester!(simple_wait_test, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_waits_for_navigation() {
-        tester!(wait_for_navigation_test, "firefox")
+        tester!(wait_for_navigation_test, "firefox");
+    }
+
+    #[serial]
+    #[test]
+    fn it_handles_cookies() {
+        tester!(handle_cookies_test, "firefox");
     }
 }

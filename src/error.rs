@@ -1,4 +1,4 @@
-use hyper::error as herror;
+use hyper::Error as HError;
 use std::error::Error;
 use std::fmt;
 use std::io::Error as IOError;
@@ -11,7 +11,7 @@ pub enum NewSessionError {
     /// The given WebDriver URL is invalid.
     BadWebdriverUrl(ParseError),
     /// The WebDriver server could not be reached.
-    Failed(herror::Error),
+    Failed(HError),
     /// The connection to the WebDriver server was lost.
     Lost(IOError),
     /// The server did not give a WebDriver-conforming response.
@@ -93,7 +93,7 @@ pub enum CmdError {
     BadUrl(ParseError),
 
     /// A request to the WebDriver server failed.
-    Failed(herror::Error),
+    Failed(HError),
 
     /// The connection to the WebDriver server was lost.
     Lost(IOError),
@@ -120,6 +120,13 @@ pub enum CmdError {
 
     /// Could not decode a base64 image
     ImageDecodeError(::base64::DecodeError),
+
+    /// Timeout of a wait condition.
+    ///
+    /// When waiting for a for a condition using [`Client::wait`](crate::Client::wait), any of the
+    /// consuming methods, waiting on some condition, may return this error, indicating that the
+    /// timeout waiting for the condition occurred.
+    WaitTimeout,
 }
 
 impl CmdError {
@@ -154,6 +161,7 @@ impl Error for CmdError {
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
             CmdError::ImageDecodeError(..) => "error decoding image",
+            CmdError::WaitTimeout => "timeout waiting on condition",
         }
     }
 
@@ -167,7 +175,10 @@ impl Error for CmdError {
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
             CmdError::ImageDecodeError(ref e) => Some(e),
-            CmdError::NotJson(_) | CmdError::NotW3C(_) | CmdError::InvalidArgument(..) => None,
+            CmdError::NotJson(_)
+            | CmdError::NotW3C(_)
+            | CmdError::InvalidArgument(..)
+            | CmdError::WaitTimeout => None,
         }
     }
 }
@@ -190,6 +201,7 @@ impl fmt::Display for CmdError {
             CmdError::InvalidArgument(ref arg, ref msg) => {
                 write!(f, "Invalid argument `{}`: {}", arg, msg)
             }
+            CmdError::WaitTimeout => Ok(()),
         }
     }
 }
@@ -206,8 +218,8 @@ impl From<ParseError> for CmdError {
     }
 }
 
-impl From<herror::Error> for CmdError {
-    fn from(e: herror::Error) -> Self {
+impl From<HError> for CmdError {
+    fn from(e: HError) -> Self {
         CmdError::Failed(e)
     }
 }
