@@ -262,6 +262,14 @@ impl Element {
         Ok(self.client)
     }
 
+    /// Find and click an `<option>` child element by a locator.
+    ///
+    /// This method clicks the first `<option>` element that is found.
+    /// If the element wasn't found a erorr will be issued.
+    pub async fn select_by(&mut self, locator: Locator<'_>) -> Result<Client, error::CmdError> {
+        self.find(locator).await?.click().await
+    }
+
     /// Find and click an `option` child element by its `value` attribute.
     pub async fn select_by_value(mut self, value: &str) -> Result<Client, error::CmdError> {
         let locator = format!("option[value='{}']", value);
