@@ -333,10 +333,7 @@ where
                     ..
                 },
             )) => Err(error::NewSessionError::NotW3C(
-                serde_json::to_value(e).unwrap_or_else(|e| {
-                    // this should not happen
-                    panic!("cannot serialize WebdriverError; {}", e);
-                }),
+                serde_json::to_value(e).expect("WebdriverError should always be serializeable to JSON")
             )),
             Err(e) => {
                 panic!("unexpected webdriver error; {}", e);
