@@ -306,10 +306,8 @@ where
                         return Ok(());
                     }
                     v.insert("sessionId".to_string(), session_id);
-                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
-                } else {
-                    Err(error::NewSessionError::NotW3C(Json::Object(v)))
                 }
+                Err(error::NewSessionError::NotW3C(Json::Object(v)))
             }
             Ok(v) | Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
             Err(error::CmdError::Failed(e)) => Err(error::NewSessionError::Failed(e)),
@@ -333,7 +331,8 @@ where
                     ..
                 },
             )) => Err(error::NewSessionError::NotW3C(
-                serde_json::to_value(e).expect("WebdriverError should always be serializeable to JSON")
+                serde_json::to_value(e)
+                    .expect("WebdriverError should always be serializeable to JSON"),
             )),
             Err(e) => {
                 panic!("unexpected webdriver error; {}", e);
