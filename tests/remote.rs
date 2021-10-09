@@ -277,7 +277,7 @@ async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
 
     c.delete_all_cookies().await?;
     let cookies = c.get_all_cookies().await?;
-    assert!(cookies.is_empty());
+    assert!(dbg!(cookies).is_empty());
 
     c.close().await
 }
