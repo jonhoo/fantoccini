@@ -21,7 +21,7 @@ pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
         "firefox" => {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({ "args": ["--headless"] });
-            caps.insert("moz:firefoxOptions".to_string(), opts.clone());
+            caps.insert("moz:firefoxOptions".to_string(), opts);
             caps
         }
         "chrome" => {
@@ -29,7 +29,7 @@ pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
             let opts = serde_json::json!({
                 "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
             });
-            caps.insert("goog:chromeOptions".to_string(), opts.clone());
+            caps.insert("goog:chromeOptions".to_string(), opts);
             caps
         }
         browser => unimplemented!("unsupported browser backend {}", browser),

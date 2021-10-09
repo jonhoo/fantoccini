@@ -325,6 +325,16 @@ where
                     ..
                 },
             )) => Err(error::NewSessionError::SessionNotCreated(e)),
+            Err(error::CmdError::Standard(
+                e
+                @
+                WebDriverError {
+                    error: ErrorStatus::UnknownError,
+                    ..
+                },
+            )) => Err(error::NewSessionError::NotW3C(
+                serde_json::to_value(e).expect("WebdriverError should always be serializeable to JSON")
+            )),
             Err(e) => {
                 panic!("unexpected webdriver error; {}", e);
             }
@@ -468,9 +478,7 @@ where
             | WebDriverCommand::AddCookie(_)
             | WebDriverCommand::DeleteCookies => base.join("cookie"),
             WebDriverCommand::GetNamedCookie(ref name)
-            | WebDriverCommand::DeleteCookie(ref name) => {
-                base.join(&format!("cookie/{}", name))
-            }
+            | WebDriverCommand::DeleteCookie(ref name) => base.join(&format!("cookie/{}", name)),
             WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
@@ -577,8 +585,7 @@ where
                 body = Some(serde_json::to_string(loc).unwrap());
                 method = Method::POST;
             }
-            WebDriverCommand::DeleteCookie(_)
-            | WebDriverCommand::DeleteCookies => {
+            WebDriverCommand::DeleteCookie(_) | WebDriverCommand::DeleteCookies => {
                 method = Method::DELETE;
             }
             WebDriverCommand::ExecuteScript(ref script) => {

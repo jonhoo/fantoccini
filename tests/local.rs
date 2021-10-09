@@ -310,7 +310,7 @@ async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), err
 
     let count: u64 = c
         .execute_async(
-            &"setTimeout(() => arguments[1](arguments[0] + 1))",
+            "setTimeout(() => arguments[1](arguments[0] + 1))",
             vec![1_u32.into()],
         )
         .await?
@@ -320,7 +320,7 @@ async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), err
     assert_eq!(2, count);
 
     let count: u64 = c
-        .execute_async(&"setTimeout(() => arguments[0](2))", vec![])
+        .execute_async("setTimeout(() => arguments[0](2))", vec![])
         .await?
         .as_u64()
         .expect("should be integer variant");

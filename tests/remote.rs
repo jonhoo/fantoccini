@@ -109,7 +109,7 @@ async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
         .await?;
 
     // and voilla, we now have the bytes for the Wikipedia logo!
-    assert!(pixels.len() > 0);
+    assert!(!pixels.is_empty());
     println!("Wikipedia logo is {}b", pixels.len());
 
     c.close().await
@@ -263,7 +263,7 @@ async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
     c.goto("https://google.com/").await?;
 
     let cookies = c.get_all_cookies().await?;
-    assert!(cookies.len() > 0);
+    assert!(!cookies.is_empty());
 
     let first_cookie = &cookies[0];
     assert_eq!(
@@ -277,7 +277,7 @@ async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
 
     c.delete_all_cookies().await?;
     let cookies = c.get_all_cookies().await?;
-    assert!(cookies.len() == 0);
+    assert!(cookies.is_empty());
 
     c.close().await
 }
