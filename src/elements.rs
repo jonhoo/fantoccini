@@ -265,7 +265,7 @@ impl Element {
     /// Find and click an `<option>` child element by a locator.
     ///
     /// This method clicks the first `<option>` element that is found.
-    /// If the element wasn't found [error::CmdError::NoSuchElement] will be issued.
+    /// If the element wasn't found, [`CmdError::NoSuchElement`](error::CmdError::NoSuchElement) will be issued.
     pub async fn select_by(mut self, locator: Locator<'_>) -> Result<Client, error::CmdError> {
         self.find(locator).await?.click().await
     }
