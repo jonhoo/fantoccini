@@ -262,22 +262,18 @@ impl Element {
         Ok(self.client)
     }
 
-    /// Find and click an `option` child element by its `value` attribute.
-    pub async fn select_by_value(mut self, value: &str) -> Result<Client, error::CmdError> {
-        let locator = format!("option[value='{}']", value);
-        let locator = webdriver::command::LocatorParameters {
-            using: webdriver::common::LocatorStrategy::CSSSelector,
-            value: locator,
-        };
+    /// Find and click an `<option>` child element by a locator.
+    ///
+    /// This method clicks the first `<option>` element that is found.
+    /// If the element wasn't found, [`CmdError::NoSuchElement`](error::CmdError::NoSuchElement) will be issued.
+    pub async fn select_by(mut self, locator: Locator<'_>) -> Result<Client, error::CmdError> {
+        self.find(locator).await?.click().await
+    }
 
-        let cmd = WebDriverCommand::FindElementElement(self.element, locator);
-        let v = self.client.issue(cmd).await?;
-        Element {
-            element: self.client.parse_lookup(v)?,
-            client: self.client,
-        }
-        .click()
-        .await
+    /// Find and click an `option` child element by its `value` attribute.
+    pub async fn select_by_value(self, value: &str) -> Result<Client, error::CmdError> {
+        self.select_by(Locator::Css(&format!("option[value='{}']", value)))
+            .await
     }
 
     /// Find and click an `<option>` child element by its index.
@@ -290,10 +286,9 @@ impl Element {
     /// in the form, or if it there are stray `<option>` in the form.
     ///
     /// The indexing in this method is 0-based.
-    pub async fn select_by_index(mut self, index: usize) -> Result<Client, error::CmdError> {
-        let locator = format!("option:nth-of-type({})", index + 1);
-
-        self.find(Locator::Css(&locator)).await?.click().await
+    pub async fn select_by_index(self, index: usize) -> Result<Client, error::CmdError> {
+        self.select_by(Locator::Css(&format!("option:nth-of-type({})", index + 1)))
+            .await
     }
 
     /// Find and click an `<option>` element by its visible text.
@@ -302,9 +297,9 @@ impl Element {
     /// It also doesn't make any normalizations before match.
     ///
     /// [example]: https://github.com/SeleniumHQ/selenium/blob/941dc9c6b2e2aa4f701c1b72be8de03d4b7e996a/py/selenium/webdriver/support/select.py#L67
-    pub async fn select_by_label(mut self, label: &str) -> Result<Client, error::CmdError> {
-        let locator = format!(r".//option[.='{}']", label);
-        self.find(Locator::XPath(&locator)).await?.click().await
+    pub async fn select_by_label(self, label: &str) -> Result<Client, error::CmdError> {
+        self.select_by(Locator::XPath(&format!(r".//option[.='{}']", label)))
+            .await
     }
 }
 
