@@ -3,10 +3,10 @@
 use crate::elements::{Element, Form};
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
-use crate::{error, Capabilities, Locator, NewWindowResponse, NewWindowType, WindowHandle};
+use crate::{error, Capabilities, Locator, NewWindowType, WindowHandle};
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto as _};
 use std::future::Future;
 use tokio::sync::{mpsc, oneshot};
 use webdriver::command::WebDriverCommand;
@@ -211,7 +211,7 @@ impl Client {
     pub async fn window(&mut self) -> Result<WindowHandle, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandle).await?;
         match res {
-            Json::String(x) => Ok(x.into()),
+            Json::String(x) => Ok(x.try_into()?),
             v => Err(error::CmdError::NotW3C(v)),
         }
     }
@@ -256,7 +256,7 @@ impl Client {
             Json::Array(handles) => handles
                 .into_iter()
                 .map(|handle| match handle {
-                    Json::String(x) => Ok(x.into()),
+                    Json::String(x) => Ok(x.try_into()?),
                     v => Err(error::CmdError::NotW3C(v)),
                 })
                 .collect::<Result<Vec<_>, _>>(),
@@ -286,13 +286,13 @@ impl Client {
             Json::Object(mut obj) => {
                 let handle = match obj
                     .remove("handle")
-                    .and_then(|x| x.as_str().map(String::from))
+                    .and_then(|x| x.as_str().map(WindowHandle::try_from))
                 {
-                    Some(handle) => handle.into(),
-                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    Some(Ok(handle)) => handle,
+                    _ => return Err(error::CmdError::NotW3C(Json::Object(obj))),
                 };
 
-                let typ = match obj.remove("type").and_then(|x| x.as_str()) {
+                let typ = match obj.get("type").and_then(|x| x.as_str()) {
                     Some(typ) => match typ {
                         "tab" => NewWindowType::Tab,
                         "window" => NewWindowType::Window,

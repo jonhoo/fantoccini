@@ -244,6 +244,28 @@ impl From<serde_json::Error> for CmdError {
     }
 }
 
+/// Error of attempting to create an invalid [`WindowHandle`] from a
+/// [`"current"` string][1].
+///
+/// [`WindowHandle`]: crate::WindowHandle
+/// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+#[derive(Clone, Copy, Debug)]
+pub struct InvalidWindowHandle;
+
+impl fmt::Display for InvalidWindowHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, r#"Window handle cannot be "current""#)
+    }
+}
+
+impl Error for InvalidWindowHandle {}
+
+impl From<InvalidWindowHandle> for CmdError {
+    fn from(_: InvalidWindowHandle) -> Self {
+        Self::NotW3C(serde_json::Value::String("current".to_string()))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

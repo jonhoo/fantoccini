@@ -142,7 +142,8 @@
 #![allow(rustdoc::missing_doc_code_examples, rustdoc::private_doc_tests)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use std::str::FromStr;
+use std::convert::TryFrom;
+use std::fmt;
 
 use hyper::client::connect;
 
@@ -306,21 +307,43 @@ impl From<WindowHandle> for String {
     }
 }
 
-impl From<String> for WindowHandle {
-    fn from(s: String) -> Self {
-        Self(s)
+impl TryFrom<String> for WindowHandle {
+    type Error = error::InvalidWindowHandle;
+
+    /// Makes the given [`String`] a [`WindowHandle`].
+    ///
+    /// # Errors
+    ///
+    /// If the given [`String`] is [`"current"`][1].
+    ///
+    /// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        if s != "current" {
+            Ok(Self(s))
+        } else {
+            Err(error::InvalidWindowHandle)
+        }
     }
 }
 
-impl From<WindowHandle> for webdriver::common::WebWindow {
-    fn from(w: WindowHandle) -> Self {
-        Self(w.0)
-    }
-}
+impl TryFrom<&str> for WindowHandle {
+    type Error = error::InvalidWindowHandle;
 
-impl From<webdriver::common::WebWindow> for WindowHandle {
-    fn from(w: webdriver::common::WebWindow) -> Self {
-        Self(w.0)
+    /// Makes the given string a [`WindowHandle`].
+    ///
+    /// Allocates if succeeds.
+    ///
+    /// # Errors
+    ///
+    /// If the given string is [`"current"`][1].
+    ///
+    /// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        if s != "current" {
+            Ok(Self(s.to_string()))
+        } else {
+            Err(error::InvalidWindowHandle)
+        }
     }
 }
 
@@ -334,6 +357,15 @@ pub enum NewWindowType {
 
     /// Opened in a separate window.
     Window,
+}
+
+impl fmt::Display for NewWindowType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Tab => write!(f, "tab"),
+            Self::Window => write!(f, "window"),
+        }
+    }
 }
 
 /// Dynamic set of [WebDriver capabilities][1].
