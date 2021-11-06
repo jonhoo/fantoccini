@@ -3,7 +3,7 @@
 use crate::{error, Client, Locator};
 use serde::Serialize;
 use serde_json::Value as Json;
-use webdriver::command::{SendKeysParameters, SwitchToFrameParameters, WebDriverCommand};
+use webdriver::command::WebDriverCommand;
 use webdriver::common::FrameId;
 use webdriver::error::WebDriverError;
 
@@ -46,7 +46,7 @@ impl Element {
             mut client,
             element,
         } = self;
-        let params = SwitchToFrameParameters {
+        let params = webdriver::command::SwitchToFrameParameters {
             id: Some(FrameId::Element(element)),
         };
         client
@@ -222,7 +222,7 @@ impl Element {
     pub async fn send_keys(&mut self, text: &str) -> Result<(), error::CmdError> {
         let cmd = WebDriverCommand::ElementSendKeys(
             self.element.clone(),
-            SendKeysParameters {
+            webdriver::command::SendKeysParameters {
                 text: text.to_owned(),
             },
         );

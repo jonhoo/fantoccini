@@ -1,15 +1,15 @@
+//! WebDriver client implementation.
+
 use crate::elements::{Element, Form};
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
-use crate::{error, Locator};
+use crate::{error, Capabilities, Locator, NewWindowResponse, NewWindowType, WindowHandle};
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
 use std::convert::TryFrom;
 use std::future::Future;
 use tokio::sync::{mpsc, oneshot};
-use webdriver::command::{
-    NewWindowParameters, SwitchToFrameParameters, SwitchToWindowParameters, WebDriverCommand,
-};
+use webdriver::command::WebDriverCommand;
 use webdriver::common::{FrameId, ELEMENT_KEY};
 
 // Used only under `native-tls`
@@ -77,7 +77,7 @@ impl Client {
     /// Returns a future that resolves to a handle for issuing additional WebDriver tasks.
     pub async fn with_capabilities_and_connector<C>(
         webdriver: &str,
-        cap: &webdriver::capabilities::Capabilities,
+        cap: &Capabilities,
         connector: C,
     ) -> Result<Self, error::NewSessionError>
     where
@@ -208,10 +208,10 @@ impl Client {
     /// See [10.1 Get Window Handle](https://www.w3.org/TR/webdriver1/#get-window-handle) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Handle"))]
-    pub async fn window(&mut self) -> Result<webdriver::common::WebWindow, error::CmdError> {
+    pub async fn window(&mut self) -> Result<WindowHandle, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandle).await?;
         match res {
-            Json::String(x) => Ok(webdriver::common::WebWindow(x)),
+            Json::String(x) => Ok(x.into()),
             v => Err(error::CmdError::NotW3C(v)),
         }
     }
@@ -237,11 +237,10 @@ impl Client {
     /// See [10.3 Switch To Window](https://www.w3.org/TR/webdriver1/#switch-to-window) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Window"))]
-    pub async fn switch_to_window(
-        &mut self,
-        window: webdriver::common::WebWindow,
-    ) -> Result<(), error::CmdError> {
-        let params = SwitchToWindowParameters { handle: window.0 };
+    pub async fn switch_to_window(&mut self, window: WindowHandle) -> Result<(), error::CmdError> {
+        let params = webdriver::command::SwitchToWindowParameters {
+            handle: window.into(),
+        };
         let _res = self.issue(WebDriverCommand::SwitchToWindow(params)).await?;
         Ok(())
     }
@@ -251,13 +250,13 @@ impl Client {
     /// See [10.4 Get Window Handles](https://www.w3.org/TR/webdriver1/#get-window-handles) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Handles"))]
-    pub async fn windows(&mut self) -> Result<Vec<webdriver::common::WebWindow>, error::CmdError> {
+    pub async fn windows(&mut self) -> Result<Vec<WindowHandle>, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandles).await?;
         match res {
             Json::Array(handles) => handles
                 .into_iter()
                 .map(|handle| match handle {
-                    Json::String(x) => Ok(webdriver::common::WebWindow(x)),
+                    Json::String(x) => Ok(x.into()),
                     v => Err(error::CmdError::NotW3C(v)),
                 })
                 .collect::<Result<Vec<_>, _>>(),
@@ -279,32 +278,30 @@ impl Client {
     /// See [11.5 New Window](https://w3c.github.io/webdriver/#dfn-new-window) of the editor's
     /// draft standard.
     #[cfg_attr(docsrs, doc(alias = "New Window"))]
-    pub async fn new_window(
-        &mut self,
-        as_tab: bool,
-    ) -> Result<webdriver::response::NewWindowResponse, error::CmdError> {
+    pub async fn new_window(&mut self, as_tab: bool) -> Result<NewWindowResponse, error::CmdError> {
         let type_hint = if as_tab { "tab" } else { "window" }.to_string();
         let type_hint = Some(type_hint);
-        let params = NewWindowParameters { type_hint };
+        let params = webdriver::command::NewWindowParameters { type_hint };
         match self.issue(WebDriverCommand::NewWindow(params)).await? {
             Json::Object(mut obj) => {
                 let handle = match obj
                     .remove("handle")
                     .and_then(|x| x.as_str().map(String::from))
                 {
-                    Some(handle) => handle,
+                    Some(handle) => handle.into(),
                     None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
                 };
 
-                let typ = match obj
-                    .remove("type")
-                    .and_then(|x| x.as_str().map(String::from))
-                {
-                    Some(typ) => typ,
+                let typ = match obj.remove("type").and_then(|x| x.as_str()) {
+                    Some(typ) => match typ {
+                        "tab" => NewWindowType::Tab,
+                        "window" => NewWindowType::Window,
+                        _ => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                    },
                     None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
                 };
 
-                Ok(webdriver::response::NewWindowResponse { handle, typ })
+                Ok(NewWindowResponse { handle, typ })
             }
             v => Err(error::CmdError::NotW3C(v)),
         }
@@ -316,7 +313,7 @@ impl Client {
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Frame"))]
     pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
-        let params = SwitchToFrameParameters {
+        let params = webdriver::command::SwitchToFrameParameters {
             id: index.map(FrameId::Short),
         };
         self.issue(WebDriverCommand::SwitchToFrame(params)).await?;
@@ -928,4 +925,14 @@ impl Client {
             }
         }
     }
+}
+
+/// Response returned by [`Client::new_window()`] method.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct NewWindowResponse {
+    /// Handle to the created browser window.
+    pub handle: WindowHandle,
+
+    /// Type of the created browser window.
+    pub typ: NewWindowType,
 }

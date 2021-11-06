@@ -142,6 +142,8 @@
 #![allow(rustdoc::missing_doc_code_examples, rustdoc::private_doc_tests)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+use std::str::FromStr;
+
 use hyper::client::connect;
 
 macro_rules! via_json {
@@ -170,7 +172,7 @@ pub struct ClientBuilder<C>
 where
     C: connect::Connect + Send + Sync + Clone + Unpin,
 {
-    capabilities: Option<webdriver::capabilities::Capabilities>,
+    capabilities: Option<Capabilities>,
     connector: C,
 }
 
@@ -203,7 +205,7 @@ where
         }
     }
 
-    /// Pass the given WebDriver capabilities to the browser.
+    /// Pass the given [WebDriver capabilities][1] to the browser.
     ///
     /// The WebDriver specification has a list of [standard
     /// capabilities](https://www.w3.org/TR/webdriver1/#capabilities), which are given below. In
@@ -214,7 +216,7 @@ where
     /// [`goog:chromeOptions`](https://sites.google.com/a/chromium.org/chromedriver/capabilities).
     ///
     /// The standard options are given below. See the
-    /// [specification](https://www.w3.org/TR/webdriver1/#capabilities) for more details.
+    /// [specification](https://w3.org/TR/webdriver1/#capabilities) for more details.
     ///
     /// | Capability | Key | Value Type | Description |
     /// |------------|-----|------------|-------------|
@@ -227,7 +229,9 @@ where
     /// | Window dimensioning/positioning | `"setWindowRect"` | boolean | Indicates whether the remote end supports all of the commands in Resizing and Positioning Windows. |
     /// | Session timeouts configuration | `"timeouts"` | JSON Object | Describes the timeouts imposed on certain session operations. |
     /// | Unhandled prompt behavior | `"unhandledPromptBehavior"` | string | Describes the current session’s user prompt handler. |
-    pub fn capabilities(&mut self, cap: webdriver::capabilities::Capabilities) -> &mut Self {
+    ///
+    /// [1]: https://w3.org/TR/webdriver/#dfn-capability
+    pub fn capabilities(&mut self, cap: Capabilities) -> &mut Self {
         self.capabilities = Some(cap);
         self
     }
@@ -266,21 +270,21 @@ pub enum Locator<'a> {
 }
 
 impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
-    fn from(locator: Locator<'a>) -> webdriver::command::LocatorParameters {
+    fn from(locator: Locator<'a>) -> Self {
         match locator {
-            Locator::Css(s) => webdriver::command::LocatorParameters {
+            Locator::Css(s) => Self {
                 using: webdriver::common::LocatorStrategy::CSSSelector,
                 value: s.to_string(),
             },
-            Locator::Id(s) => webdriver::command::LocatorParameters {
+            Locator::Id(s) => Self {
                 using: webdriver::common::LocatorStrategy::XPath,
                 value: format!("//*[@id=\"{}\"]", s),
             },
-            Locator::XPath(s) => webdriver::command::LocatorParameters {
+            Locator::XPath(s) => Self {
                 using: webdriver::common::LocatorStrategy::XPath,
                 value: s.to_string(),
             },
-            Locator::LinkText(s) => webdriver::command::LocatorParameters {
+            Locator::LinkText(s) => Self {
                 using: webdriver::common::LocatorStrategy::LinkText,
                 value: s.to_string(),
             },
@@ -288,7 +292,57 @@ impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
     }
 }
 
-mod client;
+/// A [handle][1] to a browser window.
+///
+/// Should be obtained it via [`Client::window()`] method (or similar).
+///
+/// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct WindowHandle(String);
+
+impl From<WindowHandle> for String {
+    fn from(w: WindowHandle) -> Self {
+        w.0
+    }
+}
+
+impl From<String> for WindowHandle {
+    fn from(s: String) -> Self {
+        Self(s)
+    }
+}
+
+impl From<WindowHandle> for webdriver::common::WebWindow {
+    fn from(w: WindowHandle) -> Self {
+        Self(w.0)
+    }
+}
+
+impl From<webdriver::common::WebWindow> for WindowHandle {
+    fn from(w: webdriver::common::WebWindow) -> Self {
+        Self(w.0)
+    }
+}
+
+/// A type of a a new browser window.
+///
+/// Returned by [`Client::new_window()`] method.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum NewWindowType {
+    /// Opened in a tab.
+    Tab,
+
+    /// Opened in a separate window.
+    Window,
+}
+
+/// Dynamic set of [WebDriver capabilities][1].
+///
+/// [1]: https://w3.org/TR/webdriver/#dfn-capability
+pub type Capabilities = serde_json::Map<String, serde_json::Value>;
+
+pub mod client;
+#[doc(inline)]
 pub use client::Client;
 
 pub mod cookies;
