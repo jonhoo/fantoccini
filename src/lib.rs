@@ -131,7 +131,7 @@
 //!
 //! For more examples, take a look at the `examples/` directory.
 //!
-//! [WebDriver protocol]: https://www.w3.org/TR/webdriver/
+//! [WebDriver protocol]: https://w3.org/TR/webdriver/
 //! [CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
 //! [powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
 //! [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
@@ -209,7 +209,7 @@ where
     /// Pass the given [WebDriver capabilities][1] to the browser.
     ///
     /// The WebDriver specification has a list of [standard
-    /// capabilities](https://www.w3.org/TR/webdriver1/#capabilities), which are given below. In
+    /// capabilities](https://w3.org/TR/webdriver1/#capabilities), which are given below. In
     /// addition, most browser vendors support a number of browser-specific capabilities stored
     /// in an object under a prefixed key like
     /// [`moz:firefoxOptions`](https://developer.mozilla.org/en-US/docs/Web/WebDriver/Capabilities/firefoxOptions)
@@ -249,7 +249,7 @@ where
 
 /// An element locator.
 ///
-/// See [the specification](https://www.w3.org/TR/webdriver1/#locator-strategies) for more details.
+/// See [the specification](https://w3.org/TR/webdriver1/#locator-strategies) for more details.
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Locator<'a> {
     /// Find an element matching the given [CSS selector](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors).

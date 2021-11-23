@@ -10,8 +10,8 @@ use webdriver::error::WebDriverError;
 /// A single DOM element on the current page.
 ///
 /// Note that there is a lot of subtlety in how you can interact with an element through WebDriver,
-/// which [the WebDriver standard goes into detail on](https://www.w3.org/TR/webdriver1/#elements).
-/// The same goes for inspecting [element state](https://www.w3.org/TR/webdriver1/#element-state).
+/// which [the WebDriver standard goes into detail on](https://w3.org/TR/webdriver1/#elements).
+/// The same goes for inspecting [element state](https://w3.org/TR/webdriver1/#element-state).
 #[derive(Clone, Debug, Serialize)]
 pub struct Element {
     #[serde(skip_serializing)]
@@ -34,11 +34,11 @@ impl Element {
     }
 }
 
-/// [Command Contexts](https://www.w3.org/TR/webdriver1/#command-contexts)
+/// [Command Contexts](https://w3.org/TR/webdriver1/#command-contexts)
 impl Element {
     /// Switches to the frame contained within the element.
     ///
-    /// See [10.5 Switch To Frame](https://www.w3.org/TR/webdriver1/#switch-to-frame) of the
+    /// See [10.5 Switch To Frame](https://w3.org/TR/webdriver1/#switch-to-frame) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Frame"))]
     pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
@@ -56,12 +56,12 @@ impl Element {
     }
 }
 
-/// [Element Retrieval](https://www.w3.org/TR/webdriver1/#element-retrieval)
+/// [Element Retrieval](https://w3.org/TR/webdriver1/#element-retrieval)
 impl Element {
     /// Find the first descendant element that matches the given [`Locator`].
     ///
     /// See [12.4 Find Element From
-    /// Element](https://www.w3.org/TR/webdriver1/#find-element-from-element) of the WebDriver
+    /// Element](https://w3.org/TR/webdriver1/#find-element-from-element) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Find Element From Element"))]
     pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
@@ -82,7 +82,7 @@ impl Element {
     /// Find all descendant elements that match the given [`Locator`].
     ///
     /// See [12.5 Find Elemente From
-    /// Element](https://www.w3.org/TR/webdriver1/#find-elements-from-element) of the WebDriver
+    /// Element](https://w3.org/TR/webdriver1/#find-elements-from-element) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Find Elements From Element"))]
     pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
@@ -104,13 +104,13 @@ impl Element {
     }
 }
 
-/// [Element State](https://www.w3.org/TR/webdriver1/#element-state)
+/// [Element State](https://w3.org/TR/webdriver1/#element-state)
 impl Element {
     /// Look up an [attribute] value for this element by name.
     ///
     /// `Ok(None)` is returned if the element does not have the given attribute.
     ///
-    /// See [13.2 Get Element Attribute](https://www.w3.org/TR/webdriver1/#get-element-attribute)
+    /// See [13.2 Get Element Attribute](https://w3.org/TR/webdriver1/#get-element-attribute)
     /// of the WebDriver standard.
     ///
     /// [attribute]: https://dom.spec.whatwg.org/#concept-attribute
@@ -129,7 +129,7 @@ impl Element {
     ///
     /// `Ok(None)` is returned if the element does not have the given property.
     ///
-    /// See [13.3 Get Element Property](https://www.w3.org/TR/webdriver1/#get-element-property)
+    /// See [13.3 Get Element Property](https://w3.org/TR/webdriver1/#get-element-property)
     /// of the WebDriver standard.
     ///
     /// [property]: https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.1
@@ -145,7 +145,7 @@ impl Element {
 
     /// Retrieve the text contents of this elment.
     ///
-    /// See [13.5 Get Element Text](https://www.w3.org/TR/webdriver1/#get-element-text)
+    /// See [13.5 Get Element Text](https://w3.org/TR/webdriver1/#get-element-text)
     /// of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Element Text"))]
     pub async fn text(&mut self) -> Result<String, error::CmdError> {
@@ -175,13 +175,13 @@ impl Element {
     }
 }
 
-/// [Element Interaction](https://www.w3.org/TR/webdriver1/#element-interaction)
+/// [Element Interaction](https://w3.org/TR/webdriver1/#element-interaction)
 impl Element {
     /// Simulate the user clicking on this element.
     ///
     /// Note that since this *may* result in navigation, we give up the handle to the element.
     ///
-    /// See [14.1 Element Click](https://www.w3.org/TR/webdriver1/#element-click) of the WebDriver
+    /// See [14.1 Element Click](https://w3.org/TR/webdriver1/#element-click) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Element Click"))]
     pub async fn click(mut self) -> Result<Client, error::CmdError> {
@@ -197,7 +197,7 @@ impl Element {
 
     /// Clear this element.
     ///
-    /// See [14.2 Element Clear](https://www.w3.org/TR/webdriver1/#element-clear) of the WebDriver
+    /// See [14.2 Element Clear](https://w3.org/TR/webdriver1/#element-clear) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Element Clear"))]
     pub async fn clear(&mut self) -> Result<(), error::CmdError> {
@@ -216,7 +216,7 @@ impl Element {
     /// to the element. In case the element is not keyboard-interactable, an element not
     /// interactable error is returned.
     ///
-    /// See [14.3 Element Send Keys](https://www.w3.org/TR/webdriver1/#element-send-keys) of the
+    /// See [14.3 Element Send Keys](https://w3.org/TR/webdriver1/#element-send-keys) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Element Send Keys"))]
     pub async fn send_keys(&mut self, text: &str) -> Result<(), error::CmdError> {
@@ -251,7 +251,9 @@ impl Element {
                     webdriver::error::ErrorStatus::InvalidArgument,
                     "cannot follow element without href attribute",
                 );
-                return Err(error::CmdError::Standard(e));
+                return Err(error::CmdError::Standard(
+                    error::WebDriver::from_upstream_error(e),
+                ));
             }
             v => return Err(error::CmdError::NotW3C(v)),
         };

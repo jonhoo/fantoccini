@@ -17,7 +17,7 @@ use webdriver::common::{FrameId, ELEMENT_KEY};
 use crate::ClientBuilder;
 
 /// A WebDriver client tied to a single browser
-/// [session](https://www.w3.org/TR/webdriver1/#sessions).
+/// [session](https://w3.org/TR/webdriver1/#sessions).
 ///
 /// Use [`ClientBuilder`](crate::ClientBuilder) to create a new session.
 ///
@@ -145,11 +145,11 @@ impl Client {
 
 // NOTE: new impl block to keep related methods together.
 
-/// [Navigation](https://www.w3.org/TR/webdriver1/#navigation)
+/// [Navigation](https://w3.org/TR/webdriver1/#navigation)
 impl Client {
     /// Navigate directly to the given URL.
     ///
-    /// See [9.1 Navigate To](https://www.w3.org/TR/webdriver1/#dfn-navigate-to) of the WebDriver
+    /// See [9.1 Navigate To](https://w3.org/TR/webdriver1/#dfn-navigate-to) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Navigate To"))]
     pub async fn goto(&mut self, url: &str) -> Result<(), error::CmdError> {
@@ -165,7 +165,7 @@ impl Client {
 
     /// Retrieve the currently active URL for this session.
     ///
-    /// See [9.2 Get Current URL](https://www.w3.org/TR/webdriver1/#dfn-get-current-url) of the
+    /// See [9.2 Get Current URL](https://w3.org/TR/webdriver1/#dfn-get-current-url) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Current URL"))]
     pub async fn current_url(&mut self) -> Result<url::Url, error::CmdError> {
@@ -184,7 +184,7 @@ impl Client {
 
     /// Go back to the previous page.
     ///
-    /// See [9.3 Back](https://www.w3.org/TR/webdriver1/#dfn-back) of the WebDriver standard.
+    /// See [9.3 Back](https://w3.org/TR/webdriver1/#dfn-back) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Back"))]
     pub async fn back(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::GoBack).await?;
@@ -193,7 +193,7 @@ impl Client {
 
     /// Refresh the current previous page.
     ///
-    /// See [9.5 Refresh](https://www.w3.org/TR/webdriver1/#dfn-refresh) of the WebDriver standard.
+    /// See [9.5 Refresh](https://w3.org/TR/webdriver1/#dfn-refresh) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Refresh"))]
     pub async fn refresh(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::Refresh).await?;
@@ -201,11 +201,11 @@ impl Client {
     }
 }
 
-/// [Command Contexts](https://www.w3.org/TR/webdriver1/#command-contexts)
+/// [Command Contexts](https://w3.org/TR/webdriver1/#command-contexts)
 impl Client {
     /// Gets the current window handle.
     ///
-    /// See [10.1 Get Window Handle](https://www.w3.org/TR/webdriver1/#get-window-handle) of the
+    /// See [10.1 Get Window Handle](https://w3.org/TR/webdriver1/#get-window-handle) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Handle"))]
     pub async fn window(&mut self) -> Result<WindowHandle, error::CmdError> {
@@ -224,7 +224,7 @@ impl Client {
     /// The switching must be done by calling `switch_to_window` using a still live window
     /// after the current window has been closed.
     ///
-    /// See [10.2 Close Window](https://www.w3.org/TR/webdriver1/#close-window) of the WebDriver
+    /// See [10.2 Close Window](https://w3.org/TR/webdriver1/#close-window) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Close Window"))]
     pub async fn close_window(&mut self) -> Result<(), error::CmdError> {
@@ -234,7 +234,7 @@ impl Client {
 
     /// Switches to the chosen window.
     ///
-    /// See [10.3 Switch To Window](https://www.w3.org/TR/webdriver1/#switch-to-window) of the
+    /// See [10.3 Switch To Window](https://w3.org/TR/webdriver1/#switch-to-window) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Window"))]
     pub async fn switch_to_window(&mut self, window: WindowHandle) -> Result<(), error::CmdError> {
@@ -247,7 +247,7 @@ impl Client {
 
     /// Gets a list of all active windows (and tabs)
     ///
-    /// See [10.4 Get Window Handles](https://www.w3.org/TR/webdriver1/#get-window-handles) of the
+    /// See [10.4 Get Window Handles](https://w3.org/TR/webdriver1/#get-window-handles) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Handles"))]
     pub async fn windows(&mut self) -> Result<Vec<WindowHandle>, error::CmdError> {
@@ -309,7 +309,7 @@ impl Client {
 
     /// Switches to the frame specified at the index.
     ///
-    /// See [10.5 Switch To Frame](https://www.w3.org/TR/webdriver1/#switch-to-frame) of the
+    /// See [10.5 Switch To Frame](https://w3.org/TR/webdriver1/#switch-to-frame) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Frame"))]
     pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
@@ -322,7 +322,7 @@ impl Client {
 
     /// Switches to the parent of the frame the client is currently contained within.
     ///
-    /// See [10.6 Switch To Parent Frame](https://www.w3.org/TR/webdriver1/#switch-to-parent-frame)
+    /// See [10.6 Switch To Parent Frame](https://w3.org/TR/webdriver1/#switch-to-parent-frame)
     /// of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Parent Frame"))]
     pub async fn enter_parent_frame(mut self) -> Result<Client, error::CmdError> {
@@ -332,7 +332,7 @@ impl Client {
 
     /// Sets the x, y, width, and height properties of the current window.
     ///
-    /// See [10.7.2 Set Window Rect](https://www.w3.org/TR/webdriver1/#dfn-set-window-rect) of the
+    /// See [10.7.2 Set Window Rect](https://w3.org/TR/webdriver1/#dfn-set-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Set Window Rect"))]
     pub async fn set_window_rect(
@@ -355,7 +355,7 @@ impl Client {
 
     /// Gets the x, y, width, and height properties of the current window.
     ///
-    /// See [10.7.1 Get Window Rect](https://www.w3.org/TR/webdriver1/#dfn-get-window-rect) of the
+    /// See [10.7.1 Get Window Rect](https://w3.org/TR/webdriver1/#dfn-get-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Rect"))]
     pub async fn get_window_rect(&mut self) -> Result<(u64, u64, u64, u64), error::CmdError> {
@@ -389,7 +389,7 @@ impl Client {
 
     /// Sets the x, y, width, and height properties of the current window.
     ///
-    /// See [10.7.2 Set Window Rect](https://www.w3.org/TR/webdriver1/#dfn-set-window-rect) of the
+    /// See [10.7.2 Set Window Rect](https://w3.org/TR/webdriver1/#dfn-set-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Set Window Rect"))]
     pub async fn set_window_size(
@@ -410,7 +410,7 @@ impl Client {
 
     /// Gets the width and height of the current window.
     ///
-    /// See [10.7.1 Get Window Rect](https://www.w3.org/TR/webdriver1/#dfn-get-window-rect) of the
+    /// See [10.7.1 Get Window Rect](https://w3.org/TR/webdriver1/#dfn-get-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Rect"))]
     pub async fn get_window_size(&mut self) -> Result<(u64, u64), error::CmdError> {
@@ -420,7 +420,7 @@ impl Client {
 
     /// Sets the x, y, width, and height properties of the current window.
     ///
-    /// See [10.7.2 Set Window Rect](https://www.w3.org/TR/webdriver1/#dfn-set-window-rect) of the
+    /// See [10.7.2 Set Window Rect](https://w3.org/TR/webdriver1/#dfn-set-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Set Window Rect"))]
     pub async fn set_window_position(&mut self, x: u32, y: u32) -> Result<(), error::CmdError> {
@@ -437,7 +437,7 @@ impl Client {
 
     /// Gets the x and y top-left coordinate of the current window.
     ///
-    /// See [10.7.1 Get Window Rect](https://www.w3.org/TR/webdriver1/#dfn-get-window-rect) of the
+    /// See [10.7.1 Get Window Rect](https://w3.org/TR/webdriver1/#dfn-get-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Rect"))]
     pub async fn get_window_position(&mut self) -> Result<(u64, u64), error::CmdError> {
@@ -446,11 +446,11 @@ impl Client {
     }
 }
 
-/// [Element Retrieval](https://www.w3.org/TR/webdriver1/#element-retrieval)
+/// [Element Retrieval](https://w3.org/TR/webdriver1/#element-retrieval)
 impl Client {
     /// Find an element on the page that matches the given [`Locator`].
     ///
-    /// See [12.2 Find Element](https://www.w3.org/TR/webdriver1/#find-element) of the WebDriver
+    /// See [12.2 Find Element](https://w3.org/TR/webdriver1/#find-element) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Find Element"))]
     pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
@@ -459,7 +459,7 @@ impl Client {
 
     /// Find all elements on the page that match the given [`Locator`].
     ///
-    /// See [12.3 Find Elements](https://www.w3.org/TR/webdriver1/#find-elements) of the WebDriver
+    /// See [12.3 Find Elements](https://w3.org/TR/webdriver1/#find-elements) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Find Elements"))]
     pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
@@ -485,7 +485,7 @@ impl Client {
     ///
     /// If no element has focus, the result may be the page body or a `NoSuchElement` error.
     ///
-    /// See [12.6 Get Active Element](https://www.w3.org/TR/webdriver1/#dfn-get-active-element) of
+    /// See [12.6 Get Active Element](https://w3.org/TR/webdriver1/#dfn-get-active-element) of
     /// the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Active Element"))]
     pub async fn active_element(&mut self) -> Result<Element, error::CmdError> {
@@ -511,11 +511,11 @@ impl Client {
     }
 }
 
-/// [Document Handling](https://www.w3.org/TR/webdriver1/#document-handling)
+/// [Document Handling](https://w3.org/TR/webdriver1/#document-handling)
 impl Client {
     /// Get the HTML source for the current page.
     ///
-    /// See [15.1 Get Page Source](https://www.w3.org/TR/webdriver1/#dfn-get-page-source) of the
+    /// See [15.1 Get Page Source](https://w3.org/TR/webdriver1/#dfn-get-page-source) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Page Source"))]
     pub async fn source(&mut self) -> Result<String, error::CmdError> {
@@ -535,7 +535,7 @@ impl Client {
     ///
     /// To retrieve the value of a variable, `return` has to be used in the JavaScript code.
     ///
-    /// See [15.2.1 Execute Script](https://www.w3.org/TR/webdriver1/#dfn-execute-script) of the
+    /// See [15.2.1 Execute Script](https://w3.org/TR/webdriver1/#dfn-execute-script) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Execute Script"))]
     pub async fn execute(
@@ -581,7 +581,7 @@ impl Client {
     /// ```
     ///
     /// See [15.2.2 Execute Async
-    /// Script](https://www.w3.org/TR/webdriver1/#dfn-execute-async-script) of the WebDriver
+    /// Script](https://w3.org/TR/webdriver1/#dfn-execute-async-script) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Execute Async Script"))]
     pub async fn execute_async(
@@ -599,11 +599,11 @@ impl Client {
     }
 }
 
-/// [Screen Capture](https://www.w3.org/TR/webdriver1/#screen-capture)
+/// [Screen Capture](https://w3.org/TR/webdriver1/#screen-capture)
 impl Client {
     /// Get a PNG-encoded screenshot of the current page.
     ///
-    /// See [19.1 Take Screenshot](https://www.w3.org/TR/webdriver1/#dfn-take-screenshot) of the
+    /// See [19.1 Take Screenshot](https://w3.org/TR/webdriver1/#dfn-take-screenshot) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Take Screenshot"))]
     pub async fn screenshot(&mut self) -> Result<Vec<u8>, error::CmdError> {
@@ -618,7 +618,7 @@ impl Client {
     /// Get a PNG-encoded screenshot of an element.
     ///
     /// See [19.2 Take Element
-    /// Screenshot](https://www.w3.org/TR/webdriver1/#dfn-take-element-screenshot) of the WebDriver
+    /// Screenshot](https://w3.org/TR/webdriver1/#dfn-take-element-screenshot) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Take Element Screenshot"))]
     pub async fn screenshot_element(
