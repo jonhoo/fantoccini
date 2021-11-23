@@ -142,9 +142,7 @@
 #![allow(rustdoc::missing_doc_code_examples, rustdoc::private_doc_tests)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-use std::convert::TryFrom;
-use std::fmt;
-
+use crate::wd::Capabilities;
 use hyper::client::connect;
 
 macro_rules! via_json {
@@ -247,135 +245,6 @@ where
     }
 }
 
-/// An element locator.
-///
-/// See [the specification](https://w3.org/TR/webdriver1/#locator-strategies) for more details.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum Locator<'a> {
-    /// Find an element matching the given [CSS selector](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors).
-    Css(&'a str),
-
-    /// Find an element using the given [`id`](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/id).
-    Id(&'a str),
-
-    /// Find a link element with the given link text.
-    ///
-    /// The text matching is exact.
-    LinkText(&'a str),
-
-    /// Find an element using the given [XPath expression](https://developer.mozilla.org/en-US/docs/Web/XPath).
-    ///
-    /// You can address pretty much any element this way, if you're willing to put in the time to
-    /// find the right XPath.
-    XPath(&'a str),
-}
-
-impl<'a> Locator<'a> {
-    pub(crate) fn into_parameters(self) -> webdriver::command::LocatorParameters {
-        use webdriver::command::LocatorParameters;
-        use webdriver::common::LocatorStrategy;
-
-        match self {
-            Locator::Css(s) => LocatorParameters {
-                using: LocatorStrategy::CSSSelector,
-                value: s.to_string(),
-            },
-            Locator::Id(s) => LocatorParameters {
-                using: LocatorStrategy::XPath,
-                value: format!("//*[@id=\"{}\"]", s),
-            },
-            Locator::XPath(s) => LocatorParameters {
-                using: LocatorStrategy::XPath,
-                value: s.to_string(),
-            },
-            Locator::LinkText(s) => LocatorParameters {
-                using: LocatorStrategy::LinkText,
-                value: s.to_string(),
-            },
-        }
-    }
-}
-
-/// A [handle][1] to a browser window.
-///
-/// Should be obtained it via [`Client::window()`] method (or similar).
-///
-/// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WindowHandle(String);
-
-impl From<WindowHandle> for String {
-    fn from(w: WindowHandle) -> Self {
-        w.0
-    }
-}
-
-impl TryFrom<String> for WindowHandle {
-    type Error = error::InvalidWindowHandle;
-
-    /// Makes the given [`String`] a [`WindowHandle`].
-    ///
-    /// # Errors
-    ///
-    /// If the given [`String`] is [`"current"`][1].
-    ///
-    /// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        if s != "current" {
-            Ok(Self(s))
-        } else {
-            Err(error::InvalidWindowHandle)
-        }
-    }
-}
-
-impl TryFrom<&str> for WindowHandle {
-    type Error = error::InvalidWindowHandle;
-
-    /// Makes the given string a [`WindowHandle`].
-    ///
-    /// Allocates if succeeds.
-    ///
-    /// # Errors
-    ///
-    /// If the given string is [`"current"`][1].
-    ///
-    /// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
-    fn try_from(s: &str) -> Result<Self, Self::Error> {
-        if s != "current" {
-            Ok(Self(s.to_string()))
-        } else {
-            Err(error::InvalidWindowHandle)
-        }
-    }
-}
-
-/// A type of a a new browser window.
-///
-/// Returned by [`Client::new_window()`] method.
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NewWindowType {
-    /// Opened in a tab.
-    Tab,
-
-    /// Opened in a separate window.
-    Window,
-}
-
-impl fmt::Display for NewWindowType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Tab => write!(f, "tab"),
-            Self::Window => write!(f, "window"),
-        }
-    }
-}
-
-/// Dynamic set of [WebDriver capabilities][1].
-///
-/// [1]: https://w3.org/TR/webdriver/#dfn-capability
-pub type Capabilities = serde_json::Map<String, serde_json::Value>;
-
 pub mod client;
 #[doc(inline)]
 pub use client::Client;
@@ -384,3 +253,5 @@ pub mod cookies;
 pub mod elements;
 
 pub mod wait;
+
+pub mod wd;

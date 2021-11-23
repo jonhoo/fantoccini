@@ -1,6 +1,7 @@
 //! Types used to represent particular elements on a page.
 
-use crate::{error, Client, Locator};
+use crate::wd::Locator;
+use crate::{error, Client};
 use serde::Serialize;
 use serde_json::Value as Json;
 use webdriver::command::WebDriverCommand;

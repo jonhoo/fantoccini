@@ -1,9 +1,10 @@
 //! WebDriver client implementation.
 
 use crate::elements::{Element, Form};
+use crate::error;
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
-use crate::{error, Capabilities, Locator, NewWindowType, WindowHandle};
+use crate::wd::{Capabilities, Locator, NewWindowType, WindowHandle};
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
 use std::convert::{TryFrom, TryInto as _};

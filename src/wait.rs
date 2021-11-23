@@ -44,8 +44,10 @@
 //! When a wait operation times out, it will return a [`CmdError::WaitTimeout`]. When a wait
 //! condition check returns an error, the wait operation will be aborted, and the error returned.
 
+use crate::elements::Element;
 use crate::error::CmdError;
-use crate::{elements::Element, Client, Locator};
+use crate::wd::Locator;
+use crate::Client;
 use std::time::{Duration, Instant};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
