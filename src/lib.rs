@@ -270,23 +270,26 @@ pub enum Locator<'a> {
     XPath(&'a str),
 }
 
-impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
-    fn from(locator: Locator<'a>) -> Self {
-        match locator {
-            Locator::Css(s) => Self {
-                using: webdriver::common::LocatorStrategy::CSSSelector,
+impl<'a> Locator<'a> {
+    pub(crate) fn into_parameters(self) -> webdriver::command::LocatorParameters {
+        use webdriver::command::LocatorParameters;
+        use webdriver::common::LocatorStrategy;
+
+        match self {
+            Locator::Css(s) => LocatorParameters {
+                using: LocatorStrategy::CSSSelector,
                 value: s.to_string(),
             },
-            Locator::Id(s) => Self {
-                using: webdriver::common::LocatorStrategy::XPath,
+            Locator::Id(s) => LocatorParameters {
+                using: LocatorStrategy::XPath,
                 value: format!("//*[@id=\"{}\"]", s),
             },
-            Locator::XPath(s) => Self {
-                using: webdriver::common::LocatorStrategy::XPath,
+            Locator::XPath(s) => LocatorParameters {
+                using: LocatorStrategy::XPath,
                 value: s.to_string(),
             },
-            Locator::LinkText(s) => Self {
-                using: webdriver::common::LocatorStrategy::LinkText,
+            Locator::LinkText(s) => LocatorParameters {
+                using: LocatorStrategy::LinkText,
                 value: s.to_string(),
             },
         }

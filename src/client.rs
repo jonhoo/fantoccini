@@ -454,7 +454,7 @@ impl Client {
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Find Element"))]
     pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
-        self.by(search.into()).await
+        self.by(search.into_parameters()).await
     }
 
     /// Find all elements on the page that match the given [`Locator`].
@@ -464,7 +464,7 @@ impl Client {
     #[cfg_attr(docsrs, doc(alias = "Find Elements"))]
     pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
         let res = self
-            .issue(WebDriverCommand::FindElements(search.into()))
+            .issue(WebDriverCommand::FindElements(search.into_parameters()))
             .await?;
         let array = self.parse_lookup_all(res)?;
         Ok(array
@@ -501,7 +501,7 @@ impl Client {
     ///
     /// Through the returned `Form`, HTML forms can be filled out and submitted.
     pub async fn form(&mut self, search: Locator<'_>) -> Result<Form, error::CmdError> {
-        let l = search.into();
+        let l = search.into_parameters();
         let res = self.issue(WebDriverCommand::FindElement(l)).await?;
         let f = self.parse_lookup(res)?;
         Ok(Form {

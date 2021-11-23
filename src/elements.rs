@@ -69,7 +69,7 @@ impl Element {
             .client
             .issue(WebDriverCommand::FindElementElement(
                 self.element.clone(),
-                search.into(),
+                search.into_parameters(),
             ))
             .await?;
         let e = self.client.parse_lookup(res)?;
@@ -90,7 +90,7 @@ impl Element {
             .client
             .issue(WebDriverCommand::FindElementElements(
                 self.element.clone(),
-                search.into(),
+                search.into_parameters(),
             ))
             .await?;
         let array = self.client.parse_lookup_all(res)?;
@@ -319,7 +319,8 @@ impl Form {
         locator: Locator<'_>,
         value: &str,
     ) -> Result<Self, error::CmdError> {
-        let locator = WebDriverCommand::FindElementElement(self.form.clone(), locator.into());
+        let locator =
+            WebDriverCommand::FindElementElement(self.form.clone(), locator.into_parameters());
         let value = Json::from(value);
 
         let res = self.client.issue(locator).await?;
@@ -366,7 +367,7 @@ impl Form {
     ///
     /// `false` is returned if a matching button was not found.
     pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client, error::CmdError> {
-        let locator = WebDriverCommand::FindElementElement(self.form, button.into());
+        let locator = WebDriverCommand::FindElementElement(self.form, button.into_parameters());
         let res = self.client.issue(locator).await?;
         let submit = self.client.parse_lookup(res)?;
         let res = self

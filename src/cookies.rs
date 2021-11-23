@@ -115,7 +115,7 @@ impl Client {
     pub async fn delete_cookie(&mut self, name: &str) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::DeleteCookie(name.to_string()))
             .await
-            .map(|_| ())
+            .map(drop)
     }
 
     /// Delete all cookies from the current document.
@@ -123,8 +123,6 @@ impl Client {
     /// See [16.5 Delete All Cookies](https://w3.org/TR/webdriver1/#delete-all-cookies) of the
     /// WebDriver standard.
     pub async fn delete_all_cookies(&mut self) -> Result<(), error::CmdError> {
-        self.issue(WebDriverCommand::DeleteCookies)
-            .await
-            .map(|_| ())
+        self.issue(WebDriverCommand::DeleteCookies).await.map(drop)
     }
 }
