@@ -255,3 +255,5 @@ pub mod elements;
 pub mod wait;
 
 pub mod wd;
+#[doc(inline)]
+pub use wd::Locator;
