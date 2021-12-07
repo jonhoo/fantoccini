@@ -179,7 +179,13 @@ where
 impl ClientBuilder<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
     /// Build a [`Client`] that will connect using [Rustls](https://crates.io/crates/rustls).
     pub fn rustls() -> Self {
-        Self::new(hyper_rustls::HttpsConnector::with_native_roots())
+        Self::new(
+            hyper_rustls::HttpsConnectorBuilder::new()
+                .with_native_roots()
+                .https_or_http()
+                .enable_http1()
+                .build(),
+        )
     }
 }
 
