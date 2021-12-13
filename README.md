@@ -102,7 +102,7 @@ println!("Wikipedia logo is {}b", pixels.len());
 
 For more examples, take a look at the `examples/` directory.
 
-[WebDriver protocol]: https://w3.org/TR/webdriver/
+[WebDriver protocol]: https://www.w3.org/TR/webdriver/
 [CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
 [powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
 [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors

@@ -131,7 +131,7 @@
 //!
 //! For more examples, take a look at the `examples/` directory.
 //!
-//! [WebDriver protocol]: https://w3.org/TR/webdriver/
+//! [WebDriver protocol]: https://www.w3.org/TR/webdriver/
 //! [CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
 //! [powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
 //! [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
@@ -213,7 +213,7 @@ where
     /// Pass the given [WebDriver capabilities][1] to the browser.
     ///
     /// The WebDriver specification has a list of [standard
-    /// capabilities](https://w3.org/TR/webdriver1/#capabilities), which are given below. In
+    /// capabilities](https://www.w3.org/TR/webdriver1/#capabilities), which are given below. In
     /// addition, most browser vendors support a number of browser-specific capabilities stored
     /// in an object under a prefixed key like
     /// [`moz:firefoxOptions`](https://developer.mozilla.org/en-US/docs/Web/WebDriver/Capabilities/firefoxOptions)
@@ -221,7 +221,7 @@ where
     /// [`goog:chromeOptions`](https://sites.google.com/a/chromium.org/chromedriver/capabilities).
     ///
     /// The standard options are given below. See the
-    /// [specification](https://w3.org/TR/webdriver1/#capabilities) for more details.
+    /// [specification](https://www.w3.org/TR/webdriver1/#capabilities) for more details.
     ///
     /// | Capability | Key | Value Type | Description |
     /// |------------|-----|------------|-------------|
@@ -235,7 +235,7 @@ where
     /// | Session timeouts configuration | `"timeouts"` | JSON Object | Describes the timeouts imposed on certain session operations. |
     /// | Unhandled prompt behavior | `"unhandledPromptBehavior"` | string | Describes the current session’s user prompt handler. |
     ///
-    /// [1]: https://w3.org/TR/webdriver/#dfn-capability
+    /// [1]: https://www.w3.org/TR/webdriver/#dfn-capability
     pub fn capabilities(&mut self, cap: Capabilities) -> &mut Self {
         self.capabilities = Some(cap);
         self

@@ -9,7 +9,7 @@ use std::fmt;
 ///
 /// Should be obtained it via [`Client::window()`] method (or similar).
 ///
-/// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+/// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WindowHandle(String);
 
@@ -30,7 +30,7 @@ impl<'a> TryFrom<Cow<'a, str>> for WindowHandle {
     ///
     /// If the given string is [`"current"`][1].
     ///
-    /// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+    /// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
     fn try_from(s: Cow<'a, str>) -> Result<Self, Self::Error> {
         if s != "current" {
             Ok(Self(s.into_owned()))
@@ -49,7 +49,7 @@ impl TryFrom<String> for WindowHandle {
     ///
     /// If the given [`String`] is [`"current"`][1].
     ///
-    /// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+    /// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
     fn try_from(s: String) -> Result<Self, Self::Error> {
         Self::try_from(Cow::Owned(s))
     }
@@ -66,7 +66,7 @@ impl TryFrom<&str> for WindowHandle {
     ///
     /// If the given string is [`"current"`][1].
     ///
-    /// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+    /// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         Self::try_from(Cow::Borrowed(s))
     }
@@ -97,14 +97,14 @@ impl fmt::Display for NewWindowType {
 
 /// Dynamic set of [WebDriver capabilities][1].
 ///
-/// [1]: https://w3.org/TR/webdriver/#dfn-capability
+/// [1]: https://www.w3.org/TR/webdriver/#dfn-capability
 pub type Capabilities = serde_json::Map<String, serde_json::Value>;
 
 /// An element locator.
 ///
 /// See [the specification][1] for more details.
 ///
-/// [1]: https://w3.org/TR/webdriver1/#locator-strategies
+/// [1]: https://www.w3.org/TR/webdriver1/#locator-strategies
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Locator<'a> {
     /// Find an element matching the given [CSS selector](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors).

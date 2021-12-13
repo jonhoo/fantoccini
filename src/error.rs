@@ -67,7 +67,7 @@ pub enum CmdError {
     /// See [the spec] for details about what each of these errors represent. Note that for
     /// convenience `NoSuchElement` has been extracted into its own top-level variant.
     ///
-    /// [the spec]: https://w3.org/TR/webdriver/#handling-errors
+    /// [the spec]: https://www.w3.org/TR/webdriver/#handling-errors
     Standard(WebDriver),
 
     /// No element was found matching the given locator.
@@ -77,8 +77,8 @@ pub enum CmdError {
     ///
     /// It is also used for the ["stale element reference"] error variant.
     ///
-    /// ["no such element"]: https://w3.org/TR/webdriver/#dfn-no-such-element
-    /// ["stale element reference"]: https://w3.org/TR/webdriver/#dfn-stale-element-reference
+    /// ["no such element"]: https://www.w3.org/TR/webdriver/#dfn-no-such-element
+    /// ["stale element reference"]: https://www.w3.org/TR/webdriver/#dfn-stale-element-reference
     NoSuchElement(WebDriver),
 
     /// The requested window does not exist.
@@ -86,7 +86,7 @@ pub enum CmdError {
     /// This variant lifts the ["no such window"] error variant from `Standard` to simplify
     /// checking for it in user code.
     ///
-    /// ["no such window"]: https://w3.org/TR/webdriver/#dfn-no-such-window
+    /// ["no such window"]: https://www.w3.org/TR/webdriver/#dfn-no-such-window
     NoSuchWindow(WebDriver),
 
     /// A bad URL was encountered during parsing.
@@ -115,7 +115,7 @@ pub enum CmdError {
     /// does not place `sessionId` for `NewSession` or errors under the `value` key in responses,
     /// and does not correctly encode and decode `WebElement` references.
     ///
-    /// [spec]: https://w3.org/TR/webdriver/
+    /// [spec]: https://www.w3.org/TR/webdriver/
     NotW3C(serde_json::Value),
 
     /// A function was invoked with an invalid argument.
@@ -249,7 +249,7 @@ impl From<serde_json::Error> for CmdError {
 /// [`"current"` string][1].
 ///
 /// [`WindowHandle`]: crate::WindowHandle
-/// [1]: https://w3.org/TR/webdriver/#dfn-window-handles
+/// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
 #[derive(Clone, Copy, Debug)]
 pub struct InvalidWindowHandle;
 
@@ -301,14 +301,14 @@ impl WebDriver {
 
     /// Returns [code] of this error provided by WebDriver.
     ///
-    /// [code]: https://w3.org/TR/webdriver/#dfn-error-code
+    /// [code]: https://www.w3.org/TR/webdriver/#dfn-error-code
     pub fn error(&self) -> &'static str {
         self.error.error_code()
     }
 
     /// Returns [HTTP Status] of this error provided by WebDriver.
     ///
-    /// [HTTP Status]: https://w3.org/TR/webdriver/#dfn-error-code
+    /// [HTTP Status]: https://www.w3.org/TR/webdriver/#dfn-error-code
     pub fn http_status(&self) -> http::StatusCode {
         self.error.http_status()
     }

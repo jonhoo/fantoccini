@@ -374,8 +374,8 @@ where
         };
 
         // Create a new session for this client
-        // https://w3.org/TR/webdriver/#dfn-new-session
-        // https://w3.org/TR/webdriver/#capabilities
+        // https://www.w3.org/TR/webdriver/#dfn-new-session
+        // https://www.w3.org/TR/webdriver/#capabilities
         //  - we want the browser to wait for the page to load
         cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
 
@@ -454,7 +454,7 @@ where
 
     /// Helper for determining what URL endpoint to use for various requests.
     ///
-    /// This mapping is essentially that of https://w3.org/TR/webdriver/#list-of-endpoints.
+    /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
     fn endpoint_for(&self, cmd: &Wcmd) -> Result<url::Url, url::ParseError> {
         if let WebDriverCommand::NewSession(..) = *cmd {
             return self.wdb.join("session");
@@ -525,7 +525,7 @@ where
     /// mostly a matter of picking the right URL and method from [the spec], and stuffing the JSON
     /// encoded arguments (if any) into the body.
     ///
-    /// [the spec]: https://w3.org/TR/webdriver/#list-of-endpoints
+    /// [the spec]: https://www.w3.org/TR/webdriver/#list-of-endpoints
     fn issue_wd_cmd(
         &mut self,
         cmd: WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>,
@@ -707,7 +707,7 @@ where
                 let mut is_success = status.is_success();
                 let mut legacy_status = 0;
 
-                // https://w3.org/TR/webdriver/#dfn-send-a-response
+                // https://www.w3.org/TR/webdriver/#dfn-send-a-response
                 // NOTE: the standard specifies that even errors use the "Send a Reponse" steps
                 let body = match serde_json::from_str(&*body)? {
                     Json::Object(mut v) => {
@@ -731,8 +731,8 @@ where
                     return Ok(body);
                 }
 
-                // https://w3.org/TR/webdriver/#dfn-send-an-error
-                // https://w3.org/TR/webdriver/#handling-errors
+                // https://www.w3.org/TR/webdriver/#dfn-send-an-error
+                // https://www.w3.org/TR/webdriver/#handling-errors
                 let mut body = match body {
                     Json::Object(o) => o,
                     j => return Err(error::CmdError::NotW3C(j)),
