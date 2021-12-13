@@ -107,10 +107,14 @@ pub type Capabilities = serde_json::Map<String, serde_json::Value>;
 /// [1]: https://www.w3.org/TR/webdriver1/#locator-strategies
 #[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum Locator<'a> {
-    /// Find an element matching the given [CSS selector](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors).
+    /// Find an element matching the given [CSS selector][1].
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
     Css(&'a str),
 
-    /// Find an element using the given [`id`](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/id).
+    /// Find an element using the given [`id`][1].
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/id
     Id(&'a str),
 
     /// Find a link element with the given link text.
@@ -118,10 +122,12 @@ pub enum Locator<'a> {
     /// The text matching is exact.
     LinkText(&'a str),
 
-    /// Find an element using the given [XPath expression](https://developer.mozilla.org/en-US/docs/Web/XPath).
+    /// Find an element using the given [XPath expression][1].
     ///
-    /// You can address pretty much any element this way, if you're willing to put in the time to
-    /// find the right XPath.
+    /// You can address pretty much any element this way, if you're willing to
+    /// put in the time to find the right XPath.
+    ///
+    /// [1]: https://developer.mozilla.org/en-US/docs/Web/XPath
     XPath(&'a str),
 }
 
