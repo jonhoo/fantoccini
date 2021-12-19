@@ -43,7 +43,7 @@ impl From<WebDriverCookie> for Cookie<'static> {
         }
 
         if let Some(expiry) = webdriver_cookie.expiry {
-            let dt = OffsetDateTime::from_unix_timestamp(expiry as i64);
+            let dt = OffsetDateTime::from_unix_timestamp(expiry as i64).ok();
             cookie.set_expires(dt);
         }
 
@@ -59,7 +59,9 @@ impl<'a> From<Cookie<'a>> for WebDriverCookie {
         let domain = cookie.domain().map(String::from);
         let secure = cookie.secure();
         let http_only = cookie.http_only();
-        let expiry = cookie.expires().map(|dt| dt.unix_timestamp() as u64);
+        let expiry = cookie
+            .expires()
+            .and_then(|e| e.datetime().map(|dt| dt.unix_timestamp() as u64));
 
         Self {
             name,

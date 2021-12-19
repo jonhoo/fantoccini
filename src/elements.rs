@@ -1,9 +1,10 @@
 //! Types used to represent particular elements on a page.
 
-use crate::{error, Client, Locator};
+use crate::wd::Locator;
+use crate::{error, Client};
 use serde::Serialize;
 use serde_json::Value as Json;
-use webdriver::command::{SendKeysParameters, SwitchToFrameParameters, WebDriverCommand};
+use webdriver::command::WebDriverCommand;
 use webdriver::common::FrameId;
 use webdriver::error::WebDriverError;
 
@@ -46,7 +47,7 @@ impl Element {
             mut client,
             element,
         } = self;
-        let params = SwitchToFrameParameters {
+        let params = webdriver::command::SwitchToFrameParameters {
             id: Some(FrameId::Element(element)),
         };
         client
@@ -69,7 +70,7 @@ impl Element {
             .client
             .issue(WebDriverCommand::FindElementElement(
                 self.element.clone(),
-                search.into(),
+                search.into_parameters(),
             ))
             .await?;
         let e = self.client.parse_lookup(res)?;
@@ -90,7 +91,7 @@ impl Element {
             .client
             .issue(WebDriverCommand::FindElementElements(
                 self.element.clone(),
-                search.into(),
+                search.into_parameters(),
             ))
             .await?;
         let array = self.client.parse_lookup_all(res)?;
@@ -222,7 +223,7 @@ impl Element {
     pub async fn send_keys(&mut self, text: &str) -> Result<(), error::CmdError> {
         let cmd = WebDriverCommand::ElementSendKeys(
             self.element.clone(),
-            SendKeysParameters {
+            webdriver::command::SendKeysParameters {
                 text: text.to_owned(),
             },
         );
@@ -251,7 +252,9 @@ impl Element {
                     webdriver::error::ErrorStatus::InvalidArgument,
                     "cannot follow element without href attribute",
                 );
-                return Err(error::CmdError::Standard(e));
+                return Err(error::CmdError::Standard(
+                    error::WebDriver::from_upstream_error(e),
+                ));
             }
             v => return Err(error::CmdError::NotW3C(v)),
         };
@@ -317,7 +320,8 @@ impl Form {
         locator: Locator<'_>,
         value: &str,
     ) -> Result<Self, error::CmdError> {
-        let locator = WebDriverCommand::FindElementElement(self.form.clone(), locator.into());
+        let locator =
+            WebDriverCommand::FindElementElement(self.form.clone(), locator.into_parameters());
         let value = Json::from(value);
 
         let res = self.client.issue(locator).await?;
@@ -364,7 +368,7 @@ impl Form {
     ///
     /// `false` is returned if a matching button was not found.
     pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client, error::CmdError> {
-        let locator = WebDriverCommand::FindElementElement(self.form, button.into());
+        let locator = WebDriverCommand::FindElementElement(self.form, button.into_parameters());
         let res = self.client.issue(locator).await?;
         let submit = self.client.parse_lookup(res)?;
         let res = self

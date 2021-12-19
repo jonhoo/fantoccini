@@ -142,6 +142,7 @@
 #![allow(rustdoc::missing_doc_code_examples, rustdoc::private_doc_tests)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+use crate::wd::Capabilities;
 use hyper::client::connect;
 
 macro_rules! via_json {
@@ -170,7 +171,7 @@ pub struct ClientBuilder<C>
 where
     C: connect::Connect + Send + Sync + Clone + Unpin,
 {
-    capabilities: Option<webdriver::capabilities::Capabilities>,
+    capabilities: Option<Capabilities>,
     connector: C,
 }
 
@@ -209,7 +210,7 @@ where
         }
     }
 
-    /// Pass the given WebDriver capabilities to the browser.
+    /// Pass the given [WebDriver capabilities][1] to the browser.
     ///
     /// The WebDriver specification has a list of [standard
     /// capabilities](https://www.w3.org/TR/webdriver1/#capabilities), which are given below. In
@@ -233,7 +234,9 @@ where
     /// | Window dimensioning/positioning | `"setWindowRect"` | boolean | Indicates whether the remote end supports all of the commands in Resizing and Positioning Windows. |
     /// | Session timeouts configuration | `"timeouts"` | JSON Object | Describes the timeouts imposed on certain session operations. |
     /// | Unhandled prompt behavior | `"unhandledPromptBehavior"` | string | Describes the current session’s user prompt handler. |
-    pub fn capabilities(&mut self, cap: webdriver::capabilities::Capabilities) -> &mut Self {
+    ///
+    /// [1]: https://www.w3.org/TR/webdriver/#dfn-capability
+    pub fn capabilities(&mut self, cap: Capabilities) -> &mut Self {
         self.capabilities = Some(cap);
         self
     }
@@ -248,56 +251,15 @@ where
     }
 }
 
-/// An element locator.
-///
-/// See [the specification](https://www.w3.org/TR/webdriver1/#locator-strategies) for more details.
-#[derive(Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum Locator<'a> {
-    /// Find an element matching the given [CSS selector](https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors).
-    Css(&'a str),
-
-    /// Find an element using the given [`id`](https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/id).
-    Id(&'a str),
-
-    /// Find a link element with the given link text.
-    ///
-    /// The text matching is exact.
-    LinkText(&'a str),
-
-    /// Find an element using the given [XPath expression](https://developer.mozilla.org/en-US/docs/Web/XPath).
-    ///
-    /// You can address pretty much any element this way, if you're willing to put in the time to
-    /// find the right XPath.
-    XPath(&'a str),
-}
-
-impl<'a> From<Locator<'a>> for webdriver::command::LocatorParameters {
-    fn from(locator: Locator<'a>) -> webdriver::command::LocatorParameters {
-        match locator {
-            Locator::Css(s) => webdriver::command::LocatorParameters {
-                using: webdriver::common::LocatorStrategy::CSSSelector,
-                value: s.to_string(),
-            },
-            Locator::Id(s) => webdriver::command::LocatorParameters {
-                using: webdriver::common::LocatorStrategy::XPath,
-                value: format!("//*[@id=\"{}\"]", s),
-            },
-            Locator::XPath(s) => webdriver::command::LocatorParameters {
-                using: webdriver::common::LocatorStrategy::XPath,
-                value: s.to_string(),
-            },
-            Locator::LinkText(s) => webdriver::command::LocatorParameters {
-                using: webdriver::common::LocatorStrategy::LinkText,
-                value: s.to_string(),
-            },
-        }
-    }
-}
-
-mod client;
+pub mod client;
+#[doc(inline)]
 pub use client::Client;
 
 pub mod cookies;
 pub mod elements;
 
 pub mod wait;
+
+pub mod wd;
+#[doc(inline)]
+pub use wd::Locator;

@@ -318,7 +318,7 @@ where
             Err(error::CmdError::Standard(
                 e
                 @
-                WebDriverError {
+                error::WebDriver {
                     error: ErrorStatus::SessionNotCreated,
                     ..
                 },
@@ -326,13 +326,13 @@ where
             Err(error::CmdError::Standard(
                 e
                 @
-                WebDriverError {
+                error::WebDriver {
                     error: ErrorStatus::UnknownError,
                     ..
                 },
             )) => Err(error::NewSessionError::NotW3C(
                 serde_json::to_value(e)
-                    .expect("WebdriverError should always be serializeable to JSON"),
+                    .expect("error::WebDriver should always be serializeable to JSON"),
             )),
             Err(e) => {
                 panic!("unexpected webdriver error; {}", e);
@@ -849,7 +849,9 @@ where
                 };
 
                 let message = body["message"].as_str().unwrap().to_string();
-                Err(error::CmdError::from(WebDriverError::new(es, message)))
+                Err(error::CmdError::from_webdriver_error(WebDriverError::new(
+                    es, message,
+                )))
             });
 
         Either::Left(f)

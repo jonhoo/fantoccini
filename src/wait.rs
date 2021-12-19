@@ -44,8 +44,10 @@
 //! When a wait operation times out, it will return a [`CmdError::WaitTimeout`]. When a wait
 //! condition check returns an error, the wait operation will be aborted, and the error returned.
 
+use crate::elements::Element;
 use crate::error::CmdError;
-use crate::{elements::Element, Client, Locator};
+use crate::wd::Locator;
+use crate::Client;
 use std::time::{Duration, Instant};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -130,8 +132,7 @@ impl<'c> Wait<'c> {
     /// Wait until a particular element can be found.
     pub async fn for_element(self, search: Locator<'_>) -> Result<Element, CmdError> {
         wait_on!(self, {
-            let locator: webdriver::command::LocatorParameters = search.into();
-            match self.client.by(locator).await {
+            match self.client.by(search.into_parameters()).await {
                 Ok(element) => Ok(Some(element)),
                 Err(CmdError::NoSuchElement(_)) => Ok(None),
                 Err(err) => Err(err),
