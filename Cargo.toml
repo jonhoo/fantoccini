@@ -1,6 +1,6 @@
 [package]
 name = "fantoccini"
-version = "0.18.0-beta.1"
+version = "0.18.0"
 edition = "2018"
 
 description = "High-level API for programmatically interacting with web pages through WebDriver."
@@ -31,7 +31,7 @@ futures-core = "0.3"
 futures-util = "0.3"
 tokio = { version = "1", features = ["sync", "rt"] }
 hyper = { version = "0.14", features = ["stream", "client", "http1", "http2"] }
-cookie = { version = "0.16.0-rc.1", features = ["percent-encode"] }
+cookie = { version = "0.16.0", features = ["percent-encode"] }
 base64 = "0.13"
 hyper-rustls = { version = "0.23.0", optional = true }
 hyper-tls = { version = "0.5.0", optional = true }
