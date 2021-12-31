@@ -260,7 +260,7 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
 
 // Verifies that basic cookie handling works
 async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
-    c.goto("https://google.com/").await?;
+    c.goto("https://www.wikipedia.org/").await?;
 
     let cookies = c.get_all_cookies().await?;
     assert!(!cookies.is_empty());
