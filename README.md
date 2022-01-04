@@ -92,7 +92,14 @@ let raw = img.client().raw_client_for(fantoccini::Method::GET, &src).await?;
 
 // we then read out the image bytes
 use futures_util::TryStreamExt;
-let pixels = raw.into_body().try_concat().await.map_err(fantoccini::error::CmdError::from)?;
+let pixels = raw
+    .into_body()
+    .try_fold(Vec::new(), |mut data, chunk| async move {
+        data.extend_from_slice(&chunk);
+        Ok(data)
+    })
+    .await
+    .map_err(fantoccini::error::CmdError::from)?;
 // and voilla, we now have the bytes for the Wikipedia logo!
 assert!(pixels.len() > 0);
 println!("Wikipedia logo is {}b", pixels.len());
