@@ -23,13 +23,7 @@ source code, and `Client::raw_client_for` to build a raw HTTP request for a part
 ## Examples
 
 These examples all assume that you have a [WebDriver compatible] process running on port 4444.
-A quick way to get one is to run [`geckodriver`] at the command line. The code also has
-partial support for the legacy WebDriver protocol used by `chromedriver` and `ghostdriver`.
-
-The examples will be using `panic!` or `unwrap` generously when errors occur (see `map_err`)
---- you should probably not do that in your code, and instead deal with errors when they occur.
-This is particularly true for methods that you *expect* might fail, such as lookups by CSS
-selector.
+A quick way to get one is to run [`geckodriver`] at the command line.
 
 Let's start out clicking around on Wikipedia:
 
@@ -108,3 +102,18 @@ For more examples, take a look at the `examples/` directory.
 [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
 [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 [`geckodriver`]: https://github.com/mozilla/geckodriver
+[`chromedriver`]: https://chromedriver.chromium.org/downloads
+
+# Contributing to fantoccini
+
+The following information applies only to developers interested in contributing
+to this project. If you simply want to use it to automate web browsers you can
+skip this section.
+
+## How to run tests
+
+The tests assume that you have `chromedriver` and `geckodriver` already running on your system.
+You can download them using the links above. Then run them from separate tabs in your terminal.
+They will stay running until terminated with Ctrl+C or until the terminal session is closed.
+
+Then run `cargo test` from this project directory.
