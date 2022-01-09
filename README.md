@@ -103,14 +103,6 @@ println!("Wikipedia logo is {}b", pixels.len());
 
 For more examples, take a look at the `examples/` directory.
 
-[WebDriver protocol]: https://www.w3.org/TR/webdriver/
-[CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
-[powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
-[operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
-[WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
-[`geckodriver`]: https://github.com/mozilla/geckodriver
-[`chromedriver`]: https://chromedriver.chromium.org/downloads
-
 # Contributing to fantoccini
 
 The following information applies only to developers interested in contributing
@@ -119,8 +111,16 @@ skip this section.
 
 ## How to run tests
 
-The tests assume that you have `chromedriver` and `geckodriver` already running on your system.
+The tests assume that you have [`chromedriver`] and [`geckodriver`] already running on your system.
 You can download them using the links above. Then run them from separate tabs in your terminal.
 They will stay running until terminated with Ctrl+C or until the terminal session is closed.
 
 Then run `cargo test` from this project directory.
+
+[WebDriver protocol]: https://www.w3.org/TR/webdriver/
+[CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
+[powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
+[operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
+[WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
+[`geckodriver`]: https://github.com/mozilla/geckodriver
+[`chromedriver`]: https://chromedriver.chromium.org/downloads
