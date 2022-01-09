@@ -1,7 +1,8 @@
 //! Cookie-related functionality for WebDriver.
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
-use webdriver::command::WebDriverCommand;
+use webdriver::command::{AddCookieParameters, WebDriverCommand};
+use webdriver::common::Date;
 
 use crate::client::Client;
 use crate::error;
@@ -9,9 +10,17 @@ use crate::error;
 /// Type alias for a [cookie::Cookie]
 pub type Cookie<'a> = cookie::Cookie<'a>;
 
+/// Wrapper for serializing AddCookieParameters.
+#[derive(Debug, Serialize)]
+pub struct AddCookieParametersWrapper<'a> {
+    /// The cookie to serialize.
+    #[serde(with = "AddCookieParameters")]
+    pub cookie: &'a AddCookieParameters,
+}
+
 /// Representation of a cookie as [defined by WebDriver](https://www.w3.org/TR/webdriver1/#cookies).
 #[derive(Debug, Deserialize, Serialize)]
-struct WebDriverCookie {
+pub(crate) struct WebDriverCookie {
     name: String,
     value: String,
     path: Option<String>,
@@ -20,6 +29,35 @@ struct WebDriverCookie {
     #[serde(rename = "httpOnly")]
     http_only: Option<bool>,
     expiry: Option<u64>,
+}
+
+impl From<AddCookieParameters> for WebDriverCookie {
+    fn from(params: AddCookieParameters) -> Self {
+        Self {
+            name: params.name,
+            value: params.value,
+            path: params.path,
+            domain: params.domain,
+            secure: Some(params.secure),
+            http_only: Some(params.httpOnly),
+            expiry: params.expiry.map(|d| d.0),
+        }
+    }
+}
+
+impl From<WebDriverCookie> for AddCookieParameters {
+    fn from(cookie: WebDriverCookie) -> Self {
+        Self {
+            name: cookie.name,
+            value: cookie.value,
+            path: cookie.path,
+            domain: cookie.domain,
+            secure: cookie.secure.unwrap_or_default(),
+            httpOnly: cookie.http_only.unwrap_or_default(),
+            expiry: cookie.expiry.map(Date),
+            sameSite: None,
+        }
+    }
 }
 
 impl From<WebDriverCookie> for Cookie<'static> {

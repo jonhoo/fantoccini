@@ -1,3 +1,4 @@
+use crate::cookies::AddCookieParametersWrapper;
 use crate::{error, Client};
 use futures_core::ready;
 use futures_util::future::{self, Either};
@@ -469,52 +470,86 @@ where
             WebDriverCommand::DeleteSession => unreachable!(),
             WebDriverCommand::Get(..) | WebDriverCommand::GetCurrentUrl => base.join("url"),
             WebDriverCommand::GoBack => base.join("back"),
+            WebDriverCommand::GoForward => base.join("forward"),
             WebDriverCommand::Refresh => base.join("refresh"),
+            WebDriverCommand::GetTitle => base.join("title"),
             WebDriverCommand::GetPageSource => base.join("source"),
+            WebDriverCommand::GetWindowHandle => base.join("window"),
+            WebDriverCommand::GetWindowHandles => base.join("window/handles"),
+            WebDriverCommand::NewWindow(..) => base.join("window/new"),
+            WebDriverCommand::CloseWindow => base.join("window"),
+            WebDriverCommand::GetWindowRect => base.join("window/rect"),
+            WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
+            WebDriverCommand::MinimizeWindow => base.join("window/minimize"),
+            WebDriverCommand::MaximizeWindow => base.join("window/maximize"),
+            WebDriverCommand::FullscreenWindow => base.join("window/fullscreen"),
+            WebDriverCommand::SwitchToWindow(..) => base.join("window"),
+            WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
+            WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
             WebDriverCommand::FindElement(..) => base.join("element"),
             WebDriverCommand::FindElements(..) => base.join("elements"),
-            WebDriverCommand::GetCookies
-            | WebDriverCommand::AddCookie(_)
-            | WebDriverCommand::DeleteCookies => base.join("cookie"),
-            WebDriverCommand::GetNamedCookie(ref name)
-            | WebDriverCommand::DeleteCookie(ref name) => base.join(&format!("cookie/{}", name)),
-            WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
-            WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
-            WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
-            WebDriverCommand::GetElementProperty(ref we, ref prop) => {
-                base.join(&format!("element/{}/property/{}", we.0, prop))
-            }
-            WebDriverCommand::GetElementAttribute(ref we, ref attr) => {
-                base.join(&format!("element/{}/attribute/{}", we.0, attr))
-            }
             WebDriverCommand::FindElementElement(ref p, _) => {
                 base.join(&format!("element/{}/element", p.0))
             }
             WebDriverCommand::FindElementElements(ref p, _) => {
                 base.join(&format!("element/{}/elements", p.0))
             }
-            WebDriverCommand::ElementClick(ref we) => base.join(&format!("element/{}/click", we.0)),
-            WebDriverCommand::ElementClear(ref we) => base.join(&format!("element/{}/clear", we.0)),
+            WebDriverCommand::GetActiveElement => base.join("element/active"),
+            WebDriverCommand::IsDisplayed(ref we) => {
+                base.join(&format!("element/{}/displayed", we.0))
+            }
+            WebDriverCommand::IsSelected(ref we) => {
+                base.join(&format!("element/{}/selected", we.0))
+            }
+            WebDriverCommand::GetElementAttribute(ref we, ref attr) => {
+                base.join(&format!("element/{}/attribute/{}", we.0, attr))
+            }
+            WebDriverCommand::GetElementProperty(ref we, ref prop) => {
+                base.join(&format!("element/{}/property/{}", we.0, prop))
+            }
+            WebDriverCommand::GetCSSValue(ref we, ref attr) => {
+                base.join(&format!("element/{}/css/{}", we.0, attr))
+            }
             WebDriverCommand::GetElementText(ref we) => {
                 base.join(&format!("element/{}/text", we.0))
             }
+            WebDriverCommand::GetElementTagName(ref we) => {
+                base.join(&format!("element/{}/name", we.0))
+            }
+            WebDriverCommand::GetElementRect(ref we) => {
+                base.join(&format!("element/{}/rect", we.0))
+            }
+            WebDriverCommand::IsEnabled(ref we) => base.join(&format!("element/{}/enabled", we.0)),
+            WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
+            WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
+            WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
+            WebDriverCommand::GetCookies
+            | WebDriverCommand::AddCookie(_)
+            | WebDriverCommand::DeleteCookies => base.join("cookie"),
+            WebDriverCommand::GetNamedCookie(ref name)
+            | WebDriverCommand::DeleteCookie(ref name) => base.join(&format!("cookie/{}", name)),
+            WebDriverCommand::GetTimeouts | WebDriverCommand::SetTimeouts(..) => {
+                base.join("timeouts")
+            }
+            WebDriverCommand::ElementClick(ref we) => base.join(&format!("element/{}/click", we.0)),
+            WebDriverCommand::ElementClear(ref we) => base.join(&format!("element/{}/clear", we.0)),
             WebDriverCommand::ElementSendKeys(ref we, _) => {
                 base.join(&format!("element/{}/value", we.0))
             }
-            WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
-            WebDriverCommand::GetWindowRect => base.join("window/rect"),
+            WebDriverCommand::PerformActions(..) | WebDriverCommand::ReleaseActions => {
+                base.join("actions")
+            }
+            WebDriverCommand::DismissAlert => base.join("alert/dismiss"),
+            WebDriverCommand::AcceptAlert => base.join("alert/accept"),
+            WebDriverCommand::GetAlertText | WebDriverCommand::SendAlertText(..) => {
+                base.join("alert/text")
+            }
             WebDriverCommand::TakeScreenshot => base.join("screenshot"),
             WebDriverCommand::TakeElementScreenshot(ref we) => {
                 base.join(&format!("element/{}/screenshot", we.0))
             }
-            WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
-            WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
-            WebDriverCommand::GetWindowHandle => base.join("window"),
-            WebDriverCommand::GetWindowHandles => base.join("window/handles"),
-            WebDriverCommand::NewWindow(..) => base.join("window/new"),
-            WebDriverCommand::SwitchToWindow(..) => base.join("window"),
-            WebDriverCommand::CloseWindow => base.join("window"),
-            WebDriverCommand::GetActiveElement => base.join("element/active"),
+            WebDriverCommand::Print(..) => base.join("print"),
+            WebDriverCommand::Status => base.join("status"),
             _ => unimplemented!(),
         }
     }
@@ -535,7 +570,7 @@ where
 
         use webdriver::command;
 
-        // most actions are just get requests with not parameters
+        // most actions are just GET requests with no parameters
         let url = match self.endpoint_for(&cmd) {
             Ok(url) => url,
             Err(e) => return Either::Right(future::err(error::CmdError::from(e))),
@@ -544,7 +579,7 @@ where
         let mut method = Method::GET;
         let mut body = None;
 
-        // but some are special
+        // but some have a request body
         match cmd {
             WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
                 // TODO: awful hacks
@@ -584,9 +619,6 @@ where
                 body = Some(serde_json::to_string(loc).unwrap());
                 method = Method::POST;
             }
-            WebDriverCommand::DeleteCookie(_) | WebDriverCommand::DeleteCookies => {
-                method = Method::DELETE;
-            }
             WebDriverCommand::ExecuteScript(ref script) => {
                 body = Some(serde_json::to_string(script).unwrap());
                 method = Method::POST;
@@ -602,24 +634,14 @@ where
             WebDriverCommand::ElementClick(..)
             | WebDriverCommand::ElementClear(..)
             | WebDriverCommand::GoBack
-            | WebDriverCommand::Refresh => {
+            | WebDriverCommand::GoForward
+            | WebDriverCommand::Refresh
+            | WebDriverCommand::MinimizeWindow
+            | WebDriverCommand::MaximizeWindow
+            | WebDriverCommand::FullscreenWindow
+            | WebDriverCommand::DismissAlert
+            | WebDriverCommand::AcceptAlert => {
                 body = Some("{}".to_string());
-                method = Method::POST;
-            }
-            WebDriverCommand::SetWindowRect(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::SwitchToFrame(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST
-            }
-            WebDriverCommand::SwitchToParentFrame => {
-                body = Some("{}".to_string());
-                method = Method::POST
-            }
-            WebDriverCommand::SwitchToWindow(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST;
             }
             WebDriverCommand::NewWindow(ref params) => {
@@ -629,6 +651,46 @@ where
             WebDriverCommand::CloseWindow => {
                 method = Method::DELETE;
             }
+            WebDriverCommand::SetWindowRect(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::SwitchToWindow(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::SwitchToFrame(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::SwitchToParentFrame => {
+                body = Some("{}".to_string());
+                method = Method::POST;
+            }
+            WebDriverCommand::AddCookie(ref params) => {
+                let wrapper = AddCookieParametersWrapper { cookie: params };
+                body = Some(serde_json::to_string(&wrapper).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::DeleteCookie(_) | WebDriverCommand::DeleteCookies => {
+                method = Method::DELETE;
+            }
+            WebDriverCommand::SetTimeouts(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::PerformActions(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::ReleaseActions => {
+                method = Method::DELETE;
+            }
+            WebDriverCommand::SendAlertText(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+
             _ => {}
         }
 
