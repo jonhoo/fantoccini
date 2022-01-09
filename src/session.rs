@@ -48,7 +48,7 @@ pub(crate) struct Task {
 }
 
 impl Client {
-    pub(crate) fn issue<C>(&mut self, cmd: C) -> impl Future<Output = Result<Json, error::CmdError>>
+    pub(crate) fn issue<C>(&self, cmd: C) -> impl Future<Output = Result<Json, error::CmdError>>
     where
         C: Into<Cmd>,
     {
@@ -369,7 +369,7 @@ where
         });
 
         // now that the session is running, let's do the handshake
-        let mut client = Client {
+        let client = Client {
             tx: tx.clone(),
             is_legacy: false,
         };

@@ -263,3 +263,9 @@ pub mod wait;
 pub mod wd;
 #[doc(inline)]
 pub use wd::Locator;
+
+/// Re-export bundled types;
+pub mod external {
+    pub use url::Url;
+    pub use webdriver;
+}
