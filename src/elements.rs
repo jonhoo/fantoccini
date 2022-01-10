@@ -217,6 +217,44 @@ impl Element {
         }
     }
 
+    /// Gets the x, y, width, and height properties of the current element.
+    ///
+    /// See [13.7 Get Element Rect](https://www.w3.org/TR/webdriver1/#dfn-get-element-rect) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Element Rect"))]
+    pub async fn get_element_rect(&mut self) -> Result<(i64, i64, u64, u64), error::CmdError> {
+        match self
+            .client
+            .issue(WebDriverCommand::GetElementRect(self.element.clone()))
+            .await?
+        {
+            Json::Object(mut obj) => {
+                let x = match obj.remove("x").and_then(|x| x.as_i64()) {
+                    Some(x) => x,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                let y = match obj.remove("y").and_then(|y| y.as_i64()) {
+                    Some(y) => y,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                let width = match obj.remove("width").and_then(|width| width.as_u64()) {
+                    Some(width) => width,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                let height = match obj.remove("height").and_then(|height| height.as_u64()) {
+                    Some(height) => height,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                Ok((x, y, width, height))
+            }
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
     /// Retrieve the HTML contents of this element.
     ///
     /// `inner` dictates whether the wrapping node's HTML is excluded or not. For example, take the
