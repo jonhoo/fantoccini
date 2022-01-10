@@ -125,6 +125,19 @@ impl Element {
         }
     }
 
+    /// Return true if the element is currently displayed.
+    ///
+    /// See [Element Displayedness](https://www.w3.org/TR/webdriver1/#element-displayedness)
+    /// of the WebDriver standard.
+    pub async fn is_displayed(&self) -> Result<bool, error::CmdError> {
+        let cmd = WebDriverCommand::IsDisplayed(self.element.clone());
+        match self.client.issue(cmd).await? {
+            Json::Bool(v) => Ok(v),
+            Json::Null => Ok(false),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
     /// Look up an [attribute] value for this element by name.
     ///
     /// `Ok(None)` is returned if the element does not have the given attribute.
