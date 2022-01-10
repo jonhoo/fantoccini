@@ -10,7 +10,9 @@ use serde_json::Value as Json;
 use std::convert::{TryFrom, TryInto as _};
 use std::future::Future;
 use tokio::sync::{mpsc, oneshot};
-use webdriver::command::{ActionsParameters, TimeoutsParameters, WebDriverCommand};
+use webdriver::command::{
+    ActionsParameters, SendKeysParameters, TimeoutsParameters, WebDriverCommand,
+};
 use webdriver::common::{FrameId, ELEMENT_KEY};
 
 // Used only under `native-tls`
@@ -703,6 +705,56 @@ impl Client {
     #[cfg_attr(docsrs, doc(alias = "Release Actions"))]
     pub async fn release_actions(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::ReleaseActions).await?;
+        Ok(())
+    }
+}
+
+/// [User Prompts](https://www.w3.org/TR/webdriver1/#user-prompts)
+impl Client {
+    /// Dismiss the active alert, if there is one.
+    ///
+    /// See [18.1 Dismiss Alert](https://www.w3.org/TR/webdriver1/#dismiss-alert) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Dismiss Alert"))]
+    pub async fn dismiss_alert(&self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::DismissAlert).await?;
+        Ok(())
+    }
+
+    /// Accept the active alert, if there is one.
+    ///
+    /// See [18.2 Accept Alert](https://www.w3.org/TR/webdriver1/#accept-alert) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Accept Alert"))]
+    pub async fn accept_alert(&self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::AcceptAlert).await?;
+        Ok(())
+    }
+
+    /// Get the text of the active alert, if there is one.
+    ///
+    /// See [18.3 Get Alert Text](https://www.w3.org/TR/webdriver1/#get-alert-text) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Alert Text"))]
+    pub async fn get_alert_text(&self) -> Result<String, error::CmdError> {
+        let res = self.issue(WebDriverCommand::GetAlertText).await?;
+        if let Some(v) = res.as_str() {
+            Ok(v.to_string())
+        } else {
+            Err(error::CmdError::NotW3C(res))
+        }
+    }
+
+    /// Send the specified text to the active alert, if there is one.
+    ///
+    /// See [18.4 Send Alert Text](https://www.w3.org/TR/webdriver1/#send-alert-text) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Send Alert Text"))]
+    pub async fn send_alert_text(&self, text: &str) -> Result<(), error::CmdError> {
+        let params = SendKeysParameters {
+            text: text.to_string(),
+        };
+        self.issue(WebDriverCommand::SendAlertText(params)).await?;
         Ok(())
     }
 }
