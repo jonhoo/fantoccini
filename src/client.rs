@@ -10,7 +10,7 @@ use serde_json::Value as Json;
 use std::convert::{TryFrom, TryInto as _};
 use std::future::Future;
 use tokio::sync::{mpsc, oneshot};
-use webdriver::command::WebDriverCommand;
+use webdriver::command::{ActionsParameters, WebDriverCommand};
 use webdriver::common::{FrameId, ELEMENT_KEY};
 
 // Used only under `native-tls`
@@ -646,6 +646,30 @@ impl Client {
         };
 
         self.issue(WebDriverCommand::ExecuteAsyncScript(cmd)).await
+    }
+}
+
+/// [Actions](https://www.w3.org/TR/webdriver1/#actions)
+impl Client {
+    /// Perform the specified input actions.
+    ///
+    /// See [17.5 Perform Actions](https://www.w3.org/TR/webdriver1/#perform-actions) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
+    pub async fn perform_actions(&self, actions: ActionsParameters) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::PerformActions(actions))
+            .await?;
+        Ok(())
+    }
+
+    /// Release all input actions.
+    ///
+    /// See [17.6 Release Actions](https://www.w3.org/TR/webdriver1/#release-actions) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Release Actions"))]
+    pub async fn release_actions(&self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::ReleaseActions).await?;
+        Ok(())
     }
 }
 
