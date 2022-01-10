@@ -18,17 +18,50 @@ pub struct AddCookieParametersWrapper<'a> {
     pub cookie: &'a AddCookieParameters,
 }
 
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub(crate) enum SameSite {
+    Strict,
+    Lax,
+    None,
+}
+
+impl From<String> for SameSite {
+    fn from(s: String) -> Self {
+        match s.to_lowercase().as_ref() {
+            "strict" => SameSite::Strict,
+            "lax" => SameSite::Lax,
+            _ => SameSite::None,
+        }
+    }
+}
+
+impl From<SameSite> for String {
+    fn from(s: SameSite) -> String {
+        match s {
+            SameSite::Strict => "Strict".to_string(),
+            SameSite::Lax => "Lax".to_string(),
+            SameSite::None => "None".to_string(),
+        }
+    }
+}
+
 /// Representation of a cookie as [defined by WebDriver](https://www.w3.org/TR/webdriver1/#cookies).
 #[derive(Debug, Deserialize, Serialize)]
 pub(crate) struct WebDriverCookie {
     name: String,
     value: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     domain: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     secure: Option<bool>,
-    #[serde(rename = "httpOnly")]
+    #[serde(skip_serializing_if = "Option::is_none", rename = "httpOnly")]
     http_only: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     expiry: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", rename = "sameSite")]
+    same_site: Option<SameSite>,
 }
 
 impl From<AddCookieParameters> for WebDriverCookie {
@@ -41,6 +74,7 @@ impl From<AddCookieParameters> for WebDriverCookie {
             secure: Some(params.secure),
             http_only: Some(params.httpOnly),
             expiry: params.expiry.map(|d| d.0),
+            same_site: params.sameSite.map(|x| x.into()),
         }
     }
 }
@@ -55,7 +89,7 @@ impl From<WebDriverCookie> for AddCookieParameters {
             secure: cookie.secure.unwrap_or_default(),
             httpOnly: cookie.http_only.unwrap_or_default(),
             expiry: cookie.expiry.map(Date),
-            sameSite: None,
+            sameSite: cookie.same_site.map(|x| x.into()),
         }
     }
 }
@@ -85,6 +119,15 @@ impl From<WebDriverCookie> for Cookie<'static> {
             cookie.set_expires(dt);
         }
 
+        if let Some(same_site) = webdriver_cookie.same_site {
+            use cookie::SameSite as CookieSameSite;
+            cookie.set_same_site(match same_site {
+                SameSite::Strict => CookieSameSite::Strict,
+                SameSite::Lax => CookieSameSite::Lax,
+                SameSite::None => CookieSameSite::None,
+            });
+        }
+
         cookie
     }
 }
@@ -100,6 +143,14 @@ impl<'a> From<Cookie<'a>> for WebDriverCookie {
         let expiry = cookie
             .expires()
             .and_then(|e| e.datetime().map(|dt| dt.unix_timestamp() as u64));
+        let same_site = cookie.same_site().map(|x| {
+            use cookie::SameSite as CookieSameSite;
+            match x {
+                CookieSameSite::Strict => SameSite::Strict,
+                CookieSameSite::Lax => SameSite::Lax,
+                CookieSameSite::None => SameSite::None,
+            }
+        });
 
         Self {
             name,
@@ -109,6 +160,7 @@ impl<'a> From<Cookie<'a>> for WebDriverCookie {
             secure,
             http_only,
             expiry,
+            same_site,
         }
     }
 }
@@ -144,6 +196,17 @@ impl Client {
             .await?;
         let webdriver_cookie: WebDriverCookie = serde_json::from_value(resp)?;
         Ok(webdriver_cookie.into())
+    }
+
+    /// Add the specified cookie.
+    ///
+    /// See [16.3 Add Cookie](https://www.w3.org/TR/webdriver1/#add-cookie) of the
+    /// WebDriver standard.
+    pub async fn add_cookie(&mut self, cookie: Cookie<'static>) -> Result<(), error::CmdError> {
+        let webdriver_cookie: WebDriverCookie = cookie.into();
+        self.issue(WebDriverCommand::AddCookie(webdriver_cookie.into()))
+            .await?;
+        Ok(())
     }
 
     /// Delete a single cookie from the current document.

@@ -192,6 +192,15 @@ impl Client {
         Ok(())
     }
 
+    /// Go forward to the next page.
+    ///
+    /// See [9.4 Forward](https://www.w3.org/TR/webdriver1/#dfn-forward) of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Forward"))]
+    pub async fn forward(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::GoForward).await?;
+        Ok(())
+    }
+
     /// Refresh the current previous page.
     ///
     /// See [9.5 Refresh](https://www.w3.org/TR/webdriver1/#dfn-refresh) of the WebDriver standard.
@@ -199,6 +208,19 @@ impl Client {
     pub async fn refresh(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::Refresh).await?;
         Ok(())
+    }
+
+    /// Get the current page title.
+    ///
+    /// See [9.6 Get Title](https://www.w3.org/TR/webdriver1/#dfn-get-title) of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Title"))]
+    pub async fn title(&self) -> Result<String, error::CmdError> {
+        let title = self.issue(WebDriverCommand::GetTitle).await?;
+        if let Some(title) = title.as_str() {
+            Ok(title.to_string())
+        } else {
+            Err(error::CmdError::NotW3C(title))
+        }
     }
 }
 
@@ -444,6 +466,33 @@ impl Client {
     pub async fn get_window_position(&mut self) -> Result<(u64, u64), error::CmdError> {
         let (x, y, _, _) = self.get_window_rect().await?;
         Ok((x, y))
+    }
+
+    /// Maximize the current window.
+    ///
+    /// See [10.7.3 Maximize Window](https://www.w3.org/TR/webdriver1/#dfn-maximize-window) of the
+    /// WebDriver standard.
+    pub async fn maximize_window(&self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::MaximizeWindow).await?;
+        Ok(())
+    }
+
+    /// Minimize the current window.
+    ///
+    /// See [10.7.4 Minimize Window](https://www.w3.org/TR/webdriver1/#dfn-minimize-window) of the
+    /// WebDriver standard.
+    pub async fn minimize_window(&self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::MinimizeWindow).await?;
+        Ok(())
+    }
+
+    /// Make the current window fullscreen.
+    ///
+    /// See [10.7.5 Fullscreen Window](https://www.w3.org/TR/webdriver1/#dfn-fullscreen-window) of the
+    /// WebDriver standard.
+    pub async fn fullscreen_window(&self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::FullscreenWindow).await?;
+        Ok(())
     }
 }
 

@@ -99,6 +99,32 @@ impl Element {
 
 /// [Element State](https://www.w3.org/TR/webdriver1/#element-state)
 impl Element {
+    /// Return true if the element is currently selected.
+    ///
+    /// See [13.1 Is Element Selected](https://www.w3.org/TR/webdriver1/#is-element-selected)
+    /// of the WebDriver standard.
+    pub async fn is_selected(&self) -> Result<bool, error::CmdError> {
+        let cmd = WebDriverCommand::IsSelected(self.element.clone());
+        match self.client.issue(cmd).await? {
+            Json::Bool(v) => Ok(v),
+            Json::Null => Ok(false),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Return true if the element is currently enabled.
+    ///
+    /// See [13.8 Is Element Enabled](https://www.w3.org/TR/webdriver1/#is-element-enabled)
+    /// of the WebDriver standard.
+    pub async fn is_enabled(&self) -> Result<bool, error::CmdError> {
+        let cmd = WebDriverCommand::IsEnabled(self.element.clone());
+        match self.client.issue(cmd).await? {
+            Json::Bool(v) => Ok(v),
+            Json::Null => Ok(false),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
     /// Look up an [attribute] value for this element by name.
     ///
     /// `Ok(None)` is returned if the element does not have the given attribute.
@@ -136,13 +162,42 @@ impl Element {
         }
     }
 
-    /// Retrieve the text contents of this elment.
+    /// Look up a CSS property for this element by name.
+    ///
+    /// `Ok(String::new())` is returned if the the given CSS property is not found.
+    ///
+    /// See [13.4 Get Element CSS Value](https://www.w3.org/TR/webdriver1/#get-element-css-value)
+    /// of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Element CSS Value"))]
+    pub async fn css_value(&mut self, prop: &str) -> Result<String, error::CmdError> {
+        let cmd = WebDriverCommand::GetCSSValue(self.element.clone(), prop.to_string());
+        match self.client.issue(cmd).await? {
+            Json::String(v) => Ok(v),
+            Json::Null => Ok(String::new()),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Retrieve the text contents of this element.
     ///
     /// See [13.5 Get Element Text](https://www.w3.org/TR/webdriver1/#get-element-text)
     /// of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Element Text"))]
     pub async fn text(&mut self) -> Result<String, error::CmdError> {
         let cmd = WebDriverCommand::GetElementText(self.element.clone());
+        match self.client.issue(cmd).await? {
+            Json::String(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Retrieve the tag name of this element.
+    ///
+    /// See [13.6 Get Element Tag Name](https://www.w3.org/TR/webdriver1/#get-element-tag-name)
+    /// of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Element Tag Name"))]
+    pub async fn tag_name(&mut self) -> Result<String, error::CmdError> {
+        let cmd = WebDriverCommand::GetElementTagName(self.element.clone());
         match self.client.issue(cmd).await? {
             Json::String(v) => Ok(v),
             v => Err(error::CmdError::NotW3C(v)),
