@@ -1,6 +1,7 @@
 //! WebDriver types and declarations.
 
 use crate::error;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
@@ -155,4 +156,15 @@ impl<'a> Locator<'a> {
             },
         }
     }
+}
+
+/// The WebDriver status as returned by [`Client::status()`].
+///
+/// See [8.3 Status](https://www.w3.org/TR/webdriver1/#status) of the WebDriver standard.
+///
+/// [`Client::status()`]: crate::Client::status
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebDriverStatus {
+    ready: String,
+    message: String,
 }

@@ -4,13 +4,13 @@ use crate::elements::{Element, Form};
 use crate::error;
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
-use crate::wd::{Capabilities, Locator, NewWindowType, WindowHandle};
+use crate::wd::{Capabilities, Locator, NewWindowType, WebDriverStatus, WindowHandle};
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
 use std::convert::{TryFrom, TryInto as _};
 use std::future::Future;
 use tokio::sync::{mpsc, oneshot};
-use webdriver::command::{ActionsParameters, WebDriverCommand};
+use webdriver::command::{ActionsParameters, TimeoutsParameters, WebDriverCommand};
 use webdriver::common::{FrameId, ELEMENT_KEY};
 
 // Used only under `native-tls`
@@ -145,6 +145,40 @@ impl Client {
 }
 
 // NOTE: new impl block to keep related methods together.
+
+/// [Sessions](https://www.w3.org/TR/webdriver1/#sessions)
+impl Client {
+    /// Get the WebDriver status.
+    ///
+    /// See [8.3 Status](https://www.w3.org/TR/webdriver1/#status) of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Status"))]
+    pub async fn status(&self) -> Result<WebDriverStatus, error::CmdError> {
+        let res = self.issue(WebDriverCommand::Status).await?;
+        let status: WebDriverStatus = serde_json::from_value(res)?;
+        Ok(status)
+    }
+
+    /// Get the timeouts for the current session.
+    ///
+    /// See [8.4 Get Timeouts](https://www.w3.org/TR/webdriver1/#get-timeouts) of the WebDriver
+    /// standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Timeouts"))]
+    pub async fn get_timeouts(&self) -> Result<TimeoutsParameters, error::CmdError> {
+        let res = self.issue(WebDriverCommand::GetTimeouts).await?;
+        let timeouts: TimeoutsParameters = serde_json::from_value(res)?;
+        Ok(timeouts)
+    }
+
+    /// Set the timeouts for the current session.
+    ///
+    /// See [8.5 Set Timeouts](https://www.w3.org/TR/webdriver1/#set-timeouts) of the WebDriver
+    /// standard.
+    #[cfg_attr(docsrs, doc(alias = "Set Timeouts"))]
+    pub async fn set_timeouts(&self, params: TimeoutsParameters) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::SetTimeouts(params)).await?;
+        Ok(())
+    }
+}
 
 /// [Navigation](https://www.w3.org/TR/webdriver1/#navigation)
 impl Client {
