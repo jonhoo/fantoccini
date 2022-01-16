@@ -694,7 +694,7 @@ impl Client {
 impl Client {
     /// Perform the specified input actions.
     ///
-    /// ```no_run
+    /// ```ignore
     /// use fantoccini::actions::ActionChain;
     ///
     /// let chain = ActionChain::builder()
