@@ -540,10 +540,22 @@ impl ActionChainBuilder {
         self.move_to_element(element).click()
     }
 
+    /// Add an action to click the specified mouse button on the center point of the
+    /// specified element.
+    pub fn click_element_with_button(self, element: Element, button: u64) -> Self {
+        self.move_to_element(element).click_button(button)
+    }
+
     /// Add an action to double-click the left mouse button on the center point of the
     /// specified element.
     pub fn double_click_element(self, element: Element) -> Self {
         self.move_to_element(element).double_click()
+    }
+
+    /// Add an action to double-click the specified mouse button on the center point of the
+    /// specified element.
+    pub fn double_click_element_with_button(self, element: Element, button: u64) -> Self {
+        self.move_to_element(element).double_click_button(button)
     }
 
     /// Add an action to click the specified mouse button on the center point of the
