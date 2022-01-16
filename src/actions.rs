@@ -39,14 +39,14 @@ pub enum KeyAction {
     Up {
         /// The key code, e.g. `'a'`. See the [`Keys`] module for special key codes.
         ///
-        /// [`Keys`]: crate::Keys
+        /// [`Keys`]: crate::keys::Keys
         value: char,
     },
     /// Key down action.
     Down {
         /// The key code, e.g. `'a'`. See the [`Keys`] module for special key codes.
         ///
-        /// [`Keys`]: crate::Keys
+        /// [`Keys`]: crate::keys::Keys
         value: char,
     },
 }
@@ -575,7 +575,7 @@ impl ActionChainBuilder {
     /// Add a key down action for the specified character.
     /// See [`Keys`] for the codes for special keyboard buttons.
     ///
-    /// [`Keys`]: crate::Keys
+    /// [`Keys`]: crate::keys::Keys
     pub fn key_down(mut self, value: char) -> Self {
         self.key_channel.add_action(KeyAction::Down { value });
         self.add_mouse_pause();
@@ -585,7 +585,7 @@ impl ActionChainBuilder {
     /// Add a key up action for the specified character.
     /// See [`Keys`] for the codes for special keyboard buttons.
     ///
-    /// [`Keys`]: crate::Keys
+    /// [`Keys`]: crate::keys::Keys
     pub fn key_up(mut self, value: char) -> Self {
         self.key_channel.add_action(KeyAction::Up { value });
         self.add_mouse_pause();
@@ -595,7 +595,7 @@ impl ActionChainBuilder {
     /// Add a key down + key up action for each character in the specified string.
     /// See [`Keys`] for the codes for special keyboard buttons.
     ///
-    /// [`Keys`]: crate::Keys
+    /// [`Keys`]: crate::keys::Keys
     pub fn send_keys(mut self, text: &str) -> Self {
         for c in text.chars() {
             self = self.key_down(c).key_up(c)

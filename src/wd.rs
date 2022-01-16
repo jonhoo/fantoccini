@@ -13,6 +13,7 @@ use webdriver::command::TimeoutsParameters;
 /// Should be obtained it via [`Client::window()`] method (or similar).
 ///
 /// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
+/// [`Client::window()`]: crate::Client::window
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WindowHandle(String);
 

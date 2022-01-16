@@ -248,7 +248,7 @@ impl From<serde_json::Error> for CmdError {
 /// Error of attempting to create an invalid [`WindowHandle`] from a
 /// [`"current"` string][1].
 ///
-/// [`WindowHandle`]: crate::WindowHandle
+/// [`WindowHandle`]: crate::wd::WindowHandle
 /// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
 #[derive(Clone, Copy, Debug)]
 pub struct InvalidWindowHandle;
