@@ -694,6 +694,18 @@ impl Client {
 impl Client {
     /// Perform the specified input actions.
     ///
+    /// Example:
+    /// ```no_run
+    /// use fantoccini::actions::ActionChain;
+    ///
+    /// let chain = ActionChain::builder()
+    ///     .click_element(element)
+    ///     .pause(Duration::from_secs(2))
+    ///     .send_keys("fantoccini")
+    ///     .build();
+    /// client.perform_actions(chain).await?;
+    /// ```
+    ///
     /// See [17.5 Perform Actions](https://www.w3.org/TR/webdriver1/#perform-actions) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
