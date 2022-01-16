@@ -115,7 +115,7 @@
 //! let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
 //! let src = img.attr("src").await?.expect("image should have a src");
 //! // now build a raw HTTP client request (which also has all current cookies)
-//! let raw = img.client.raw_client_for(hyper::Method::GET, &src).await?;
+//! let raw = img.client().raw_client_for(hyper::Method::GET, &src).await?;
 //!
 //! // we then read out the image bytes
 //! use futures_util::TryStreamExt;
@@ -255,17 +255,13 @@ pub mod client;
 #[doc(inline)]
 pub use client::Client;
 
+pub mod actions;
 pub mod cookies;
 pub mod elements;
+pub mod keys;
 
 pub mod wait;
 
 pub mod wd;
 #[doc(inline)]
 pub use wd::Locator;
-
-/// Re-export bundled types;
-pub mod external {
-    pub use url::Url;
-    pub use webdriver;
-}

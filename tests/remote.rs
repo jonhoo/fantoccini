@@ -89,7 +89,7 @@ async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::Cmd
         ""
     );
 
-    let mut c = e.client;
+    let mut c = e.client();
     c.close().await
 }
 
@@ -102,7 +102,11 @@ async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
     let src = img.attr("src").await?.expect("image should have a src");
 
     // now build a raw HTTP client request (which also has all current cookies)
-    let raw = img.client.raw_client_for(Method::GET, &src).await?;
+    let raw = img
+        .client()
+        .clone()
+        .raw_client_for(Method::GET, &src)
+        .await?;
 
     // we then read out the image bytes
     let pixels = hyper::body::to_bytes(raw.into_body())

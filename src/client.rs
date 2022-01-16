@@ -1,18 +1,19 @@
 //! WebDriver client implementation.
 
+use crate::actions::ActionChain;
 use crate::elements::{Element, Form};
 use crate::error;
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
-use crate::wd::{Capabilities, Locator, NewWindowType, WebDriverStatus, WindowHandle};
+use crate::wd::{
+    Capabilities, Locator, NewWindowType, TimeoutConfiguration, WebDriverStatus, WindowHandle,
+};
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
 use std::convert::{TryFrom, TryInto as _};
 use std::future::Future;
 use tokio::sync::{mpsc, oneshot};
-use webdriver::command::{
-    ActionsParameters, SendKeysParameters, TimeoutsParameters, WebDriverCommand,
-};
+use webdriver::command::{SendKeysParameters, WebDriverCommand};
 use webdriver::common::{FrameId, ELEMENT_KEY};
 
 // Used only under `native-tls`
@@ -165,9 +166,9 @@ impl Client {
     /// See [8.4 Get Timeouts](https://www.w3.org/TR/webdriver1/#get-timeouts) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Get Timeouts"))]
-    pub async fn get_timeouts(&self) -> Result<TimeoutsParameters, error::CmdError> {
+    pub async fn get_timeouts(&self) -> Result<TimeoutConfiguration, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetTimeouts).await?;
-        let timeouts: TimeoutsParameters = serde_json::from_value(res)?;
+        let timeouts: TimeoutConfiguration = serde_json::from_value(res)?;
         Ok(timeouts)
     }
 
@@ -176,8 +177,12 @@ impl Client {
     /// See [8.5 Set Timeouts](https://www.w3.org/TR/webdriver1/#set-timeouts) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Set Timeouts"))]
-    pub async fn set_timeouts(&self, params: TimeoutsParameters) -> Result<(), error::CmdError> {
-        self.issue(WebDriverCommand::SetTimeouts(params)).await?;
+    pub async fn set_timeouts(
+        &self,
+        timeouts: TimeoutConfiguration,
+    ) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::SetTimeouts(timeouts.into()))
+            .await?;
         Ok(())
     }
 }
@@ -692,8 +697,8 @@ impl Client {
     /// See [17.5 Perform Actions](https://www.w3.org/TR/webdriver1/#perform-actions) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
-    pub async fn perform_actions(&self, actions: ActionsParameters) -> Result<(), error::CmdError> {
-        self.issue(WebDriverCommand::PerformActions(actions))
+    pub async fn perform_actions(&self, actions: ActionChain) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::PerformActions(actions.into()))
             .await?;
         Ok(())
     }

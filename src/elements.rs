@@ -17,10 +17,31 @@ use webdriver::error::WebDriverError;
 pub struct Element {
     /// The high-level WebDriver client, for sending commands.
     #[serde(skip_serializing)]
-    pub client: Client,
+    pub(crate) client: Client,
     /// The encapsulated WebElement struct.
     #[serde(flatten)]
-    pub element: webdriver::common::WebElement,
+    pub(crate) element: webdriver::common::WebElement,
+}
+
+impl Element {
+    /// Construct an `Element` with the specified element id.
+    /// The element id is the id given by the webdriver.
+    pub fn from_element_id(client: Client, element_id: String) -> Self {
+        Self {
+            client,
+            element: webdriver::common::WebElement(element_id),
+        }
+    }
+
+    /// Get back the [`Client`] hosting this `Element`.
+    pub fn client(self) -> Client {
+        self.client
+    }
+
+    /// Get the element id as given by the webdriver.
+    pub fn element_id(&self) -> &str {
+        &self.element.0
+    }
 }
 
 /// An HTML form on the current page.
