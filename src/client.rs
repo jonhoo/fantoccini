@@ -155,7 +155,7 @@ impl Client {
     ///
     /// See [8.3 Status](https://www.w3.org/TR/webdriver1/#status) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Status"))]
-    pub async fn status(&self) -> Result<WebDriverStatus, error::CmdError> {
+    pub async fn status(&mut self) -> Result<WebDriverStatus, error::CmdError> {
         let res = self.issue(WebDriverCommand::Status).await?;
         let status: WebDriverStatus = serde_json::from_value(res)?;
         Ok(status)
@@ -166,7 +166,7 @@ impl Client {
     /// See [8.4 Get Timeouts](https://www.w3.org/TR/webdriver1/#get-timeouts) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Get Timeouts"))]
-    pub async fn get_timeouts(&self) -> Result<TimeoutConfiguration, error::CmdError> {
+    pub async fn get_timeouts(&mut self) -> Result<TimeoutConfiguration, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetTimeouts).await?;
         let timeouts: TimeoutConfiguration = serde_json::from_value(res)?;
         Ok(timeouts)
@@ -178,7 +178,7 @@ impl Client {
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Set Timeouts"))]
     pub async fn set_timeouts(
-        &self,
+        &mut self,
         timeouts: TimeoutConfiguration,
     ) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::SetTimeouts(timeouts.into()))
@@ -255,7 +255,7 @@ impl Client {
     ///
     /// See [9.6 Get Title](https://www.w3.org/TR/webdriver1/#dfn-get-title) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Title"))]
-    pub async fn title(&self) -> Result<String, error::CmdError> {
+    pub async fn title(&mut self) -> Result<String, error::CmdError> {
         let title = self.issue(WebDriverCommand::GetTitle).await?;
         if let Some(title) = title.as_str() {
             Ok(title.to_string())
@@ -376,7 +376,7 @@ impl Client {
     /// See [10.5 Switch To Frame](https://www.w3.org/TR/webdriver1/#switch-to-frame) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Frame"))]
-    pub async fn enter_frame(self, index: Option<u16>) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
         let params = webdriver::command::SwitchToFrameParameters {
             id: index.map(FrameId::Short),
         };
@@ -389,7 +389,7 @@ impl Client {
     /// See [10.6 Switch To Parent Frame](https://www.w3.org/TR/webdriver1/#switch-to-parent-frame)
     /// of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Parent Frame"))]
-    pub async fn enter_parent_frame(self) -> Result<Client, error::CmdError> {
+    pub async fn enter_parent_frame(mut self) -> Result<Client, error::CmdError> {
         self.issue(WebDriverCommand::SwitchToParentFrame).await?;
         Ok(self)
     }
@@ -513,7 +513,7 @@ impl Client {
     ///
     /// See [10.7.3 Maximize Window](https://www.w3.org/TR/webdriver1/#dfn-maximize-window) of the
     /// WebDriver standard.
-    pub async fn maximize_window(&self) -> Result<(), error::CmdError> {
+    pub async fn maximize_window(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::MaximizeWindow).await?;
         Ok(())
     }
@@ -522,7 +522,7 @@ impl Client {
     ///
     /// See [10.7.4 Minimize Window](https://www.w3.org/TR/webdriver1/#dfn-minimize-window) of the
     /// WebDriver standard.
-    pub async fn minimize_window(&self) -> Result<(), error::CmdError> {
+    pub async fn minimize_window(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::MinimizeWindow).await?;
         Ok(())
     }
@@ -531,7 +531,7 @@ impl Client {
     ///
     /// See [10.7.5 Fullscreen Window](https://www.w3.org/TR/webdriver1/#dfn-fullscreen-window) of the
     /// WebDriver standard.
-    pub async fn fullscreen_window(&self) -> Result<(), error::CmdError> {
+    pub async fn fullscreen_window(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::FullscreenWindow).await?;
         Ok(())
     }
@@ -697,7 +697,7 @@ impl Client {
     /// See [17.5 Perform Actions](https://www.w3.org/TR/webdriver1/#perform-actions) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
-    pub async fn perform_actions(&self, actions: ActionChain) -> Result<(), error::CmdError> {
+    pub async fn perform_actions(&mut self, actions: ActionChain) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::PerformActions(actions.into()))
             .await?;
         Ok(())
@@ -708,7 +708,7 @@ impl Client {
     /// See [17.6 Release Actions](https://www.w3.org/TR/webdriver1/#release-actions) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Release Actions"))]
-    pub async fn release_actions(&self) -> Result<(), error::CmdError> {
+    pub async fn release_actions(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::ReleaseActions).await?;
         Ok(())
     }
@@ -721,7 +721,7 @@ impl Client {
     /// See [18.1 Dismiss Alert](https://www.w3.org/TR/webdriver1/#dismiss-alert) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Dismiss Alert"))]
-    pub async fn dismiss_alert(&self) -> Result<(), error::CmdError> {
+    pub async fn dismiss_alert(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::DismissAlert).await?;
         Ok(())
     }
@@ -731,7 +731,7 @@ impl Client {
     /// See [18.2 Accept Alert](https://www.w3.org/TR/webdriver1/#accept-alert) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Accept Alert"))]
-    pub async fn accept_alert(&self) -> Result<(), error::CmdError> {
+    pub async fn accept_alert(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::AcceptAlert).await?;
         Ok(())
     }
@@ -741,7 +741,7 @@ impl Client {
     /// See [18.3 Get Alert Text](https://www.w3.org/TR/webdriver1/#get-alert-text) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Alert Text"))]
-    pub async fn get_alert_text(&self) -> Result<String, error::CmdError> {
+    pub async fn get_alert_text(&mut self) -> Result<String, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetAlertText).await?;
         if let Some(v) = res.as_str() {
             Ok(v.to_string())
@@ -755,7 +755,7 @@ impl Client {
     /// See [18.4 Send Alert Text](https://www.w3.org/TR/webdriver1/#send-alert-text) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Send Alert Text"))]
-    pub async fn send_alert_text(&self, text: &str) -> Result<(), error::CmdError> {
+    pub async fn send_alert_text(&mut self, text: &str) -> Result<(), error::CmdError> {
         let params = SendKeysParameters {
             text: text.to_string(),
         };

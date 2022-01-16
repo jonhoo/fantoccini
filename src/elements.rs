@@ -59,7 +59,10 @@ impl Element {
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Frame"))]
     pub async fn enter_frame(self) -> Result<Client, error::CmdError> {
-        let Self { client, element } = self;
+        let Self {
+            mut client,
+            element,
+        } = self;
         let params = webdriver::command::SwitchToFrameParameters {
             id: Some(FrameId::Element(element)),
         };
@@ -124,7 +127,7 @@ impl Element {
     ///
     /// See [13.1 Is Element Selected](https://www.w3.org/TR/webdriver1/#is-element-selected)
     /// of the WebDriver standard.
-    pub async fn is_selected(&self) -> Result<bool, error::CmdError> {
+    pub async fn is_selected(&mut self) -> Result<bool, error::CmdError> {
         let cmd = WebDriverCommand::IsSelected(self.element.clone());
         match self.client.issue(cmd).await? {
             Json::Bool(v) => Ok(v),
@@ -137,7 +140,7 @@ impl Element {
     ///
     /// See [13.8 Is Element Enabled](https://www.w3.org/TR/webdriver1/#is-element-enabled)
     /// of the WebDriver standard.
-    pub async fn is_enabled(&self) -> Result<bool, error::CmdError> {
+    pub async fn is_enabled(&mut self) -> Result<bool, error::CmdError> {
         let cmd = WebDriverCommand::IsEnabled(self.element.clone());
         match self.client.issue(cmd).await? {
             Json::Bool(v) => Ok(v),
@@ -150,7 +153,7 @@ impl Element {
     ///
     /// See [Element Displayedness](https://www.w3.org/TR/webdriver1/#element-displayedness)
     /// of the WebDriver standard.
-    pub async fn is_displayed(&self) -> Result<bool, error::CmdError> {
+    pub async fn is_displayed(&mut self) -> Result<bool, error::CmdError> {
         let cmd = WebDriverCommand::IsDisplayed(self.element.clone());
         match self.client.issue(cmd).await? {
             Json::Bool(v) => Ok(v),
@@ -304,7 +307,7 @@ impl Element {
     /// See [14.1 Element Click](https://www.w3.org/TR/webdriver1/#element-click) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Element Click"))]
-    pub async fn click(self) -> Result<Client, error::CmdError> {
+    pub async fn click(mut self) -> Result<Client, error::CmdError> {
         let cmd = WebDriverCommand::ElementClick(self.element);
         let r = self.client.issue(cmd).await?;
         if r.is_null() || r.as_object().map(|o| o.is_empty()).unwrap_or(false) {
@@ -486,7 +489,7 @@ impl Form {
     /// Submit this form using the button matched by the given selector.
     ///
     /// `false` is returned if a matching button was not found.
-    pub async fn submit_with(self, button: Locator<'_>) -> Result<Client, error::CmdError> {
+    pub async fn submit_with(mut self, button: Locator<'_>) -> Result<Client, error::CmdError> {
         let locator = WebDriverCommand::FindElementElement(self.form, button.into_parameters());
         let res = self.client.issue(locator).await?;
         let submit = self.client.parse_lookup(res)?;
@@ -523,7 +526,7 @@ impl Form {
     ///
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
-    pub async fn submit_direct(self) -> Result<Client, error::CmdError> {
+    pub async fn submit_direct(mut self) -> Result<Client, error::CmdError> {
         let mut args = vec![via_json!(&self.form)];
         self.client.fixup_elements(&mut args);
         // some sites are silly, and name their submit button "submit". this ends up overwriting
@@ -554,7 +557,11 @@ impl Form {
     /// However, it will *also* inject a hidden input element on the page that carries the given
     /// `field=value` mapping. This allows you to emulate the form data as it would have been *if*
     /// the submit button was indeed clicked.
-    pub async fn submit_sneaky(self, field: &str, value: &str) -> Result<Client, error::CmdError> {
+    pub async fn submit_sneaky(
+        mut self,
+        field: &str,
+        value: &str,
+    ) -> Result<Client, error::CmdError> {
         let mut args = vec![via_json!(&self.form), Json::from(field), Json::from(value)];
         self.client.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
