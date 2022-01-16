@@ -1,5 +1,7 @@
 //! Key codes for use with Actions.
 
+use std::ops::Add;
+
 /// Key codes for use with Actions.
 #[derive(Debug)]
 pub enum Keys {
@@ -177,5 +179,16 @@ impl From<Keys> for char {
             Keys::Meta => '\u{e03d}',
             Keys::Command => '\u{e03d}',
         }
+    }
+}
+
+impl<S> Add<S> for Keys
+where
+    S: AsRef<str>,
+{
+    type Output = String;
+
+    fn add(self, rhs: S) -> Self::Output {
+        char::from(self).to_string() + rhs.as_ref()
     }
 }

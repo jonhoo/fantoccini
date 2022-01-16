@@ -168,7 +168,7 @@ impl<'a> Locator<'a> {
 /// [`Client::status()`]: crate::Client::status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebDriverStatus {
-    ready: String,
+    ready: bool,
     message: String,
 }
 

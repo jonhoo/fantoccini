@@ -194,6 +194,11 @@ impl Element {
         let cmd = WebDriverCommand::GetElementProperty(self.element.clone(), prop.to_string());
         match self.client.issue(cmd).await? {
             Json::String(v) => Ok(Some(v)),
+            Json::Bool(b) => {
+                // NOTE: boolean properties such as "checked" seem to be returned as boolean
+                //       values rather than strings.
+                Ok(Some(b.to_string()))
+            }
             Json::Null => Ok(None),
             v => Err(error::CmdError::NotW3C(v)),
         }
@@ -246,19 +251,19 @@ impl Element {
     /// See [13.7 Get Element Rect](https://www.w3.org/TR/webdriver1/#dfn-get-element-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Element Rect"))]
-    pub async fn get_element_rect(&mut self) -> Result<(i64, i64, u64, u64), error::CmdError> {
+    pub async fn get_element_rect(&mut self) -> Result<(f64, f64, u64, u64), error::CmdError> {
         match self
             .client
             .issue(WebDriverCommand::GetElementRect(self.element.clone()))
             .await?
         {
             Json::Object(mut obj) => {
-                let x = match obj.remove("x").and_then(|x| x.as_i64()) {
+                let x = match obj.remove("x").and_then(|x| x.as_f64()) {
                     Some(x) => x,
                     None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
                 };
 
-                let y = match obj.remove("y").and_then(|y| y.as_i64()) {
+                let y = match obj.remove("y").and_then(|y| y.as_f64()) {
                     Some(y) => y,
                     None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
                 };

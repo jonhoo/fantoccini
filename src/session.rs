@@ -461,6 +461,10 @@ where
             return self.wdb.join("session");
         }
 
+        if let WebDriverCommand::Status = *cmd {
+            return self.wdb.join("status");
+        }
+
         let base = {
             self.wdb
                 .join(&format!("session/{}/", self.session.as_ref().unwrap()))?
@@ -549,7 +553,7 @@ where
                 base.join(&format!("element/{}/screenshot", we.0))
             }
             WebDriverCommand::Print(..) => base.join("print"),
-            WebDriverCommand::Status => base.join("status"),
+            WebDriverCommand::Status => unreachable!(),
             _ => unimplemented!(),
         }
     }

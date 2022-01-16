@@ -18,10 +18,22 @@ pub struct AddCookieParametersWrapper<'a> {
     pub cookie: &'a AddCookieParameters,
 }
 
+/// The SameSite parameter for cookies.
+///
+/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite
+/// for more details.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub(crate) enum SameSite {
+    /// Cookies will only be sent in a first-party context and not be sent along with
+    /// requests initiated by third party websites.
     Strict,
+    /// Cookies are not sent on normal cross-site subrequests (for example to load images
+    /// or frames into a third party site), but are sent when a user is navigating to the
+    /// origin site (i.e., when following a link).
     Lax,
+    /// Cookies will be sent in all contexts, i.e. in responses to both first-party and
+    /// cross-origin requests. If SameSite=None is set, the cookie Secure attribute must
+    /// also be set (or the cookie will be blocked).
     None,
 }
 
