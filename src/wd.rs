@@ -1,6 +1,8 @@
 //! WebDriver types and declarations.
 
 use crate::error;
+#[cfg(doc)]
+use crate::Client;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -13,7 +15,6 @@ use webdriver::command::TimeoutsParameters;
 /// Should be obtained it via [`Client::window()`] method (or similar).
 ///
 /// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
-/// [`Client::window()`]: crate::Client::window
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct WindowHandle(String);
 
@@ -164,8 +165,6 @@ impl<'a> Locator<'a> {
 /// The WebDriver status as returned by [`Client::status()`].
 ///
 /// See [8.3 Status](https://www.w3.org/TR/webdriver1/#status) of the WebDriver standard.
-///
-/// [`Client::status()`]: crate::Client::status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebDriverStatus {
     ready: bool,
@@ -175,9 +174,6 @@ pub struct WebDriverStatus {
 /// Timeout configuration, for various timeout settings.
 ///
 /// Used by [`Client::get_timeouts()`] and [`Client::set_timeouts()`].
-///
-/// [`Client::get_timeouts()`]: crate::Client::get_timeouts
-/// [`Client::set_timeouts()`]: crate::Client::set_timeouts
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeoutConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -211,8 +207,6 @@ impl TimeoutConfiguration {
     /// NOTE: It is recommended to leave the `implicit` timeout at 0 seconds, because that makes
     ///       it possible to check for the non-existence of an element without an implicit delay.
     ///       Also see [`Client::wait()`] for element polling functionality.
-    ///
-    /// [`Client::wait()`]: crate::Client::wait
     pub fn new(
         script: Option<Duration>,
         page_load: Option<Duration>,
@@ -256,22 +250,12 @@ impl TimeoutConfiguration {
     }
 }
 
-impl From<TimeoutsParameters> for TimeoutConfiguration {
-    fn from(tp: TimeoutsParameters) -> Self {
-        Self {
-            script: tp.script.flatten(),
-            page_load: tp.page_load,
-            implicit: tp.implicit,
-        }
-    }
-}
-
-impl From<TimeoutConfiguration> for TimeoutsParameters {
-    fn from(tc: TimeoutConfiguration) -> Self {
-        Self {
-            script: tc.script.map(Some),
-            page_load: tc.page_load,
-            implicit: tc.implicit,
+impl TimeoutConfiguration {
+    pub(crate) fn into_params(self) -> TimeoutsParameters {
+        TimeoutsParameters {
+            script: self.script.map(Some),
+            page_load: self.page_load,
+            implicit: self.implicit,
         }
     }
 }

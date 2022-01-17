@@ -1,4 +1,5 @@
 //! Cookie-related functionality for WebDriver.
+use cookie::SameSite;
 use serde::{Deserialize, Serialize};
 use time::OffsetDateTime;
 use webdriver::command::{AddCookieParameters, WebDriverCommand};
@@ -12,49 +13,10 @@ pub type Cookie<'a> = cookie::Cookie<'a>;
 
 /// Wrapper for serializing AddCookieParameters.
 #[derive(Debug, Serialize)]
-pub struct AddCookieParametersWrapper<'a> {
+pub(crate) struct AddCookieParametersWrapper<'a> {
     /// The cookie to serialize.
     #[serde(with = "AddCookieParameters")]
     pub cookie: &'a AddCookieParameters,
-}
-
-/// The SameSite parameter for cookies.
-///
-/// See https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie/SameSite
-/// for more details.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-pub(crate) enum SameSite {
-    /// Cookies will only be sent in a first-party context and not be sent along with
-    /// requests initiated by third party websites.
-    Strict,
-    /// Cookies are not sent on normal cross-site subrequests (for example to load images
-    /// or frames into a third party site), but are sent when a user is navigating to the
-    /// origin site (i.e., when following a link).
-    Lax,
-    /// Cookies will be sent in all contexts, i.e. in responses to both first-party and
-    /// cross-origin requests. If SameSite=None is set, the cookie Secure attribute must
-    /// also be set (or the cookie will be blocked).
-    None,
-}
-
-impl From<String> for SameSite {
-    fn from(s: String) -> Self {
-        match s.to_lowercase().as_ref() {
-            "strict" => SameSite::Strict,
-            "lax" => SameSite::Lax,
-            _ => SameSite::None,
-        }
-    }
-}
-
-impl From<SameSite> for String {
-    fn from(s: SameSite) -> String {
-        match s {
-            SameSite::Strict => "Strict".to_string(),
-            SameSite::Lax => "Lax".to_string(),
-            SameSite::None => "None".to_string(),
-        }
-    }
 }
 
 /// Representation of a cookie as [defined by WebDriver](https://www.w3.org/TR/webdriver1/#cookies).
@@ -73,35 +35,20 @@ pub(crate) struct WebDriverCookie {
     #[serde(skip_serializing_if = "Option::is_none")]
     expiry: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none", rename = "sameSite")]
-    same_site: Option<SameSite>,
+    same_site: Option<String>,
 }
 
-impl From<AddCookieParameters> for WebDriverCookie {
-    fn from(params: AddCookieParameters) -> Self {
-        Self {
-            name: params.name,
-            value: params.value,
-            path: params.path,
-            domain: params.domain,
-            secure: Some(params.secure),
-            http_only: Some(params.httpOnly),
-            expiry: params.expiry.map(|d| d.0),
-            same_site: params.sameSite.map(|x| x.into()),
-        }
-    }
-}
-
-impl From<WebDriverCookie> for AddCookieParameters {
-    fn from(cookie: WebDriverCookie) -> Self {
-        Self {
-            name: cookie.name,
-            value: cookie.value,
-            path: cookie.path,
-            domain: cookie.domain,
-            secure: cookie.secure.unwrap_or_default(),
-            httpOnly: cookie.http_only.unwrap_or_default(),
-            expiry: cookie.expiry.map(Date),
-            sameSite: cookie.same_site.map(|x| x.into()),
+impl WebDriverCookie {
+    fn into_params(self) -> AddCookieParameters {
+        AddCookieParameters {
+            name: self.name,
+            value: self.value,
+            path: self.path,
+            domain: self.domain,
+            secure: self.secure.unwrap_or_default(),
+            httpOnly: self.http_only.unwrap_or_default(),
+            expiry: self.expiry.map(Date),
+            sameSite: self.same_site,
         }
     }
 }
@@ -132,11 +79,10 @@ impl From<WebDriverCookie> for Cookie<'static> {
         }
 
         if let Some(same_site) = webdriver_cookie.same_site {
-            use cookie::SameSite as CookieSameSite;
-            cookie.set_same_site(match same_site {
-                SameSite::Strict => CookieSameSite::Strict,
-                SameSite::Lax => CookieSameSite::Lax,
-                SameSite::None => CookieSameSite::None,
+            cookie.set_same_site(match same_site.as_ref() {
+                "STRICT" | "Strict" | "strict" => SameSite::Strict,
+                "NONE" | "None" | "none" => SameSite::None,
+                _ => SameSite::Lax,
             });
         }
 
@@ -155,13 +101,10 @@ impl<'a> From<Cookie<'a>> for WebDriverCookie {
         let expiry = cookie
             .expires()
             .and_then(|e| e.datetime().map(|dt| dt.unix_timestamp() as u64));
-        let same_site = cookie.same_site().map(|x| {
-            use cookie::SameSite as CookieSameSite;
-            match x {
-                CookieSameSite::Strict => SameSite::Strict,
-                CookieSameSite::Lax => SameSite::Lax,
-                CookieSameSite::None => SameSite::None,
-            }
+        let same_site = cookie.same_site().map(|x| match x {
+            SameSite::Strict => "Strict".to_string(),
+            SameSite::Lax => "Lax".to_string(),
+            SameSite::None => "None".to_string(),
         });
 
         Self {
@@ -216,7 +159,7 @@ impl Client {
     /// WebDriver standard.
     pub async fn add_cookie(&mut self, cookie: Cookie<'static>) -> Result<(), error::CmdError> {
         let webdriver_cookie: WebDriverCookie = cookie.into();
-        self.issue(WebDriverCommand::AddCookie(webdriver_cookie.into()))
+        self.issue(WebDriverCommand::AddCookie(webdriver_cookie.into_params()))
             .await?;
         Ok(())
     }

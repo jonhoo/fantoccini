@@ -1,25 +1,28 @@
 //! Actions functionality for WebDriver.
 use crate::elements::Element;
+#[cfg(doc)]
+use crate::keys::Key;
 use std::fmt::Debug;
 use std::time::Duration;
 use webdriver::actions as WDActions;
 
 /// An action not associated with an input device (i.e. pause).
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum NullAction {
     /// Pause for the specified duration.
     Pause {
-        /// The pause duration, given in milliseconds.
-        duration: u64,
+        /// The pause duration.
+        duration: Duration,
     },
 }
 
-impl From<NullAction> for WDActions::NullActionItem {
-    fn from(na: NullAction) -> Self {
-        match na {
+impl NullAction {
+    fn into_item(self) -> WDActions::NullActionItem {
+        match self {
             NullAction::Pause { duration } => WDActions::NullActionItem::General(
                 WDActions::GeneralAction::Pause(WDActions::PauseAction {
-                    duration: Some(duration),
+                    duration: Some(duration.as_millis() as u64),
                 }),
             ),
         }
@@ -28,36 +31,33 @@ impl From<NullAction> for WDActions::NullActionItem {
 
 /// An action performed with a keyboard.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum KeyAction {
     /// Pause action.
     /// Useful for adding pauses between other key actions.
     Pause {
         /// The pause duration, given in milliseconds.
-        duration: u64,
+        duration: Duration,
     },
     /// Key up action.
     Up {
-        /// The key code, e.g. `'a'`. See the [`Keys`] module for special key codes.
-        ///
-        /// [`Keys`]: crate::keys::Keys
+        /// The key code, e.g. `'a'`. See the [`Key`] enum for special key codes.
         value: char,
     },
     /// Key down action.
     Down {
-        /// The key code, e.g. `'a'`. See the [`Keys`] module for special key codes.
-        ///
-        /// [`Keys`]: crate::keys::Keys
+        /// The key code, e.g. `'a'`. See the [`Key`] enum for special key codes.
         value: char,
     },
 }
 
-impl From<KeyAction> for WDActions::KeyActionItem {
-    fn from(ka: KeyAction) -> Self {
+impl KeyAction {
+    fn into_item(self) -> WDActions::KeyActionItem {
         use webdriver::actions::{KeyAction as WDKeyAction, KeyDownAction, KeyUpAction};
-        match ka {
+        match self {
             KeyAction::Pause { duration } => WDActions::KeyActionItem::General(
                 WDActions::GeneralAction::Pause(WDActions::PauseAction {
-                    duration: Some(duration),
+                    duration: Some(duration.as_millis() as u64),
                 }),
             ),
             KeyAction::Up { value } => {
@@ -77,12 +77,13 @@ impl From<KeyAction> for WDActions::KeyActionItem {
 /// An action performed with a pointer device. See `PointerActionType` for
 /// the availabledevice types.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum PointerAction {
     /// Pause action.
     /// Useful for adding pauses between other key actions.
     Pause {
         /// The pause duration, given in milliseconds.
-        duration: u64,
+        duration: Duration,
     },
     /// Pointer button down.
     Down {
@@ -118,6 +119,7 @@ pub enum PointerAction {
 
 /// The pointer origin to use for the relative x,y offset.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum PointerOrigin {
     /// Coordinates are relative to the top-left corner of the browser window.
     Viewport,
@@ -127,20 +129,21 @@ pub enum PointerOrigin {
     WebElement(Element),
 }
 
-impl From<PointerOrigin> for WDActions::PointerOrigin {
-    fn from(po: PointerOrigin) -> Self {
-        match po {
+impl PointerOrigin {
+    fn into_wd_pointerorigin(self) -> WDActions::PointerOrigin {
+        match self {
             PointerOrigin::Viewport => WDActions::PointerOrigin::Viewport,
             PointerOrigin::Pointer => WDActions::PointerOrigin::Pointer,
-            PointerOrigin::WebElement(e) => WDActions::PointerOrigin::Element(
-                webdriver::common::WebElement(e.element_id().to_string()),
-            ),
+            PointerOrigin::WebElement(e) => {
+                WDActions::PointerOrigin::Element(webdriver::common::WebElement(e.element_id().0))
+            }
         }
     }
 }
 
 /// The type of pointer.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum PointerActionType {
     /// A mouse pointer device.
     Mouse,
@@ -150,9 +153,9 @@ pub enum PointerActionType {
     Touch,
 }
 
-impl From<PointerActionType> for WDActions::PointerType {
-    fn from(pat: PointerActionType) -> Self {
-        match pat {
+impl PointerActionType {
+    fn into_wd_pointertype(self) -> WDActions::PointerType {
+        match self {
             PointerActionType::Mouse => WDActions::PointerType::Mouse,
             PointerActionType::Pen => WDActions::PointerType::Pen,
             PointerActionType::Touch => WDActions::PointerType::Touch,
@@ -160,12 +163,12 @@ impl From<PointerActionType> for WDActions::PointerType {
     }
 }
 
-impl From<PointerAction> for WDActions::PointerActionItem {
-    fn from(pa: PointerAction) -> Self {
-        match pa {
+impl PointerAction {
+    fn into_item(self) -> WDActions::PointerActionItem {
+        match self {
             PointerAction::Pause { duration } => WDActions::PointerActionItem::General(
                 WDActions::GeneralAction::Pause(WDActions::PauseAction {
-                    duration: Some(duration),
+                    duration: Some(duration.as_millis() as u64),
                 }),
             ),
             PointerAction::Down { button } => WDActions::PointerActionItem::Pointer(
@@ -182,7 +185,7 @@ impl From<PointerAction> for WDActions::PointerActionItem {
             } => WDActions::PointerActionItem::Pointer(WDActions::PointerAction::Move(
                 WDActions::PointerMoveAction {
                     duration: Some(duration),
-                    origin: origin.into(),
+                    origin: origin.into_wd_pointerorigin(),
                     x: Some(x),
                     y: Some(y),
                 },
@@ -214,15 +217,14 @@ impl NullActionChannel {
     }
 
     /// Add a pause action to this channel.
-    pub fn add_pause(&mut self, duration: Duration) {
-        self.add_action(NullAction::Pause {
-            duration: duration.as_millis() as u64,
-        });
+    pub fn pause(&mut self, duration: Duration) -> &mut Self {
+        self.then(NullAction::Pause { duration })
     }
 
     /// Add the specified action to this channel.
-    pub fn add_action(&mut self, action: NullAction) {
+    pub fn then(&mut self, action: NullAction) -> &mut Self {
         self.actions.push(action);
+        self
     }
 }
 
@@ -246,15 +248,14 @@ impl KeyActionChannel {
     }
 
     /// Add a pause action to this channel.
-    pub fn add_pause(&mut self, duration: Duration) {
-        self.add_action(KeyAction::Pause {
-            duration: duration.as_millis() as u64,
-        });
+    pub fn pause(&mut self, duration: Duration) -> &mut Self {
+        self.then(KeyAction::Pause { duration })
     }
 
     /// Add the specified action to this channel.
-    pub fn add_action(&mut self, action: KeyAction) {
+    pub fn then(&mut self, action: KeyAction) -> &mut Self {
         self.actions.push(action);
+        self
     }
 }
 
@@ -281,27 +282,49 @@ impl PointerActionChannel {
     }
 
     /// Add a pause action to this channel.
-    pub fn add_pause(&mut self, duration: Duration) {
-        self.add_action(PointerAction::Pause {
-            duration: duration.as_millis() as u64,
-        });
+    pub fn pause(&mut self, duration: Duration) -> &mut Self {
+        self.then(PointerAction::Pause { duration })
     }
 
     /// Add the specified action to this channel.
-    pub fn add_action(&mut self, action: PointerAction) {
+    pub fn then(&mut self, action: PointerAction) -> &mut Self {
         self.actions.push(action);
+        self
     }
 }
 
 /// An ActionChannel is a sequence of actions of a specific type.
-/// When combined with other channels, you can think of them like a grid, with actions on the
-/// horizontal axis and channels on the vertical axis. All of the actions in the first column
-/// will be executed simultaneously, then all of the second actions, and so on.
-/// The second column will not be executed until all actions in the first column have been
-/// completed, including any pauses.
 ///
-/// Thus, the duration of each column will be equal to the longest duration of any individual
-/// action in that column.
+/// When combined with other channels, you can think of them like a table, where each
+/// row contains a channel and each column is 1 "tick" of time. The duration of any given
+/// tick will be equal to the longest duration of any individual action in that column.
+///
+/// See the following example diagram:
+///
+/// ```ignore
+///   Tick ->                 1          2                     3
+/// |===================================================================
+/// | KeyActionChannel      |  Down   |  Up                 |  Pause  |
+/// |-------------------------------------------------------------------
+/// | PointerActionChannel  |  Down   |  Pause (2 seconds)  |  Up     |
+/// |-------------------------------------------------------------------
+/// | (other channel type)  |  Pause  |  Pause              |  Pause  |
+/// |===================================================================
+/// ```
+///
+/// At tick 1, both a `KeyAction::Down` and a `PointerAction::Down` are triggered
+/// simultaneously.
+///
+/// At tick 2, only a `KeyAction::Up` is triggered. Meanwhile the pointer channel
+/// has a `PointerAction::Pause` for 2 seconds. Note that tick 3 does not start
+/// until all of the actions from tick 2 have completed, including any pauses.
+///
+/// At tick 3, only a `PointerAction::Up` is triggered.
+///
+/// The bottom channel is just to show that other channels can be added. This could
+/// be any channel type, including an additional `Key` or `Pointer` channel. There
+/// is no theoretical limit to the number of channels that can be specified.
+///
 #[derive(Debug, Clone)]
 pub enum ActionChannel {
     /// A channel containing null actions.
@@ -315,12 +338,19 @@ pub enum ActionChannel {
 
 impl ActionChannel {
     /// Add a pause action for this channel.
-    pub fn add_pause(&mut self, duration: Duration) {
+    pub fn pause(&mut self, duration: Duration) -> &mut Self {
         match self {
-            ActionChannel::Null(channel) => channel.add_pause(duration),
-            ActionChannel::Key(channel) => channel.add_pause(duration),
-            ActionChannel::Pointer(channel) => channel.add_pause(duration),
+            ActionChannel::Null(channel) => {
+                channel.pause(duration);
+            }
+            ActionChannel::Key(channel) => {
+                channel.pause(duration);
+            }
+            ActionChannel::Pointer(channel) => {
+                channel.pause(duration);
+            }
         }
+        self
     }
 
     fn into_sequence(self) -> WDActions::ActionSequence {
@@ -328,22 +358,22 @@ impl ActionChannel {
             ActionChannel::Null(channel) => WDActions::ActionSequence {
                 id: channel.id,
                 actions: WDActions::ActionsType::Null {
-                    actions: channel.actions.into_iter().map(|x| x.into()).collect(),
+                    actions: channel.actions.into_iter().map(|x| x.into_item()).collect(),
                 },
             },
             ActionChannel::Key(channel) => WDActions::ActionSequence {
                 id: channel.id,
                 actions: WDActions::ActionsType::Key {
-                    actions: channel.actions.into_iter().map(|x| x.into()).collect(),
+                    actions: channel.actions.into_iter().map(|x| x.into_item()).collect(),
                 },
             },
             ActionChannel::Pointer(channel) => WDActions::ActionSequence {
                 id: channel.id,
                 actions: WDActions::ActionsType::Pointer {
                     parameters: WDActions::PointerActionParameters {
-                        pointer_type: channel.pointer_type.into(),
+                        pointer_type: channel.pointer_type.into_wd_pointertype(),
                     },
-                    actions: channel.actions.into_iter().map(|x| x.into()).collect(),
+                    actions: channel.actions.into_iter().map(|x| x.into_item()).collect(),
                 },
             },
         }
@@ -377,15 +407,15 @@ impl ActionChain {
     }
 }
 
-impl From<ActionChain> for webdriver::command::ActionsParameters {
-    fn from(ac: ActionChain) -> Self {
-        let mut sequences = Vec::new();
-
-        for channel in ac.channels {
-            sequences.push(channel.into_sequence());
+impl ActionChain {
+    pub(crate) fn into_params(self) -> webdriver::command::ActionsParameters {
+        webdriver::command::ActionsParameters {
+            actions: self
+                .channels
+                .into_iter()
+                .map(|x| x.into_sequence())
+                .collect(),
         }
-
-        webdriver::command::ActionsParameters { actions: sequences }
     }
 }
 
@@ -429,17 +459,17 @@ impl ActionChainBuilder {
     }
 
     fn add_key_pause(&mut self) {
-        self.key_channel.add_pause(self.default_duration);
+        self.key_channel.pause(self.default_duration);
     }
 
     fn add_mouse_pause(&mut self) {
-        self.mouse_channel.add_pause(self.default_duration);
+        self.mouse_channel.pause(self.default_duration);
     }
 
     /// Add a pause for the specified duration.
     pub fn pause(mut self, duration: Duration) -> Self {
-        self.key_channel.add_pause(duration);
-        self.mouse_channel.add_pause(duration);
+        self.key_channel.pause(duration);
+        self.mouse_channel.pause(duration);
         self
     }
 
@@ -448,26 +478,28 @@ impl ActionChainBuilder {
     /// - Middle = 1
     /// - Right = 2
     pub fn button_down(mut self, button: u64) -> Self {
-        self.mouse_channel
-            .add_action(PointerAction::Down { button });
+        self.mouse_channel.then(PointerAction::Down { button });
         self.add_key_pause();
         self
     }
 
-    /// Add a mouse button up action. Button values are as follows:
+    /// Add a mouse button up action.
+    ///
+    /// Button values are as follows:
     /// - Left = 0
     /// - Middle = 1
     /// - Right = 2
     pub fn button_up(mut self, button: u64) -> Self {
-        self.mouse_channel.add_action(PointerAction::Up { button });
+        self.mouse_channel.then(PointerAction::Up { button });
         self.add_key_pause();
         self
     }
 
-    /// Add a mouse move action. The `x_offset` and `y_offset` values are relative
-    /// to the current mouse position.
+    /// Add a mouse move action.
+    ///
+    /// The `x_offset` and `y_offset` values are relative to the current mouse position.
     pub fn move_by(mut self, x_offset: i64, y_offset: i64) -> Self {
-        self.mouse_channel.add_action(PointerAction::Move {
+        self.mouse_channel.then(PointerAction::Move {
             duration: self.default_duration.as_millis() as u64,
             origin: PointerOrigin::Pointer,
             x: x_offset,
@@ -477,10 +509,11 @@ impl ActionChainBuilder {
         self
     }
 
-    /// Add a mouse move action. The `x` and `y` values are relative to the
-    /// top left corner of the browser window.
+    /// Add a mouse move action.
+    ///
+    /// The `x` and `y` values are relative to the top left corner of the browser window.
     pub fn move_to(mut self, x: i64, y: i64) -> Self {
-        self.mouse_channel.add_action(PointerAction::Move {
+        self.mouse_channel.then(PointerAction::Move {
             duration: self.default_duration.as_millis() as u64,
             origin: PointerOrigin::Viewport,
             x,
@@ -490,10 +523,11 @@ impl ActionChainBuilder {
         self
     }
 
-    /// Add an action to move the mouse to the specified element. The `x` and `y` values are
-    /// relative to the element's center position.
+    /// Add an action to move the mouse to the specified element.
+    ///
+    /// The `x` and `y` values are relative to the element's center position.
     pub fn move_to_element_with_offset(mut self, element: Element, x: i64, y: i64) -> Self {
-        self.mouse_channel.add_action(PointerAction::Move {
+        self.mouse_channel.then(PointerAction::Move {
             duration: self.default_duration.as_millis() as u64,
             origin: PointerOrigin::WebElement(element),
             x,
@@ -508,7 +542,9 @@ impl ActionChainBuilder {
         self.move_to_element_with_offset(element, 0, 0)
     }
 
-    /// Add an action to click the specified mouse button. Button values are as follows:
+    /// Add an action to click the specified mouse button.
+    ///
+    /// Button values are as follows:
     /// - Left = 0
     /// - Middle = 1
     /// - Right = 2
@@ -516,7 +552,9 @@ impl ActionChainBuilder {
         self.button_down(button).button_up(button)
     }
 
-    /// Add an action to double-click the specified mouse button. Button values are as follows:
+    /// Add an action to double-click the specified mouse button.
+    ///
+    /// Button values are as follows:
     /// - Left = 0
     /// - Middle = 1
     /// - Right = 2
@@ -561,6 +599,7 @@ impl ActionChainBuilder {
     /// Add an action to click the specified mouse button on the center point of the
     /// source element, then drag to the center point of the target element, and then
     /// release the same mouse button.
+    ///
     /// Button values are as follows:
     /// - Left = 0
     /// - Middle = 1
@@ -585,29 +624,26 @@ impl ActionChainBuilder {
     }
 
     /// Add a key down action for the specified character.
-    /// See [`Keys`] for the codes for special keyboard buttons.
     ///
-    /// [`Keys`]: crate::keys::Keys
+    /// See [`Key`] for the codes for special keyboard buttons.
     pub fn key_down(mut self, value: char) -> Self {
-        self.key_channel.add_action(KeyAction::Down { value });
+        self.key_channel.then(KeyAction::Down { value });
         self.add_mouse_pause();
         self
     }
 
     /// Add a key up action for the specified character.
-    /// See [`Keys`] for the codes for special keyboard buttons.
     ///
-    /// [`Keys`]: crate::keys::Keys
+    /// See [`Key`] for the codes for special keyboard buttons.
     pub fn key_up(mut self, value: char) -> Self {
-        self.key_channel.add_action(KeyAction::Up { value });
+        self.key_channel.then(KeyAction::Up { value });
         self.add_mouse_pause();
         self
     }
 
     /// Add a key down + key up action for each character in the specified string.
-    /// See [`Keys`] for the codes for special keyboard buttons.
     ///
-    /// [`Keys`]: crate::keys::Keys
+    /// See [`Key`] for the codes for special keyboard buttons.
     pub fn send_keys(mut self, text: &str) -> Self {
         for c in text.chars() {
             self = self.key_down(c).key_up(c)
@@ -618,6 +654,7 @@ impl ActionChainBuilder {
 
 #[cfg(test)]
 mod tests {
+    use crate::elements::ElementId;
     use crate::Client;
     use serde_json::json;
     use tokio::sync::mpsc::unbounded_channel;
@@ -645,12 +682,16 @@ mod tests {
     #[test]
     fn test_null_action() {
         compare_null_action(
-            NullAction::Pause { duration: 0 },
+            NullAction::Pause {
+                duration: Duration::from_millis(0),
+            },
             json!({"type": "pause", "duration": 0}),
         );
 
         compare_null_action(
-            NullAction::Pause { duration: 4 },
+            NullAction::Pause {
+                duration: Duration::from_millis(4),
+            },
             json!({"type": "pause", "duration": 4}),
         );
     }
@@ -676,12 +717,16 @@ mod tests {
     #[test]
     fn test_key_action_pause() {
         compare_key_action(
-            KeyAction::Pause { duration: 0 },
+            KeyAction::Pause {
+                duration: Duration::from_millis(0),
+            },
             json!({"type": "pause", "duration": 0}),
         );
 
         compare_key_action(
-            KeyAction::Pause { duration: 3 },
+            KeyAction::Pause {
+                duration: Duration::from_millis(3),
+            },
             json!({"type": "pause", "duration": 3}),
         );
     }
@@ -738,12 +783,16 @@ mod tests {
     #[test]
     fn test_pointer_action_pause() {
         compare_pointer_action(
-            PointerAction::Pause { duration: 0 },
+            PointerAction::Pause {
+                duration: Duration::from_millis(0),
+            },
             json!({"type": "pause", "duration": 0}),
         );
 
         compare_pointer_action(
-            PointerAction::Pause { duration: 2 },
+            PointerAction::Pause {
+                duration: Duration::from_millis(2),
+            },
             json!({"type": "pause", "duration": 2}),
         );
     }
@@ -819,7 +868,7 @@ mod tests {
                 y: 0,
                 origin: PointerOrigin::WebElement(Element::from_element_id(
                     fake_client.clone(),
-                    "id1234".to_string(),
+                    ElementId("id1234".to_string()),
                 )),
             },
             json!({
@@ -866,7 +915,7 @@ mod tests {
                 y: 200,
                 origin: PointerOrigin::WebElement(Element::from_element_id(
                     fake_client,
-                    "someid".to_string(),
+                    ElementId("someid".to_string()),
                 )),
             },
             json!({

@@ -181,7 +181,7 @@ impl Client {
         &mut self,
         timeouts: TimeoutConfiguration,
     ) -> Result<(), error::CmdError> {
-        self.issue(WebDriverCommand::SetTimeouts(timeouts.into()))
+        self.issue(WebDriverCommand::SetTimeouts(timeouts.into_params()))
             .await?;
         Ok(())
     }
@@ -257,8 +257,8 @@ impl Client {
     #[cfg_attr(docsrs, doc(alias = "Get Title"))]
     pub async fn title(&mut self) -> Result<String, error::CmdError> {
         let title = self.issue(WebDriverCommand::GetTitle).await?;
-        if let Some(title) = title.as_str() {
-            Ok(title.to_string())
+        if let Json::String(s) = title {
+            Ok(s)
         } else {
             Err(error::CmdError::NotW3C(title))
         }
@@ -709,7 +709,7 @@ impl Client {
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
     pub async fn perform_actions(&mut self, actions: ActionChain) -> Result<(), error::CmdError> {
-        self.issue(WebDriverCommand::PerformActions(actions.into()))
+        self.issue(WebDriverCommand::PerformActions(actions.into_params()))
             .await?;
         Ok(())
     }
@@ -754,8 +754,8 @@ impl Client {
     #[cfg_attr(docsrs, doc(alias = "Get Alert Text"))]
     pub async fn get_alert_text(&mut self) -> Result<String, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetAlertText).await?;
-        if let Some(v) = res.as_str() {
-            Ok(v.to_string())
+        if let Json::String(s) = res {
+            Ok(s)
         } else {
             Err(error::CmdError::NotW3C(res))
         }

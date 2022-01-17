@@ -8,6 +8,10 @@ use webdriver::command::WebDriverCommand;
 use webdriver::common::FrameId;
 use webdriver::error::WebDriverError;
 
+/// An element id.
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct ElementId(pub String);
+
 /// A single DOM element on the current page.
 ///
 /// Note that there is a lot of subtlety in how you can interact with an element through WebDriver,
@@ -26,10 +30,10 @@ pub struct Element {
 impl Element {
     /// Construct an `Element` with the specified element id.
     /// The element id is the id given by the webdriver.
-    pub fn from_element_id(client: Client, element_id: String) -> Self {
+    pub fn from_element_id(client: Client, element_id: ElementId) -> Self {
         Self {
             client,
-            element: webdriver::common::WebElement(element_id),
+            element: webdriver::common::WebElement(element_id.0),
         }
     }
 
@@ -39,8 +43,8 @@ impl Element {
     }
 
     /// Get the element id as given by the webdriver.
-    pub fn element_id(&self) -> &str {
-        &self.element.0
+    pub fn element_id(&self) -> ElementId {
+        ElementId(self.element.0.clone())
     }
 }
 
@@ -185,6 +189,8 @@ impl Element {
     ///
     /// `Ok(None)` is returned if the element does not have the given property.
     ///
+    /// Boolean properties such as "checked" will be returned as the String "true" or "false".
+    ///
     /// See [13.3 Get Element Property](https://www.w3.org/TR/webdriver1/#get-element-property)
     /// of the WebDriver standard.
     ///
@@ -194,11 +200,7 @@ impl Element {
         let cmd = WebDriverCommand::GetElementProperty(self.element.clone(), prop.to_string());
         match self.client.issue(cmd).await? {
             Json::String(v) => Ok(Some(v)),
-            Json::Bool(b) => {
-                // NOTE: boolean properties such as "checked" seem to be returned as boolean
-                //       values rather than strings.
-                Ok(Some(b.to_string()))
-            }
+            Json::Bool(b) => Ok(Some(b.to_string())),
             Json::Null => Ok(None),
             v => Err(error::CmdError::NotW3C(v)),
         }
@@ -251,7 +253,7 @@ impl Element {
     /// See [13.7 Get Element Rect](https://www.w3.org/TR/webdriver1/#dfn-get-element-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Element Rect"))]
-    pub async fn get_element_rect(&mut self) -> Result<(f64, f64, u64, u64), error::CmdError> {
+    pub async fn rectangle(&mut self) -> Result<(f64, f64, f64, f64), error::CmdError> {
         match self
             .client
             .issue(WebDriverCommand::GetElementRect(self.element.clone()))
@@ -268,12 +270,12 @@ impl Element {
                     None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
                 };
 
-                let width = match obj.remove("width").and_then(|width| width.as_u64()) {
+                let width = match obj.remove("width").and_then(|width| width.as_f64()) {
                     Some(width) => width,
                     None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
                 };
 
-                let height = match obj.remove("height").and_then(|height| height.as_u64()) {
+                let height = match obj.remove("height").and_then(|height| height.as_f64()) {
                     Some(height) => height,
                     None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
                 };
