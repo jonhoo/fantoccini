@@ -4,13 +4,50 @@ use crate::wd::Locator;
 use crate::{error, Client};
 use serde::Serialize;
 use serde_json::Value as Json;
+use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 use webdriver::command::WebDriverCommand;
 use webdriver::common::FrameId;
 use webdriver::error::WebDriverError;
 
 /// An element id.
-#[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ElementId(pub String);
+///
+/// See [11. Elements](https://www.w3.org/TR/webdriver1/#elements) of the
+/// WebDriver standard.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct ElementId(String);
+
+impl Display for ElementId {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl AsRef<str> for ElementId {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for ElementId {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<ElementId> for String {
+    fn from(id: ElementId) -> Self {
+        id.0
+    }
+}
+
+impl From<String> for ElementId {
+    fn from(s: String) -> Self {
+        ElementId(s)
+    }
+}
 
 /// A single DOM element on the current page.
 ///
@@ -135,7 +172,6 @@ impl Element {
         let cmd = WebDriverCommand::IsSelected(self.element.clone());
         match self.client.issue(cmd).await? {
             Json::Bool(v) => Ok(v),
-            Json::Null => Ok(false),
             v => Err(error::CmdError::NotW3C(v)),
         }
     }
@@ -148,7 +184,6 @@ impl Element {
         let cmd = WebDriverCommand::IsEnabled(self.element.clone());
         match self.client.issue(cmd).await? {
             Json::Bool(v) => Ok(v),
-            Json::Null => Ok(false),
             v => Err(error::CmdError::NotW3C(v)),
         }
     }
@@ -161,7 +196,6 @@ impl Element {
         let cmd = WebDriverCommand::IsDisplayed(self.element.clone());
         match self.client.issue(cmd).await? {
             Json::Bool(v) => Ok(v),
-            Json::Null => Ok(false),
             v => Err(error::CmdError::NotW3C(v)),
         }
     }
@@ -217,7 +251,6 @@ impl Element {
         let cmd = WebDriverCommand::GetCSSValue(self.element.clone(), prop.to_string());
         match self.client.issue(cmd).await? {
             Json::String(v) => Ok(v),
-            Json::Null => Ok(String::new()),
             v => Err(error::CmdError::NotW3C(v)),
         }
     }

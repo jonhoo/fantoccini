@@ -196,3 +196,68 @@ impl AddAssign<Key> for String {
         self.push(rhs.into());
     }
 }
+
+impl Add<String> for Key {
+    type Output = String;
+
+    fn add(self, rhs: String) -> Self::Output {
+        format!("{}{}", char::from(self), rhs)
+    }
+}
+
+impl Add<Key> for Key {
+    type Output = String;
+
+    fn add(self, rhs: Key) -> Self::Output {
+        format!("{}{}", char::from(self), char::from(rhs))
+    }
+}
+
+impl Add<&str> for Key {
+    type Output = String;
+
+    fn add(self, rhs: &str) -> Self::Output {
+        format!("{}{}", char::from(self), rhs)
+    }
+}
+
+impl Add<Key> for &str {
+    type Output = String;
+
+    fn add(self, rhs: Key) -> Self::Output {
+        format!("{}{}", self, char::from(rhs))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_keys() {
+        assert_eq!(Key::Control + Key::Shift, "\u{e009}\u{e008}".to_string());
+    }
+
+    #[test]
+    fn test_key_str() {
+        assert_eq!(Key::Control + "a", "\u{e009}a".to_string());
+        assert_eq!("a" + Key::Control, "a\u{e009}".to_string());
+    }
+
+    #[test]
+    fn test_key_string() {
+        assert_eq!(Key::Control + "a".to_string(), "\u{e009}a".to_string());
+        assert_eq!("a".to_string() + Key::Control, "a\u{e009}".to_string());
+    }
+
+    #[test]
+    fn test_string_addassign() {
+        let mut k = String::new();
+        k += Key::Control;
+        assert_eq!(k, "\u{e009}".to_string());
+
+        let mut k = "test".to_string();
+        k += Key::Control;
+        assert_eq!(k, "test\u{e009}".to_string());
+    }
+}

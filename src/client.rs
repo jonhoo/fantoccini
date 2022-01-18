@@ -1,6 +1,6 @@
 //! WebDriver client implementation.
 
-use crate::actions::ActionChain;
+use crate::actions::{ActionSequence, Actions};
 use crate::elements::{Element, Form};
 use crate::error;
 use crate::session::{Cmd, Session, Task};
@@ -692,26 +692,31 @@ impl Client {
 
 /// [Actions](https://www.w3.org/TR/webdriver1/#actions)
 impl Client {
-    /// Perform the specified input actions.
+    /// Create a new Actions chain.
     ///
     /// ```ignore
-    /// use fantoccini::actions::ActionChain;
-    ///
-    /// let chain = ActionChain::builder()
-    ///     .click_element(element)
-    ///     .pause(Duration::from_secs(2))
-    ///     .send_keys("fantoccini")
-    ///     .build();
-    /// client.perform_actions(chain).await?;
+    /// let mouse_actions = MouseActions::new("mouse")
+    ///     .then(PointerAction::Down {
+    ///         button: MOUSE_BUTTON_LEFT,
+    ///     })
+    ///     .then(PointerAction::Move {
+    ///         duration: Some(Duration::from_secs(2)),
+    ///         origin: PointerOrigin::Pointer,
+    ///         x: 100,
+    ///         y: 0,
+    ///     })
+    ///     .then(PointerAction::Up {
+    ///         button: MOUSE_BUTTON_LEFT,
+    ///     });
+    /// client.actions(mouse_actions).perform().await?;
     /// ```
     ///
-    /// See [17.5 Perform Actions](https://www.w3.org/TR/webdriver1/#perform-actions) of the
-    /// WebDriver standard.
-    #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
-    pub async fn perform_actions(&mut self, actions: ActionChain) -> Result<(), error::CmdError> {
-        self.issue(WebDriverCommand::PerformActions(actions.into_params()))
-            .await?;
-        Ok(())
+    /// See the documentation for [`Actions`] for more information.
+    pub fn actions(&mut self, actions: impl Into<ActionSequence>) -> Actions {
+        Actions {
+            client: self.clone(),
+            sequences: vec![actions.into()],
+        }
     }
 
     /// Release all input actions.
@@ -721,6 +726,24 @@ impl Client {
     #[cfg_attr(docsrs, doc(alias = "Release Actions"))]
     pub async fn release_actions(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::ReleaseActions).await?;
+        Ok(())
+    }
+}
+
+impl Actions {
+    /// Perform the specified input actions.
+    ///
+    /// See [17.5 Perform Actions](https://www.w3.org/TR/webdriver1/#perform-actions) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
+    pub async fn perform(mut self) -> Result<(), error::CmdError> {
+        let actions = webdriver::command::ActionsParameters {
+            actions: self.sequences.into_iter().map(|x| x.0).collect(),
+        };
+
+        self.client
+            .issue(WebDriverCommand::PerformActions(actions))
+            .await?;
         Ok(())
     }
 }

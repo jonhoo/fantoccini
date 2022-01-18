@@ -1,6 +1,8 @@
 //! Cookie-related functionality for WebDriver.
+
 use cookie::SameSite;
 use serde::{Deserialize, Serialize};
+use std::convert::{TryFrom, TryInto};
 use time::OffsetDateTime;
 use webdriver::command::{AddCookieParameters, WebDriverCommand};
 use webdriver::common::Date;
@@ -16,7 +18,7 @@ pub type Cookie<'a> = cookie::Cookie<'a>;
 pub(crate) struct AddCookieParametersWrapper<'a> {
     /// The cookie to serialize.
     #[serde(with = "AddCookieParameters")]
-    pub cookie: &'a AddCookieParameters,
+    pub(crate) cookie: &'a AddCookieParameters,
 }
 
 /// Representation of a cookie as [defined by WebDriver](https://www.w3.org/TR/webdriver1/#cookies).
@@ -53,8 +55,10 @@ impl WebDriverCookie {
     }
 }
 
-impl From<WebDriverCookie> for Cookie<'static> {
-    fn from(webdriver_cookie: WebDriverCookie) -> Self {
+impl TryFrom<WebDriverCookie> for Cookie<'static> {
+    type Error = error::CmdError;
+
+    fn try_from(webdriver_cookie: WebDriverCookie) -> Result<Self, Self::Error> {
         let mut cookie = cookie::Cookie::new(webdriver_cookie.name, webdriver_cookie.value);
 
         if let Some(path) = webdriver_cookie.path {
@@ -79,14 +83,20 @@ impl From<WebDriverCookie> for Cookie<'static> {
         }
 
         if let Some(same_site) = webdriver_cookie.same_site {
-            cookie.set_same_site(match same_site.as_ref() {
-                "STRICT" | "Strict" | "strict" => SameSite::Strict,
-                "NONE" | "None" | "none" => SameSite::None,
-                _ => SameSite::Lax,
+            cookie.set_same_site(match &same_site {
+                x if x.eq_ignore_ascii_case("strict") => SameSite::Strict,
+                x if x.eq_ignore_ascii_case("lax") => SameSite::Lax,
+                x if x.eq_ignore_ascii_case("none") => SameSite::None,
+                _ => {
+                    return Err(error::CmdError::InvalidArgument(
+                        "same_site".to_string(),
+                        same_site,
+                    ))
+                }
             });
         }
 
-        cookie
+        Ok(cookie)
     }
 }
 
@@ -130,12 +140,12 @@ impl Client {
         let resp = self.issue(WebDriverCommand::GetCookies).await?;
 
         let webdriver_cookies: Vec<WebDriverCookie> = serde_json::from_value(resp)?;
-        let cookies: Vec<Cookie<'static>> = webdriver_cookies
+        let cookies: Result<Vec<Cookie<'static>>, error::CmdError> = webdriver_cookies
             .into_iter()
-            .map(|raw_cookie| raw_cookie.into())
+            .map(|raw_cookie| raw_cookie.try_into())
             .collect();
 
-        Ok(cookies)
+        Ok(cookies?)
     }
 
     /// Get a single named cookie associated with the current document.
@@ -150,7 +160,7 @@ impl Client {
             .issue(WebDriverCommand::GetNamedCookie(name.to_string()))
             .await?;
         let webdriver_cookie: WebDriverCookie = serde_json::from_value(resp)?;
-        Ok(webdriver_cookie.into())
+        Ok(webdriver_cookie.try_into()?)
     }
 
     /// Add the specified cookie.
