@@ -260,4 +260,12 @@ mod tests {
         k += Key::Control;
         assert_eq!(k, "test\u{e009}".to_string());
     }
+
+    #[test]
+    fn test_key_key_string() {
+        assert_eq!(
+            Key::Control + Key::Alt + "e",
+            "\u{e009}\u{e00a}e".to_string()
+        );
+    }
 }

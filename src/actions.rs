@@ -2,7 +2,6 @@
 use crate::elements::Element;
 #[cfg(doc)]
 use crate::keys::Key;
-use crate::Client;
 use std::fmt::Debug;
 use std::time::Duration;
 use webdriver::actions as WDActions;
@@ -107,28 +106,53 @@ pub enum PointerAction {
     },
     /// Pointer button down.
     Down {
-        /// The mouse button index. Button values are as follows:
-        /// - Left = 0
-        /// - Middle = 1
-        /// - Right = 2
+        /// The mouse button index.
+        ///
+        /// The following constants are provided:
+        /// - MOUSE_BUTTON_LEFT
+        /// - MOUSE_BUTTON_MIDDLE
+        /// - MOUSE_BUTTON_RIGHT
         button: u64,
     },
     /// Pointer button up.
     Up {
-        /// The mouse button index. Button values are as follows:
-        /// - Left = 0
-        /// - Middle = 1
-        /// - Right = 2
+        /// The mouse button index.
+        ///
+        /// The following constants are provided:
+        /// - MOUSE_BUTTON_LEFT
+        /// - MOUSE_BUTTON_MIDDLE
+        /// - MOUSE_BUTTON_RIGHT
         button: u64,
     },
-    /// Pointer move action.
+    /// Move the pointer relative to the current position.
     ///
-    /// The x and y offsets are relative to the origin.
-    Move {
+    /// The x and y offsets are relative to the current pointer position.
+    MoveBy {
         /// The move duration.
         duration: Option<Duration>,
-        /// The origin that the `x` and `y` coordinates are relative to.
-        origin: PointerOrigin,
+        /// `x` offset, in pixels.
+        x: i64,
+        /// `y` offset, in pixels.
+        y: i64,
+    },
+    /// Move the pointer to a new position.
+    ///
+    /// The x and y offsets are relative to the top-left corner of the viewport.
+    MoveTo {
+        /// The move duration.
+        duration: Option<Duration>,
+        /// `x` offset, in pixels.
+        x: i64,
+        /// `y` offset, in pixels.
+        y: i64,
+    },
+    /// Move the pointer to a position relative to the specified element.
+    MoveToElement {
+        /// The element to move the pointer in relation to. The `x` and `y` offsets are relative
+        /// to this element's center position.
+        element: Element,
+        /// The move duration.
+        duration: Option<Duration>,
         /// `x` offset, in pixels.
         x: i64,
         /// `y` offset, in pixels.
@@ -136,30 +160,6 @@ pub enum PointerAction {
     },
     /// Pointer cancel action. Used to cancel the current pointer action.
     Cancel,
-}
-
-/// The pointer origin to use for the relative x,y offset.
-#[derive(Debug, Clone)]
-#[non_exhaustive]
-pub enum PointerOrigin {
-    /// Coordinates are relative to the top-left corner of the browser window.
-    Viewport,
-    /// Coordinates are relative to the pointer's current position.
-    Pointer,
-    /// Coordinates are relative to the specified element's center position.
-    WebElement(Element),
-}
-
-impl PointerOrigin {
-    fn into_wd_pointerorigin(self) -> WDActions::PointerOrigin {
-        match self {
-            PointerOrigin::Viewport => WDActions::PointerOrigin::Viewport,
-            PointerOrigin::Pointer => WDActions::PointerOrigin::Pointer,
-            PointerOrigin::WebElement(e) => WDActions::PointerOrigin::Element(
-                webdriver::common::WebElement(e.element_id().into()),
-            ),
-        }
-    }
 }
 
 impl PointerAction {
@@ -176,15 +176,31 @@ impl PointerAction {
             PointerAction::Up { button } => WDActions::PointerActionItem::Pointer(
                 WDActions::PointerAction::Up(WDActions::PointerUpAction { button }),
             ),
-            PointerAction::Move {
+            PointerAction::MoveBy { duration, x, y } => WDActions::PointerActionItem::Pointer(
+                WDActions::PointerAction::Move(WDActions::PointerMoveAction {
+                    duration: duration.map(|x| x.as_millis() as u64),
+                    origin: WDActions::PointerOrigin::Pointer,
+                    x: Some(x),
+                    y: Some(y),
+                }),
+            ),
+            PointerAction::MoveTo { duration, x, y } => WDActions::PointerActionItem::Pointer(
+                WDActions::PointerAction::Move(WDActions::PointerMoveAction {
+                    duration: duration.map(|x| x.as_millis() as u64),
+                    origin: WDActions::PointerOrigin::Viewport,
+                    x: Some(x),
+                    y: Some(y),
+                }),
+            ),
+            PointerAction::MoveToElement {
+                element,
                 duration,
-                origin,
                 x,
                 y,
             } => WDActions::PointerActionItem::Pointer(WDActions::PointerAction::Move(
                 WDActions::PointerMoveAction {
                     duration: duration.map(|x| x.as_millis() as u64),
-                    origin: origin.into_wd_pointerorigin(),
+                    origin: WDActions::PointerOrigin::Element(element.element),
                     x: Some(x),
                     y: Some(y),
                 },
@@ -196,7 +212,7 @@ impl PointerAction {
     }
 }
 
-/// A sequence containing `Null` actions.
+/// A sequence containing [`Null` actions](NullAction).
 #[derive(Debug, Clone)]
 pub struct NullActions {
     /// An identifier to distinguish this sequence from others.
@@ -209,9 +225,9 @@ pub struct NullActions {
 
 impl NullActions {
     /// Create a new NullActions sequence.
-    pub fn new(id: &str) -> Self {
+    pub fn new(id: String) -> Self {
         Self {
-            id: id.to_string(),
+            id,
             actions: Vec::new(),
         }
     }
@@ -228,7 +244,7 @@ impl From<NullActions> for ActionSequence {
     }
 }
 
-/// A sequence containing `Key` actions.
+/// A sequence containing [`Key` actions](KeyAction).
 #[derive(Debug, Clone)]
 pub struct KeyActions {
     /// An identifier to distinguish this sequence from others.
@@ -241,9 +257,9 @@ pub struct KeyActions {
 
 impl KeyActions {
     /// Create a new KeyActions sequence.
-    pub fn new(id: &str) -> Self {
+    pub fn new(id: String) -> Self {
         Self {
-            id: id.to_string(),
+            id,
             actions: Vec::new(),
         }
     }
@@ -260,7 +276,7 @@ impl From<KeyActions> for ActionSequence {
     }
 }
 
-/// A sequence containing `Pointer` actions for a mouse.
+/// A sequence containing [`Pointer` actions](PointerAction) for a mouse.
 #[derive(Debug, Clone)]
 pub struct MouseActions {
     /// An identifier to distinguish this sequence from others.
@@ -273,9 +289,9 @@ pub struct MouseActions {
 
 impl MouseActions {
     /// Create a new `MouseActions` sequence.
-    pub fn new(id: &str) -> Self {
+    pub fn new(id: String) -> Self {
         Self {
-            id: id.to_string(),
+            id,
             actions: Vec::new(),
         }
     }
@@ -295,7 +311,7 @@ impl From<MouseActions> for ActionSequence {
     }
 }
 
-/// A sequence containing `Pointer` actions for a pen device.
+/// A sequence containing [`Pointer` actions](PointerAction) for a pen device.
 #[derive(Debug, Clone)]
 pub struct PenActions {
     /// An identifier to distinguish this sequence from others.
@@ -308,9 +324,9 @@ pub struct PenActions {
 
 impl PenActions {
     /// Create a new `PenActions` sequence.
-    pub fn new(id: &str) -> Self {
+    pub fn new(id: String) -> Self {
         Self {
-            id: id.to_string(),
+            id,
             actions: Vec::new(),
         }
     }
@@ -330,7 +346,7 @@ impl From<PenActions> for ActionSequence {
     }
 }
 
-/// A sequence containing `Pointer` actions for a touch device.
+/// A sequence containing [`Pointer` actions](PointerAction) for a touch device.
 #[derive(Debug, Clone)]
 pub struct TouchActions {
     /// An identifier to distinguish this sequence from others.
@@ -343,9 +359,9 @@ pub struct TouchActions {
 
 impl TouchActions {
     /// Create a new `TouchActions` sequence.
-    pub fn new(id: &str) -> Self {
+    pub fn new(id: String) -> Self {
         Self {
-            id: id.to_string(),
+            id,
             actions: Vec::new(),
         }
     }
@@ -371,6 +387,8 @@ impl From<TouchActions> for ActionSequence {
 #[derive(Debug)]
 pub struct ActionSequence(pub(crate) WDActions::ActionSequence);
 
+/// A source capable of providing inputs for a browser action chain.
+///
 /// Each sequence type implements `InputSource` which provides a `pause()` and a `then()`
 /// method. Each call to `pause()` or `then()` represents one tick for this sequence.
 pub trait InputSource: Into<ActionSequence> {
@@ -449,7 +467,7 @@ impl InputSource for TouchActions {
     }
 }
 
-/// A list of action sequences to be performed via `Client::perform_actions()`
+/// A list of action sequences to be performed via [`Client::perform_actions()`]
 ///
 /// An [`ActionSequence`] is a sequence of actions of a specific type.
 ///
@@ -482,9 +500,8 @@ impl InputSource for TouchActions {
 /// The bottom sequence is just to show that other sequences can be added. This could
 /// be any of `NullActions`, `KeyActions` or `PointerActions`. There is no theoretical
 /// limit to the number of sequences that can be specified.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Actions {
-    pub(crate) client: Client,
     pub(crate) sequences: Vec<ActionSequence>,
 }
 
@@ -493,5 +510,27 @@ impl Actions {
     pub fn and(mut self, sequence: impl Into<ActionSequence>) -> Self {
         self.sequences.push(sequence.into());
         self
+    }
+}
+
+impl<T> From<T> for Actions
+where
+    T: Into<ActionSequence>,
+{
+    fn from(sequence: T) -> Self {
+        Self {
+            sequences: vec![sequence.into()],
+        }
+    }
+}
+
+impl<T> From<Vec<T>> for Actions
+where
+    T: Into<ActionSequence>,
+{
+    fn from(sequences: Vec<T>) -> Self {
+        Self {
+            sequences: sequences.into_iter().map(|x| x.into()).collect(),
+        }
     }
 }

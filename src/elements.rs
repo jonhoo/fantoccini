@@ -10,26 +10,30 @@ use webdriver::command::WebDriverCommand;
 use webdriver::common::FrameId;
 use webdriver::error::WebDriverError;
 
-/// An element id.
+/// Web element reference.
 ///
-/// See [11. Elements](https://www.w3.org/TR/webdriver1/#elements) of the
-/// WebDriver standard.
+/// > Each element has an associated web element reference that uniquely identifies the element
+/// > across all browsing contexts. The web element reference for every element representing the
+/// > same element must be the same. It must be a string, and should be the result of generating
+/// > a UUID.
+///
+/// See [11. Elements](https://www.w3.org/TR/webdriver1/#elements) of the WebDriver standard.
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
-pub struct ElementId(String);
+pub struct ElementRef(String);
 
-impl Display for ElementId {
+impl Display for ElementRef {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
 }
 
-impl AsRef<str> for ElementId {
+impl AsRef<str> for ElementRef {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl Deref for ElementId {
+impl Deref for ElementRef {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -37,15 +41,15 @@ impl Deref for ElementId {
     }
 }
 
-impl From<ElementId> for String {
-    fn from(id: ElementId) -> Self {
+impl From<ElementRef> for String {
+    fn from(id: ElementRef) -> Self {
         id.0
     }
 }
 
-impl From<String> for ElementId {
+impl From<String> for ElementRef {
     fn from(s: String) -> Self {
-        ElementId(s)
+        ElementRef(s)
     }
 }
 
@@ -67,7 +71,7 @@ pub struct Element {
 impl Element {
     /// Construct an `Element` with the specified element id.
     /// The element id is the id given by the webdriver.
-    pub fn from_element_id(client: Client, element_id: ElementId) -> Self {
+    pub fn from_element_id(client: Client, element_id: ElementRef) -> Self {
         Self {
             client,
             element: webdriver::common::WebElement(element_id.0),
@@ -80,8 +84,8 @@ impl Element {
     }
 
     /// Get the element id as given by the webdriver.
-    pub fn element_id(&self) -> ElementId {
-        ElementId(self.element.0.clone())
+    pub fn element_id(&self) -> ElementRef {
+        ElementRef(self.element.0.clone())
     }
 }
 
