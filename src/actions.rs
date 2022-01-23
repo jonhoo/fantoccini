@@ -1,4 +1,6 @@
 //! Actions functionality for WebDriver.
+#[cfg(doc)]
+use crate::client::Client;
 use crate::elements::Element;
 #[cfg(doc)]
 use crate::keys::Key;
