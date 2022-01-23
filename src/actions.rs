@@ -217,7 +217,7 @@ impl PointerAction {
 /// A sequence containing [`Null` actions](NullAction).
 #[derive(Debug, Clone)]
 pub struct NullActions {
-    /// An identifier to distinguish this sequence from others.
+    /// A unique identifier to distinguish this input source from others.
     ///
     /// Choose a meaningful string as it may be useful for debugging.
     id: String,
@@ -227,6 +227,8 @@ pub struct NullActions {
 
 impl NullActions {
     /// Create a new NullActions sequence.
+    ///
+    /// The id can be any string but must uniquely identify this input source.
     pub fn new(id: String) -> Self {
         Self {
             id,
@@ -249,7 +251,7 @@ impl From<NullActions> for ActionSequence {
 /// A sequence containing [`Key` actions](KeyAction).
 #[derive(Debug, Clone)]
 pub struct KeyActions {
-    /// An identifier to distinguish this sequence from others.
+    /// A unique identifier to distinguish this input source from others.
     ///
     /// Choose a meaningful string as it may be useful for debugging.
     id: String,
@@ -259,6 +261,8 @@ pub struct KeyActions {
 
 impl KeyActions {
     /// Create a new KeyActions sequence.
+    ///
+    /// The id can be any string but must uniquely identify this input source.
     pub fn new(id: String) -> Self {
         Self {
             id,
@@ -281,7 +285,7 @@ impl From<KeyActions> for ActionSequence {
 /// A sequence containing [`Pointer` actions](PointerAction) for a mouse.
 #[derive(Debug, Clone)]
 pub struct MouseActions {
-    /// An identifier to distinguish this sequence from others.
+    /// A unique identifier to distinguish this input source from others.
     ///
     /// Choose a meaningful string as it may be useful for debugging.
     id: String,
@@ -291,6 +295,8 @@ pub struct MouseActions {
 
 impl MouseActions {
     /// Create a new `MouseActions` sequence.
+    ///
+    /// The id can be any string but must uniquely identify this input source.
     pub fn new(id: String) -> Self {
         Self {
             id,
@@ -316,7 +322,7 @@ impl From<MouseActions> for ActionSequence {
 /// A sequence containing [`Pointer` actions](PointerAction) for a pen device.
 #[derive(Debug, Clone)]
 pub struct PenActions {
-    /// An identifier to distinguish this sequence from others.
+    /// A unique identifier to distinguish this input source from others.
     ///
     /// Choose a meaningful string as it may be useful for debugging.
     id: String,
@@ -326,6 +332,8 @@ pub struct PenActions {
 
 impl PenActions {
     /// Create a new `PenActions` sequence.
+    ///
+    /// The id can be any string but must uniquely identify this input source.
     pub fn new(id: String) -> Self {
         Self {
             id,
@@ -351,7 +359,7 @@ impl From<PenActions> for ActionSequence {
 /// A sequence containing [`Pointer` actions](PointerAction) for a touch device.
 #[derive(Debug, Clone)]
 pub struct TouchActions {
-    /// An identifier to distinguish this sequence from others.
+    /// A unique identifier to distinguish this input source from others.
     ///
     /// Choose a meaningful string as it may be useful for debugging.
     id: String,
@@ -361,6 +369,8 @@ pub struct TouchActions {
 
 impl TouchActions {
     /// Create a new `TouchActions` sequence.
+    ///
+    /// The id can be any string but must uniquely identify this input source.
     pub fn new(id: String) -> Self {
         Self {
             id,
