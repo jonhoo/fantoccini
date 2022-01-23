@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use std::time::Duration;
 use webdriver::actions as WDActions;
 
-/// An action not associated with an input device (i.e. pause).
+/// An action not associated with an input device (e.g. pause).
 ///
 /// See [17.4.1 General Actions](https://www.w3.org/TR/webdriver1/#general-actions) of the
 /// WebDriver standard.
