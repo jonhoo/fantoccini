@@ -1,9 +1,10 @@
 //! Key codes for use with Actions.
 
+use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign};
 
 /// Key codes for use with Actions.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Key {
     /// Null
     Null,
@@ -179,6 +180,12 @@ impl From<Key> for char {
             Key::Meta => '\u{e03d}',
             Key::Command => '\u{e03d}',
         }
+    }
+}
+
+impl Display for Key {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", char::from(self.clone()))
     }
 }
 

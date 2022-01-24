@@ -873,6 +873,7 @@ where
                             "invalid session id" => ErrorStatus::InvalidSessionId,
                             "no such element" => ErrorStatus::NoSuchElement,
                             "no such window" => ErrorStatus::NoSuchWindow,
+                            "no such alert" => ErrorStatus::NoSuchAlert,
                             "stale element reference" => ErrorStatus::NoSuchElement,
                             _ => unreachable!(
                                 "received unknown error ({}) for NOT_FOUND status code",

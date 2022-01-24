@@ -167,14 +167,19 @@ impl<'a> Locator<'a> {
 /// See [8.3 Status](https://www.w3.org/TR/webdriver1/#status) of the WebDriver standard.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebDriverStatus {
-    ready: bool,
-    message: String,
+    /// True if the webdriver is ready to start a new session.
+    ///
+    /// NOTE: Geckodriver will return `false` if a session has already started, since it
+    ///       only supports a single session.
+    pub ready: bool,
+    /// The current status message.
+    pub message: String,
 }
 
 /// Timeout configuration, for various timeout settings.
 ///
 /// Used by [`Client::get_timeouts()`] and [`Client::set_timeouts()`].
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TimeoutConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]
     script: Option<u64>,

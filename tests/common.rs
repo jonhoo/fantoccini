@@ -231,3 +231,11 @@ fn file_not_found() -> Response<Body> {
         .body(Body::empty())
         .unwrap()
 }
+
+pub fn sample_page_url(port: u16) -> String {
+    format!("http://localhost:{}/sample_page.html", port)
+}
+
+pub fn other_page_url(port: u16) -> String {
+    format!("http://localhost:{}/other_page.html", port)
+}

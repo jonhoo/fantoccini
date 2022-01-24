@@ -88,5 +88,50 @@
             <option id="select3-option-3">Select3-Option3</option>
         </select>
     </div>
+    <div>
+        <script>
+            function showAlert() {
+                alert("This is an alert");
+            }
+
+            function showConfirm() {
+                const elem = document.getElementById("alert-answer");
+                if (confirm("Press OK or Cancel")) {
+                    elem.innerHTML = "OK";
+                } else {
+                    elem.innerHTML = "Cancel";
+                }
+            }
+
+            function showPrompt() {
+                document.getElementById("alert-answer").innerHTML = prompt("What is your name?");
+            }
+        </script>
+        <br /><br />
+        <button id="button-alert" onclick="showAlert()">Show alert</button>
+        <button id="button-confirm" onclick="showConfirm()">Show confirm</button>
+        <button id="button-prompt" onclick="showPrompt()">Show prompt</button>
+        <div id="alert-answer"></div>
+    </div>
+    <div>
+        <label>
+            <input type="checkbox" id="checkbox-option-1" />
+            Option 1
+        </label>
+
+        <label>
+            <input type="checkbox" id="checkbox-disabled" disabled />
+            Option 2
+        </label>
+
+        <label>
+            <input type="checkbox" id="checkbox-hidden" style="display: none;" />
+            Option 3
+        </label>
+    </div>
+    <div>
+        <label for="text-input">Text:</label>
+        <input type="text" id="text-input" />
+    </div>
 </body>
 </html>
