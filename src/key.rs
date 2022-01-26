@@ -4,7 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::{Add, AddAssign};
 
 /// Key codes for use with Actions.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Key {
     /// Null
     Null,
@@ -185,7 +185,7 @@ impl From<Key> for char {
 
 impl Display for Key {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", char::from(self.clone()))
+        write!(f, "{}", char::from(*self))
     }
 }
 

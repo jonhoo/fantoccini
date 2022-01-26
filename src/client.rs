@@ -177,7 +177,8 @@ impl Client {
     /// See [8.5 Set Timeouts](https://www.w3.org/TR/webdriver1/#set-timeouts) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Set Timeouts"))]
-    pub async fn set_timeouts(
+    #[cfg_attr(docsrs, doc(alias = "Update Timeouts"))]
+    pub async fn update_timeouts(
         &mut self,
         timeouts: TimeoutConfiguration,
     ) -> Result<(), error::CmdError> {
@@ -707,7 +708,7 @@ impl Client {
     ///     .then(PointerAction::Up {
     ///         button: MOUSE_BUTTON_LEFT,
     ///     });
-    /// client.perform_actions(mouse_actions.into()).await?;
+    /// client.perform_actions(mouse_actions).await?;
     /// ```
     ///
     /// See the documentation for [`Actions`] for more information.
@@ -716,9 +717,12 @@ impl Client {
     /// See [17.5 Perform Actions](https://www.w3.org/TR/webdriver1/#perform-actions) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
-    pub async fn perform_actions(&mut self, actions: Actions) -> Result<(), error::CmdError> {
+    pub async fn perform_actions(
+        &mut self,
+        actions: impl Into<Actions>,
+    ) -> Result<(), error::CmdError> {
         let params = webdriver::command::ActionsParameters {
-            actions: actions.sequences.into_iter().map(|x| x.0).collect(),
+            actions: actions.into().sequences.into_iter().map(|x| x.0).collect(),
         };
 
         self.issue(WebDriverCommand::PerformActions(params)).await?;

@@ -5,7 +5,7 @@ extern crate fantoccini;
 extern crate futures_util;
 
 use crate::common::sample_page_url;
-use fantoccini::keys::Key;
+use fantoccini::key::Key;
 use fantoccini::{error, Client, Locator};
 
 mod common;
@@ -68,7 +68,7 @@ async fn element_tag_name(mut c: Client, port: u16) -> Result<(), error::CmdErro
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
     let mut elem = c.find(Locator::Id("checkbox-option-1")).await?;
-    assert_eq!(elem.tag_name().await?, "input");
+    assert_eq!(elem.tag_name().await?.to_lowercase(), "input");
     Ok(())
 }
 

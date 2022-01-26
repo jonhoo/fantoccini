@@ -3,7 +3,7 @@
 use crate::client::Client;
 use crate::elements::Element;
 #[cfg(doc)]
-use crate::keys::Key;
+use crate::key::Key;
 use std::fmt::Debug;
 use std::time::Duration;
 use webdriver::actions as WDActions;
@@ -110,20 +110,22 @@ pub enum PointerAction {
     Down {
         /// The mouse button index.
         ///
-        /// The following constants are provided:
-        /// - MOUSE_BUTTON_LEFT
-        /// - MOUSE_BUTTON_MIDDLE
-        /// - MOUSE_BUTTON_RIGHT
+        /// The following constants are provided, but any mouse index can be used
+        /// to represent the corresponding mouse button.
+        /// - [MOUSE_BUTTON_LEFT]
+        /// - [MOUSE_BUTTON_MIDDLE]
+        /// - [MOUSE_BUTTON_RIGHT]
         button: u64,
     },
     /// Pointer button up.
     Up {
         /// The mouse button index.
         ///
-        /// The following constants are provided:
-        /// - MOUSE_BUTTON_LEFT
-        /// - MOUSE_BUTTON_MIDDLE
-        /// - MOUSE_BUTTON_RIGHT
+        /// The following constants are provided, but any mouse index can be used
+        /// to represent the corresponding mouse button.
+        /// - [MOUSE_BUTTON_LEFT]
+        /// - [MOUSE_BUTTON_MIDDLE]
+        /// - [MOUSE_BUTTON_RIGHT]
         button: u64,
     },
     /// Move the pointer relative to the current position.
@@ -400,6 +402,9 @@ impl From<TouchActions> for ActionSequence {
 pub struct ActionSequence(pub(crate) WDActions::ActionSequence);
 
 /// A source capable of providing inputs for a browser action chain.
+///
+/// See [input source](https://www.w3.org/TR/webdriver1/#dfn-input-sources) in the
+/// WebDriver standard.
 ///
 /// Each sequence type implements `InputSource` which provides a `pause()` and a `then()`
 /// method. Each call to `pause()` or `then()` represents one tick for this sequence.

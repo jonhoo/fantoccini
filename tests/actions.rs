@@ -1,15 +1,13 @@
 //! Alert tests
 #[macro_use]
 extern crate serial_test;
-extern crate fantoccini;
-extern crate futures_util;
 
 use crate::common::sample_page_url;
 use fantoccini::actions::{
     Actions, InputSource, KeyAction, KeyActions, MouseActions, NullActions, PointerAction,
     MOUSE_BUTTON_LEFT,
 };
-use fantoccini::keys::Key;
+use fantoccini::key::Key;
 use fantoccini::{error, Client, Locator};
 use std::time::Duration;
 use time::Instant;
@@ -21,7 +19,7 @@ async fn actions_null(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.goto(&sample_url).await?;
     let null_actions = NullActions::new("null".to_string()).pause(Duration::from_secs(1));
     let now = Instant::now();
-    c.perform_actions(vec![null_actions].into()).await?;
+    c.perform_actions(null_actions).await?;
     assert!(now.elapsed().as_seconds_f64() >= 1.0);
     Ok(())
 }
@@ -33,20 +31,25 @@ async fn actions_key(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     // Test pause.
     let key_pause = KeyActions::new("key".to_string()).pause(Duration::from_secs(1));
     let now = Instant::now();
-    c.perform_actions(vec![key_pause].into()).await?;
+    c.perform_actions(key_pause).await?;
     assert!(now.elapsed().as_seconds_f64() >= 1.0);
 
     // Test key down/up.
     let mut elem = c.find(Locator::Id("text-input")).await?;
-    assert_eq!(elem.prop("value").await?.unwrap(), "");
+    elem.send_keys("a").await?;
+    assert_eq!(elem.prop("value").await?.unwrap(), "a");
 
     let key_actions = KeyActions::new("key".to_string())
-        .then(KeyAction::Down { value: 'a' })
-        .then(KeyAction::Up { value: 'a' });
+        .then(KeyAction::Down {
+            value: Key::Backspace.into(),
+        })
+        .then(KeyAction::Up {
+            value: Key::Backspace.into(),
+        });
     elem.click().await?;
-    c.perform_actions(vec![key_actions].into()).await?;
+    c.perform_actions(key_actions).await?;
     let mut elem = c.find(Locator::Id("text-input")).await?;
-    assert_eq!(elem.prop("value").await?.unwrap(), "a");
+    assert_eq!(elem.prop("value").await?.unwrap(), "");
     Ok(())
 }
 
@@ -57,7 +60,7 @@ async fn actions_mouse(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     // Test pause.
     let mouse_pause = MouseActions::new("mouse".to_string()).pause(Duration::from_secs(1));
     let now = Instant::now();
-    c.perform_actions(vec![mouse_pause].into()).await?;
+    c.perform_actions(mouse_pause).await?;
     assert!(now.elapsed().as_seconds_f64() >= 1.0);
 
     let elem = c.find(Locator::Id("button-alert")).await?;
@@ -77,7 +80,7 @@ async fn actions_mouse(mut c: Client, port: u16) -> Result<(), error::CmdError> 
             button: MOUSE_BUTTON_LEFT,
         });
 
-    c.perform_actions(vec![mouse_actions].into()).await?;
+    c.perform_actions(mouse_actions).await?;
     assert_eq!(c.get_alert_text().await?, "This is an alert");
     c.dismiss_alert().await?;
     Ok(())
@@ -153,7 +156,7 @@ async fn actions_release(mut c: Client, port: u16) -> Result<(), error::CmdError
     let key_actions = KeyActions::new("key".to_string()).then(KeyAction::Down {
         value: Key::Control.into(),
     });
-    c.perform_actions(vec![key_actions].into()).await?;
+    c.perform_actions(key_actions).await?;
 
     // Now release all actions. This should release the control key.
     c.release_actions().await?;
@@ -166,7 +169,7 @@ async fn actions_release(mut c: Client, port: u16) -> Result<(), error::CmdError
     // However if the Control key was released (as expected)
     // then this will type 'a' into the text element.
     let key_actions = KeyActions::new("key".to_string()).then(KeyAction::Down { value: 'a' });
-    c.perform_actions(vec![key_actions].into()).await?;
+    c.perform_actions(key_actions).await?;
     assert_eq!(elem.prop("value").await?.unwrap(), "a");
     Ok(())
 }

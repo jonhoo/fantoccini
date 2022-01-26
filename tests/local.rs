@@ -398,14 +398,14 @@ async fn timeouts(mut c: Client, _: u16) -> Result<(), error::CmdError> {
         Some(Duration::from_secs(60)),
         Some(Duration::from_secs(30)),
     );
-    c.set_timeouts(new_timeouts.clone()).await?;
+    c.update_timeouts(new_timeouts.clone()).await?;
 
     let got_timeouts = c.get_timeouts().await?;
     assert_eq!(got_timeouts, new_timeouts);
 
     // Ensure partial update also works.
     let update_timeouts = TimeoutConfiguration::new(None, None, Some(Duration::from_secs(0)));
-    c.set_timeouts(update_timeouts.clone()).await?;
+    c.update_timeouts(update_timeouts.clone()).await?;
 
     let got_timeouts = c.get_timeouts().await?;
     assert_eq!(
