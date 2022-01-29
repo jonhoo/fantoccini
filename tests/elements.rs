@@ -1,11 +1,8 @@
 //! Element tests
-use serial_test::serial;
-extern crate fantoccini;
-extern crate futures_util;
-
 use crate::common::sample_page_url;
 use fantoccini::key::Key;
 use fantoccini::{error, Client, Locator};
+use serial_test::serial;
 
 mod common;
 

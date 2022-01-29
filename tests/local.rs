@@ -1,11 +1,8 @@
 //! Tests that don't make use of external websites.
-use serial_test::serial;
-extern crate fantoccini;
-extern crate futures_util;
-
 use crate::common::{other_page_url, sample_page_url};
 use fantoccini::wd::TimeoutConfiguration;
 use fantoccini::{error, Client, Locator};
+use serial_test::serial;
 use std::time::Duration;
 
 mod common;

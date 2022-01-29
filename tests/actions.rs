@@ -1,6 +1,4 @@
-//! Alert tests
-use serial_test::serial;
-
+//! Actions tests
 use crate::common::sample_page_url;
 use fantoccini::actions::{
     Actions, InputSource, KeyAction, KeyActions, MouseActions, NullActions, PointerAction,
@@ -8,6 +6,7 @@ use fantoccini::actions::{
 };
 use fantoccini::key::Key;
 use fantoccini::{error, Client, Locator};
+use serial_test::serial;
 use std::time::Duration;
 use time::Instant;
 
