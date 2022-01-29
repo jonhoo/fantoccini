@@ -244,7 +244,7 @@ impl Element {
         }
     }
 
-    /// Look up the [`computed value`] of a CSS property for this element by name.
+    /// Look up the [computed value] of a CSS property for this element by name.
     ///
     /// `Ok(String::new())` is returned if the the given CSS property is not found.
     ///
