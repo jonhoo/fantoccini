@@ -64,7 +64,8 @@ async fn element_tag_name(mut c: Client, port: u16) -> Result<(), error::CmdErro
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
     let mut elem = c.find(Locator::Id("checkbox-option-1")).await?;
-    assert!(elem.tag_name().await?.eq_ignore_ascii_case("input"));
+    let tag_name = elem.tag_name().await?;
+    assert!(tag_name.eq_ignore_ascii_case("input"), "{} != input", tag_name);
     Ok(())
 }
 
