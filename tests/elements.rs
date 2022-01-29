@@ -1,6 +1,5 @@
 //! Element tests
-#[macro_use]
-extern crate serial_test;
+use serial_test::serial;
 extern crate fantoccini;
 extern crate futures_util;
 
@@ -68,7 +67,7 @@ async fn element_tag_name(mut c: Client, port: u16) -> Result<(), error::CmdErro
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
     let mut elem = c.find(Locator::Id("checkbox-option-1")).await?;
-    assert_eq!(elem.tag_name().await?.to_lowercase(), "input");
+    assert!(elem.tag_name().await?.eq_ignore_ascii_case("input"));
     Ok(())
 }
 

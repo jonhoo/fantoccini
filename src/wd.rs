@@ -178,7 +178,7 @@ pub struct WebDriverStatus {
 
 /// Timeout configuration, for various timeout settings.
 ///
-/// Used by [`Client::get_timeouts()`] and [`Client::set_timeouts()`].
+/// Used by [`Client::get_timeouts()`] and [`Client::update_timeouts()`].
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct TimeoutConfiguration {
     #[serde(skip_serializing_if = "Option::is_none")]

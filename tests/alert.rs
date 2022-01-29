@@ -1,6 +1,5 @@
 //! Alert tests
-#[macro_use]
-extern crate serial_test;
+use serial_test::serial;
 extern crate fantoccini;
 extern crate futures_util;
 

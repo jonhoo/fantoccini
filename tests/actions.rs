@@ -1,6 +1,5 @@
 //! Alert tests
-#[macro_use]
-extern crate serial_test;
+use serial_test::serial;
 
 use crate::common::sample_page_url;
 use fantoccini::actions::{

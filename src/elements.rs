@@ -244,12 +244,14 @@ impl Element {
         }
     }
 
-    /// Look up a CSS property for this element by name.
+    /// Look up the [`computed value`] of a CSS property for this element by name.
     ///
     /// `Ok(String::new())` is returned if the the given CSS property is not found.
     ///
     /// See [13.4 Get Element CSS Value](https://www.w3.org/TR/webdriver1/#get-element-css-value)
     /// of the WebDriver standard.
+    ///
+    /// [`computed value`]: https://drafts.csswg.org/css-cascade-4/#computed-value
     #[cfg_attr(docsrs, doc(alias = "Get Element CSS Value"))]
     pub async fn css_value(&mut self, prop: &str) -> Result<String, error::CmdError> {
         let cmd = WebDriverCommand::GetCSSValue(self.element.clone(), prop.to_string());

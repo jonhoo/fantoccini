@@ -112,9 +112,9 @@ pub enum PointerAction {
         ///
         /// The following constants are provided, but any mouse index can be used
         /// to represent the corresponding mouse button.
-        /// - [MOUSE_BUTTON_LEFT]
-        /// - [MOUSE_BUTTON_MIDDLE]
-        /// - [MOUSE_BUTTON_RIGHT]
+        /// - [`MOUSE_BUTTON_LEFT`]
+        /// - [`MOUSE_BUTTON_MIDDLE`]
+        /// - [`MOUSE_BUTTON_RIGHT`]
         button: u64,
     },
     /// Pointer button up.
@@ -123,9 +123,9 @@ pub enum PointerAction {
         ///
         /// The following constants are provided, but any mouse index can be used
         /// to represent the corresponding mouse button.
-        /// - [MOUSE_BUTTON_LEFT]
-        /// - [MOUSE_BUTTON_MIDDLE]
-        /// - [MOUSE_BUTTON_RIGHT]
+        /// - [`MOUSE_BUTTON_LEFT`]
+        /// - [`MOUSE_BUTTON_MIDDLE`]
+        /// - [`MOUSE_BUTTON_RIGHT`]
         button: u64,
     },
     /// Move the pointer relative to the current position.
