@@ -88,53 +88,45 @@ async fn actions_mouse_move(mut c: Client, port: u16) -> Result<(), error::CmdEr
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
 
-    let mut elem = c.find(Locator::Id("text-input")).await?;
+    let mut elem = c.find(Locator::Id("button-alert")).await?;
     let rect = elem.rectangle().await?;
+    let elem_center_x = rect.0 + (rect.2 / 2.0);
     let elem_center_y = rect.1 + (rect.3 / 2.0);
 
-    elem.send_keys("fantoccini").await?;
-    assert_eq!(elem.prop("value").await?.unwrap(), "fantoccini");
-
-    // Test mouse MoveTo and MoveBy, by implementing drag-and-drop to select text
-    // in the text input element.
+    // Test mouse MoveBy.
     let mouse_actions = MouseActions::new("mouse".to_string())
-        // Move to the left edge of the input element.
-        // Offset by 1 pixel to ensure we click inside the element.
+        // Move to a position at a known offset from the button.
         .then(PointerAction::MoveTo {
             duration: None,
-            x: (rect.0 as i64) + 1,
-            y: elem_center_y as i64,
+            x: 0,
+            y: elem_center_y as i64 - 100,
+        })
+        // Now move by relative offset so that the cursor is now over the button.
+        .then(PointerAction::MoveBy {
+            duration: None,
+            x: elem_center_x as i64,
+            y: 100,
         })
         // Press left mouse button down.
         .then(PointerAction::Down {
             button: MOUSE_BUTTON_LEFT,
-        })
-        // Drag mouse to the right edge of the input element.
-        // Reduce width by 2 pixels to ensure we stop dragging just inside the right edge.
-        .then(PointerAction::MoveBy {
-            duration: None,
-            x: (rect.2 as i64) - 2,
-            y: 0,
         })
         // Release left mouse button.
         .then(PointerAction::Up {
             button: MOUSE_BUTTON_LEFT,
         });
 
-    // Press the delete key after the mouse actions. Note that we need to pause
-    // once for each mouse action, so that the Key down action occurs afterwards.
-    let key_actions = KeyActions::new("key".to_string())
-        .pause(Duration::default())
-        .pause(Duration::default())
-        .pause(Duration::default())
-        .pause(Duration::default())
-        .then(KeyAction::Down {
-            value: Key::Delete.into(),
-        });
+    // Sanity check - ensure no alerts are displayed prior to actions.
+    assert!(matches!(
+        c.get_alert_text().await,
+        Err(error::CmdError::NoSuchAlert(..))
+    ));
 
-    let actions = Actions::from(mouse_actions).and(key_actions);
+    let actions = Actions::from(mouse_actions);
     c.perform_actions(actions).await?;
-    assert_eq!(elem.prop("value").await?.unwrap(), "");
+    assert_eq!(c.get_alert_text().await?, "This is an alert");
+    c.accept_alert().await?;
+
     Ok(())
 }
 
