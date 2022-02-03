@@ -1,5 +1,6 @@
 //! Tests that make use of external websites.
 
+use cookie::SameSite;
 use fantoccini::{error, Client, Locator};
 use futures_util::TryFutureExt;
 use hyper::Method;
@@ -265,15 +266,23 @@ async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
     let cookies = c.get_all_cookies().await?;
     assert!(!cookies.is_empty());
 
-    let first_cookie = &cookies[0];
+    // Add a new cookie.
+    use fantoccini::cookies::Cookie;
+    let mut cookie = Cookie::new("cookietest", "fantoccini");
+    cookie.set_domain(".wikipedia.org");
+    cookie.set_path("/");
+    cookie.set_same_site(Some(SameSite::Lax));
+    c.add_cookie(cookie.clone()).await?;
+
+    // Verify that the cookie exists.
     assert_eq!(
-        c.get_named_cookie(first_cookie.name()).await?.value(),
-        first_cookie.value()
+        c.get_named_cookie(cookie.name()).await?.value(),
+        cookie.value()
     );
 
-    // Delete a cookie and make sure it's gone
-    c.delete_cookie(first_cookie.name()).await?;
-    assert!(c.get_named_cookie(first_cookie.name()).await.is_err());
+    // Delete the cookie and make sure it's gone
+    c.delete_cookie(cookie.name()).await?;
+    assert!(c.get_named_cookie(cookie.name()).await.is_err());
 
     c.delete_all_cookies().await?;
     let cookies = c.get_all_cookies().await?;

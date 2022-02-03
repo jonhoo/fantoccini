@@ -255,8 +255,10 @@ pub mod client;
 #[doc(inline)]
 pub use client::Client;
 
+pub mod actions;
 pub mod cookies;
 pub mod elements;
+pub mod key;
 
 pub mod wait;
 

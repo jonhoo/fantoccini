@@ -89,6 +89,14 @@ pub enum CmdError {
     /// ["no such window"]: https://www.w3.org/TR/webdriver/#dfn-no-such-window
     NoSuchWindow(WebDriver),
 
+    /// The requested alert does not exist.
+    ///
+    /// This variant lifts the ["no such alert"] error variant from `Standard` to simplify
+    /// checking for it in user code.
+    ///
+    /// ["no such alert"]: https://www.w3.org/TR/webdriver/#dfn-no-such-alert
+    NoSuchAlert(WebDriver),
+
     /// A bad URL was encountered during parsing.
     ///
     /// This normally happens if a link is clicked or the current URL is requested, but the URL in
@@ -150,14 +158,20 @@ impl CmdError {
     }
 
     pub(crate) fn from_webdriver_error(e: webdriver::WebDriverError) -> Self {
-        if let webdriver::WebDriverError {
-            error: webdriver::ErrorStatus::NoSuchElement,
-            ..
-        } = e
-        {
-            CmdError::NoSuchElement(WebDriver::from_upstream_error(e))
-        } else {
-            CmdError::Standard(WebDriver::from_upstream_error(e))
+        match e {
+            webdriver::WebDriverError {
+                error: webdriver::ErrorStatus::NoSuchElement,
+                ..
+            } => CmdError::NoSuchElement(WebDriver::from_upstream_error(e)),
+            webdriver::WebDriverError {
+                error: webdriver::ErrorStatus::NoSuchWindow,
+                ..
+            } => CmdError::NoSuchWindow(WebDriver::from_upstream_error(e)),
+            webdriver::WebDriverError {
+                error: webdriver::ErrorStatus::NoSuchAlert,
+                ..
+            } => CmdError::NoSuchAlert(WebDriver::from_upstream_error(e)),
+            _ => CmdError::Standard(WebDriver::from_upstream_error(e)),
         }
     }
 }
@@ -168,6 +182,7 @@ impl Error for CmdError {
             CmdError::Standard(..) => "webdriver returned error",
             CmdError::NoSuchElement(..) => "no element found matching selector",
             CmdError::NoSuchWindow(..) => "no window is currently selected",
+            CmdError::NoSuchAlert(..) => "no alert is currently visible",
             CmdError::BadUrl(..) => "bad url provided",
             CmdError::Failed(..) => "webdriver could not be reached",
             CmdError::Lost(..) => "webdriver connection lost",
@@ -184,7 +199,8 @@ impl Error for CmdError {
         match *self {
             CmdError::Standard(ref e)
             | CmdError::NoSuchElement(ref e)
-            | CmdError::NoSuchWindow(ref e) => Some(e),
+            | CmdError::NoSuchWindow(ref e)
+            | CmdError::NoSuchAlert(ref e) => Some(e),
             CmdError::BadUrl(ref e) => Some(e),
             CmdError::Failed(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
@@ -205,7 +221,8 @@ impl fmt::Display for CmdError {
         match *self {
             CmdError::Standard(ref e)
             | CmdError::NoSuchElement(ref e)
-            | CmdError::NoSuchWindow(ref e) => write!(f, "{}", e),
+            | CmdError::NoSuchWindow(ref e)
+            | CmdError::NoSuchAlert(ref e) => write!(f, "{}", e),
             CmdError::BadUrl(ref e) => write!(f, "{}", e),
             CmdError::Failed(ref e) => write!(f, "{}", e),
             CmdError::Lost(ref e) => write!(f, "{}", e),
@@ -248,7 +265,7 @@ impl From<serde_json::Error> for CmdError {
 /// Error of attempting to create an invalid [`WindowHandle`] from a
 /// [`"current"` string][1].
 ///
-/// [`WindowHandle`]: crate::WindowHandle
+/// [`WindowHandle`]: crate::wd::WindowHandle
 /// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
 #[derive(Clone, Copy, Debug)]
 pub struct InvalidWindowHandle;

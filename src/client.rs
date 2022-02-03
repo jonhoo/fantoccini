@@ -1,16 +1,19 @@
 //! WebDriver client implementation.
 
+use crate::actions::Actions;
 use crate::elements::{Element, Form};
 use crate::error;
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
-use crate::wd::{Capabilities, Locator, NewWindowType, WindowHandle};
+use crate::wd::{
+    Capabilities, Locator, NewWindowType, TimeoutConfiguration, WebDriverStatus, WindowHandle,
+};
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
 use std::convert::{TryFrom, TryInto as _};
 use std::future::Future;
 use tokio::sync::{mpsc, oneshot};
-use webdriver::command::WebDriverCommand;
+use webdriver::command::{SendKeysParameters, WebDriverCommand};
 use webdriver::common::{FrameId, ELEMENT_KEY};
 
 // Used only under `native-tls`
@@ -146,6 +149,45 @@ impl Client {
 
 // NOTE: new impl block to keep related methods together.
 
+/// [Sessions](https://www.w3.org/TR/webdriver1/#sessions)
+impl Client {
+    /// Get the WebDriver status.
+    ///
+    /// See [8.3 Status](https://www.w3.org/TR/webdriver1/#status) of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Status"))]
+    pub async fn status(&mut self) -> Result<WebDriverStatus, error::CmdError> {
+        let res = self.issue(WebDriverCommand::Status).await?;
+        let status: WebDriverStatus = serde_json::from_value(res)?;
+        Ok(status)
+    }
+
+    /// Get the timeouts for the current session.
+    ///
+    /// See [8.4 Get Timeouts](https://www.w3.org/TR/webdriver1/#get-timeouts) of the WebDriver
+    /// standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Timeouts"))]
+    pub async fn get_timeouts(&mut self) -> Result<TimeoutConfiguration, error::CmdError> {
+        let res = self.issue(WebDriverCommand::GetTimeouts).await?;
+        let timeouts: TimeoutConfiguration = serde_json::from_value(res)?;
+        Ok(timeouts)
+    }
+
+    /// Set the timeouts for the current session.
+    ///
+    /// See [8.5 Set Timeouts](https://www.w3.org/TR/webdriver1/#set-timeouts) of the WebDriver
+    /// standard.
+    #[cfg_attr(docsrs, doc(alias = "Set Timeouts"))]
+    #[cfg_attr(docsrs, doc(alias = "Update Timeouts"))]
+    pub async fn update_timeouts(
+        &mut self,
+        timeouts: TimeoutConfiguration,
+    ) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::SetTimeouts(timeouts.into_params()))
+            .await?;
+        Ok(())
+    }
+}
+
 /// [Navigation](https://www.w3.org/TR/webdriver1/#navigation)
 impl Client {
     /// Navigate directly to the given URL.
@@ -192,6 +234,15 @@ impl Client {
         Ok(())
     }
 
+    /// Go forward to the next page.
+    ///
+    /// See [9.4 Forward](https://www.w3.org/TR/webdriver1/#dfn-forward) of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Forward"))]
+    pub async fn forward(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::GoForward).await?;
+        Ok(())
+    }
+
     /// Refresh the current previous page.
     ///
     /// See [9.5 Refresh](https://www.w3.org/TR/webdriver1/#dfn-refresh) of the WebDriver standard.
@@ -199,6 +250,19 @@ impl Client {
     pub async fn refresh(&mut self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::Refresh).await?;
         Ok(())
+    }
+
+    /// Get the current page title.
+    ///
+    /// See [9.6 Get Title](https://www.w3.org/TR/webdriver1/#dfn-get-title) of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Title"))]
+    pub async fn title(&mut self) -> Result<String, error::CmdError> {
+        let title = self.issue(WebDriverCommand::GetTitle).await?;
+        if let Json::String(s) = title {
+            Ok(s)
+        } else {
+            Err(error::CmdError::NotW3C(title))
+        }
     }
 }
 
@@ -445,6 +509,33 @@ impl Client {
         let (x, y, _, _) = self.get_window_rect().await?;
         Ok((x, y))
     }
+
+    /// Maximize the current window.
+    ///
+    /// See [10.7.3 Maximize Window](https://www.w3.org/TR/webdriver1/#dfn-maximize-window) of the
+    /// WebDriver standard.
+    pub async fn maximize_window(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::MaximizeWindow).await?;
+        Ok(())
+    }
+
+    /// Minimize the current window.
+    ///
+    /// See [10.7.4 Minimize Window](https://www.w3.org/TR/webdriver1/#dfn-minimize-window) of the
+    /// WebDriver standard.
+    pub async fn minimize_window(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::MinimizeWindow).await?;
+        Ok(())
+    }
+
+    /// Make the current window fullscreen.
+    ///
+    /// See [10.7.5 Fullscreen Window](https://www.w3.org/TR/webdriver1/#dfn-fullscreen-window) of the
+    /// WebDriver standard.
+    pub async fn fullscreen_window(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::FullscreenWindow).await?;
+        Ok(())
+    }
 }
 
 /// [Element Retrieval](https://www.w3.org/TR/webdriver1/#element-retrieval)
@@ -597,6 +688,105 @@ impl Client {
         };
 
         self.issue(WebDriverCommand::ExecuteAsyncScript(cmd)).await
+    }
+}
+
+/// [Actions](https://www.w3.org/TR/webdriver1/#actions)
+impl Client {
+    /// Create a new Actions chain.
+    ///
+    /// ```ignore
+    /// let mouse_actions = MouseActions::new("mouse")
+    ///     .then(PointerAction::Down {
+    ///         button: MOUSE_BUTTON_LEFT,
+    ///     })
+    ///     .then(PointerAction::MoveBy {
+    ///         duration: Some(Duration::from_secs(2)),
+    ///         x: 100,
+    ///         y: 0,
+    ///     })
+    ///     .then(PointerAction::Up {
+    ///         button: MOUSE_BUTTON_LEFT,
+    ///     });
+    /// client.perform_actions(mouse_actions).await?;
+    /// ```
+    ///
+    /// See the documentation for [`Actions`] for more information.
+    /// Perform the specified input actions.
+    ///
+    /// See [17.5 Perform Actions](https://www.w3.org/TR/webdriver1/#perform-actions) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
+    pub async fn perform_actions(
+        &mut self,
+        actions: impl Into<Actions>,
+    ) -> Result<(), error::CmdError> {
+        let params = webdriver::command::ActionsParameters {
+            actions: actions.into().sequences.into_iter().map(|x| x.0).collect(),
+        };
+
+        self.issue(WebDriverCommand::PerformActions(params)).await?;
+        Ok(())
+    }
+
+    /// Release all input actions.
+    ///
+    /// See [17.6 Release Actions](https://www.w3.org/TR/webdriver1/#release-actions) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Release Actions"))]
+    pub async fn release_actions(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::ReleaseActions).await?;
+        Ok(())
+    }
+}
+
+/// [User Prompts](https://www.w3.org/TR/webdriver1/#user-prompts)
+impl Client {
+    /// Dismiss the active alert, if there is one.
+    ///
+    /// See [18.1 Dismiss Alert](https://www.w3.org/TR/webdriver1/#dismiss-alert) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Dismiss Alert"))]
+    pub async fn dismiss_alert(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::DismissAlert).await?;
+        Ok(())
+    }
+
+    /// Accept the active alert, if there is one.
+    ///
+    /// See [18.2 Accept Alert](https://www.w3.org/TR/webdriver1/#accept-alert) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Accept Alert"))]
+    pub async fn accept_alert(&mut self) -> Result<(), error::CmdError> {
+        self.issue(WebDriverCommand::AcceptAlert).await?;
+        Ok(())
+    }
+
+    /// Get the text of the active alert, if there is one.
+    ///
+    /// See [18.3 Get Alert Text](https://www.w3.org/TR/webdriver1/#get-alert-text) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Alert Text"))]
+    pub async fn get_alert_text(&mut self) -> Result<String, error::CmdError> {
+        let res = self.issue(WebDriverCommand::GetAlertText).await?;
+        if let Json::String(s) = res {
+            Ok(s)
+        } else {
+            Err(error::CmdError::NotW3C(res))
+        }
+    }
+
+    /// Send the specified text to the active alert, if there is one.
+    ///
+    /// See [18.4 Send Alert Text](https://www.w3.org/TR/webdriver1/#send-alert-text) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Send Alert Text"))]
+    pub async fn send_alert_text(&mut self, text: &str) -> Result<(), error::CmdError> {
+        let params = SendKeysParameters {
+            text: text.to_string(),
+        };
+        self.issue(WebDriverCommand::SendAlertText(params)).await?;
+        Ok(())
     }
 }
 

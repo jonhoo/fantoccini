@@ -4,9 +4,54 @@ use crate::wd::Locator;
 use crate::{error, Client};
 use serde::Serialize;
 use serde_json::Value as Json;
+use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 use webdriver::command::WebDriverCommand;
 use webdriver::common::FrameId;
 use webdriver::error::WebDriverError;
+
+/// Web element reference.
+///
+/// > Each element has an associated web element reference that uniquely identifies the element
+/// > across all browsing contexts. The web element reference for every element representing the
+/// > same element must be the same. It must be a string, and should be the result of generating
+/// > a UUID.
+///
+/// See [11. Elements](https://www.w3.org/TR/webdriver1/#elements) of the WebDriver standard.
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct ElementRef(String);
+
+impl Display for ElementRef {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl AsRef<str> for ElementRef {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for ElementRef {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl From<ElementRef> for String {
+    fn from(id: ElementRef) -> Self {
+        id.0
+    }
+}
+
+impl From<String> for ElementRef {
+    fn from(s: String) -> Self {
+        ElementRef(s)
+    }
+}
 
 /// A single DOM element on the current page.
 ///
@@ -15,10 +60,33 @@ use webdriver::error::WebDriverError;
 /// The same goes for inspecting [element state](https://www.w3.org/TR/webdriver1/#element-state).
 #[derive(Clone, Debug, Serialize)]
 pub struct Element {
+    /// The high-level WebDriver client, for sending commands.
     #[serde(skip_serializing)]
     pub(crate) client: Client,
+    /// The encapsulated WebElement struct.
     #[serde(flatten)]
     pub(crate) element: webdriver::common::WebElement,
+}
+
+impl Element {
+    /// Construct an `Element` with the specified element id.
+    /// The element id is the id given by the webdriver.
+    pub fn from_element_id(client: Client, element_id: ElementRef) -> Self {
+        Self {
+            client,
+            element: webdriver::common::WebElement(element_id.0),
+        }
+    }
+
+    /// Get back the [`Client`] hosting this `Element`.
+    pub fn client(self) -> Client {
+        self.client
+    }
+
+    /// Get the element id as given by the webdriver.
+    pub fn element_id(&self) -> ElementRef {
+        ElementRef(self.element.0.clone())
+    }
 }
 
 /// An HTML form on the current page.
@@ -26,13 +94,6 @@ pub struct Element {
 pub struct Form {
     pub(crate) client: Client,
     pub(crate) form: webdriver::common::WebElement,
-}
-
-impl Element {
-    /// Get back the [`Client`] hosting this `Element`.
-    pub fn client(self) -> Client {
-        self.client
-    }
 }
 
 /// [Command Contexts](https://www.w3.org/TR/webdriver1/#command-contexts)
@@ -107,6 +168,42 @@ impl Element {
 
 /// [Element State](https://www.w3.org/TR/webdriver1/#element-state)
 impl Element {
+    /// Return true if the element is currently selected.
+    ///
+    /// See [13.1 Is Element Selected](https://www.w3.org/TR/webdriver1/#is-element-selected)
+    /// of the WebDriver standard.
+    pub async fn is_selected(&mut self) -> Result<bool, error::CmdError> {
+        let cmd = WebDriverCommand::IsSelected(self.element.clone());
+        match self.client.issue(cmd).await? {
+            Json::Bool(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Return true if the element is currently enabled.
+    ///
+    /// See [13.8 Is Element Enabled](https://www.w3.org/TR/webdriver1/#is-element-enabled)
+    /// of the WebDriver standard.
+    pub async fn is_enabled(&mut self) -> Result<bool, error::CmdError> {
+        let cmd = WebDriverCommand::IsEnabled(self.element.clone());
+        match self.client.issue(cmd).await? {
+            Json::Bool(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Return true if the element is currently displayed.
+    ///
+    /// See [Element Displayedness](https://www.w3.org/TR/webdriver1/#element-displayedness)
+    /// of the WebDriver standard.
+    pub async fn is_displayed(&mut self) -> Result<bool, error::CmdError> {
+        let cmd = WebDriverCommand::IsDisplayed(self.element.clone());
+        match self.client.issue(cmd).await? {
+            Json::Bool(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
     /// Look up an [attribute] value for this element by name.
     ///
     /// `Ok(None)` is returned if the element does not have the given attribute.
@@ -130,6 +227,8 @@ impl Element {
     ///
     /// `Ok(None)` is returned if the element does not have the given property.
     ///
+    /// Boolean properties such as "checked" will be returned as the String "true" or "false".
+    ///
     /// See [13.3 Get Element Property](https://www.w3.org/TR/webdriver1/#get-element-property)
     /// of the WebDriver standard.
     ///
@@ -139,12 +238,30 @@ impl Element {
         let cmd = WebDriverCommand::GetElementProperty(self.element.clone(), prop.to_string());
         match self.client.issue(cmd).await? {
             Json::String(v) => Ok(Some(v)),
+            Json::Bool(b) => Ok(Some(b.to_string())),
             Json::Null => Ok(None),
             v => Err(error::CmdError::NotW3C(v)),
         }
     }
 
-    /// Retrieve the text contents of this elment.
+    /// Look up the [computed value] of a CSS property for this element by name.
+    ///
+    /// `Ok(String::new())` is returned if the the given CSS property is not found.
+    ///
+    /// See [13.4 Get Element CSS Value](https://www.w3.org/TR/webdriver1/#get-element-css-value)
+    /// of the WebDriver standard.
+    ///
+    /// [computed value]: https://drafts.csswg.org/css-cascade-4/#computed-value
+    #[cfg_attr(docsrs, doc(alias = "Get Element CSS Value"))]
+    pub async fn css_value(&mut self, prop: &str) -> Result<String, error::CmdError> {
+        let cmd = WebDriverCommand::GetCSSValue(self.element.clone(), prop.to_string());
+        match self.client.issue(cmd).await? {
+            Json::String(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Retrieve the text contents of this element.
     ///
     /// See [13.5 Get Element Text](https://www.w3.org/TR/webdriver1/#get-element-text)
     /// of the WebDriver standard.
@@ -153,6 +270,57 @@ impl Element {
         let cmd = WebDriverCommand::GetElementText(self.element.clone());
         match self.client.issue(cmd).await? {
             Json::String(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Retrieve the tag name of this element.
+    ///
+    /// See [13.6 Get Element Tag Name](https://www.w3.org/TR/webdriver1/#get-element-tag-name)
+    /// of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Element Tag Name"))]
+    pub async fn tag_name(&mut self) -> Result<String, error::CmdError> {
+        let cmd = WebDriverCommand::GetElementTagName(self.element.clone());
+        match self.client.issue(cmd).await? {
+            Json::String(v) => Ok(v),
+            v => Err(error::CmdError::NotW3C(v)),
+        }
+    }
+
+    /// Gets the x, y, width, and height properties of the current element.
+    ///
+    /// See [13.7 Get Element Rect](https://www.w3.org/TR/webdriver1/#dfn-get-element-rect) of the
+    /// WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Element Rect"))]
+    pub async fn rectangle(&mut self) -> Result<(f64, f64, f64, f64), error::CmdError> {
+        match self
+            .client
+            .issue(WebDriverCommand::GetElementRect(self.element.clone()))
+            .await?
+        {
+            Json::Object(mut obj) => {
+                let x = match obj.remove("x").and_then(|x| x.as_f64()) {
+                    Some(x) => x,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                let y = match obj.remove("y").and_then(|y| y.as_f64()) {
+                    Some(y) => y,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                let width = match obj.remove("width").and_then(|width| width.as_f64()) {
+                    Some(width) => width,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                let height = match obj.remove("height").and_then(|height| height.as_f64()) {
+                    Some(height) => height,
+                    None => return Err(error::CmdError::NotW3C(Json::Object(obj))),
+                };
+
+                Ok((x, y, width, height))
+            }
             v => Err(error::CmdError::NotW3C(v)),
         }
     }

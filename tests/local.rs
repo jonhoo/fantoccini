@@ -1,16 +1,11 @@
 //! Tests that don't make use of external websites.
-#[macro_use]
-extern crate serial_test;
-extern crate fantoccini;
-extern crate futures_util;
-
+use crate::common::{other_page_url, sample_page_url};
+use fantoccini::wd::TimeoutConfiguration;
 use fantoccini::{error, Client, Locator};
+use serial_test::serial;
+use std::time::Duration;
 
 mod common;
-
-fn sample_page_url(port: u16) -> String {
-    format!("http://localhost:{}/sample_page.html", port)
-}
 
 async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
@@ -29,7 +24,7 @@ async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdE
         .await?;
 
     let new_url = c.current_url().await?;
-    let expected_url = format!("http://localhost:{}/other_page.html", port);
+    let expected_url = other_page_url(port);
     assert_eq!(new_url.as_str(), expected_url.as_str());
 
     c.close().await
@@ -353,6 +348,74 @@ async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), err
     Ok(())
 }
 
+async fn back_and_forward(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let sample_url = sample_page_url(port);
+    c.goto(&sample_url).await?;
+
+    assert_eq!(c.current_url().await?.as_str(), sample_url);
+
+    let other_url = other_page_url(port);
+    c.goto(&other_url).await?;
+    assert_eq!(c.current_url().await?.as_str(), other_url);
+
+    c.back().await?;
+    assert_eq!(c.current_url().await?.as_str(), sample_url);
+
+    c.forward().await?;
+    assert_eq!(c.current_url().await?.as_str(), other_url);
+
+    Ok(())
+}
+
+async fn status_firefox(mut c: Client, _: u16) -> Result<(), error::CmdError> {
+    // Geckodriver only supports a single session, and since we're already in a
+    // session, it should return `false` here.
+    assert!(!c.status().await?.ready);
+    Ok(())
+}
+
+async fn status_chrome(mut c: Client, _: u16) -> Result<(), error::CmdError> {
+    // Chromedriver supports multiple sessions, so it should always return
+    // `true` here.
+    assert!(c.status().await?.ready);
+    Ok(())
+}
+
+async fn page_title(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    let sample_url = sample_page_url(port);
+    c.goto(&sample_url).await?;
+    assert_eq!(c.title().await?, "Sample Page");
+    Ok(())
+}
+
+async fn timeouts(mut c: Client, _: u16) -> Result<(), error::CmdError> {
+    let new_timeouts = TimeoutConfiguration::new(
+        Some(Duration::from_secs(60)),
+        Some(Duration::from_secs(60)),
+        Some(Duration::from_secs(30)),
+    );
+    c.update_timeouts(new_timeouts.clone()).await?;
+
+    let got_timeouts = c.get_timeouts().await?;
+    assert_eq!(got_timeouts, new_timeouts);
+
+    // Ensure partial update also works.
+    let update_timeouts = TimeoutConfiguration::new(None, None, Some(Duration::from_secs(0)));
+    c.update_timeouts(update_timeouts.clone()).await?;
+
+    let got_timeouts = c.get_timeouts().await?;
+    assert_eq!(
+        got_timeouts,
+        TimeoutConfiguration::new(
+            new_timeouts.script(),
+            new_timeouts.page_load(),
+            update_timeouts.implicit()
+        )
+    );
+
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -450,6 +513,30 @@ mod firefox {
     fn resolve_execute_async_value_test() {
         local_tester!(resolve_execute_async_value, "firefox");
     }
+
+    #[test]
+    #[serial]
+    fn back_and_forward_test() {
+        local_tester!(back_and_forward, "firefox");
+    }
+
+    #[test]
+    #[serial]
+    fn status_test() {
+        local_tester!(status_firefox, "firefox");
+    }
+
+    #[test]
+    #[serial]
+    fn title_test() {
+        local_tester!(page_title, "firefox");
+    }
+
+    #[test]
+    #[serial]
+    fn timeouts_test() {
+        local_tester!(timeouts, "firefox");
+    }
 }
 
 mod chrome {
@@ -523,5 +610,25 @@ mod chrome {
     #[test]
     fn select_by_test() {
         local_tester!(select_by, "chrome")
+    }
+
+    #[test]
+    fn back_and_forward_test() {
+        local_tester!(back_and_forward, "chrome");
+    }
+
+    #[test]
+    fn status_test() {
+        local_tester!(status_chrome, "chrome");
+    }
+
+    #[test]
+    fn title_test() {
+        local_tester!(page_title, "chrome");
+    }
+
+    #[test]
+    fn timeouts_test() {
+        local_tester!(timeouts, "chrome");
     }
 }
