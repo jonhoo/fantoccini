@@ -85,6 +85,9 @@ async fn actions_mouse(mut c: Client, port: u16) -> Result<(), error::CmdError> 
 }
 
 async fn actions_mouse_move(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+    // Set window size to avoid moving the cursor out-of-bounds during actions.
+    c.set_window_rect(0, 0, 800, 800).await?;
+
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
 
