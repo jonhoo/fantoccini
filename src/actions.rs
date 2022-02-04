@@ -413,9 +413,11 @@ pub trait InputSource: Into<ActionSequence> {
     type Action;
 
     /// Add a pause action to the sequence for this input source.
+    #[must_use]
     fn pause(self, duration: Duration) -> Self;
 
     /// Add the specified action to the sequence for this input source.
+    #[must_use]
     fn then(self, action: Self::Action) -> Self;
 }
 
@@ -524,6 +526,7 @@ pub struct Actions {
 
 impl Actions {
     /// Append the specified sequence to the list of sequences.
+    #[must_use]
     pub fn and(mut self, sequence: impl Into<ActionSequence>) -> Self {
         self.sequences.push(sequence.into());
         self

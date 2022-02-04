@@ -112,18 +112,21 @@ impl<'c> Wait<'c> {
     }
 
     /// Set the timeout until the operation should wait.
+    #[must_use]
     pub fn at_most(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
     /// Wait forever.
+    #[must_use]
     pub fn forever(mut self) -> Self {
         self.timeout = None;
         self
     }
 
     /// Sets the period to delay checks.
+    #[must_use]
     pub fn every(mut self, period: Duration) -> Self {
         self.period = period;
         self
