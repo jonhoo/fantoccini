@@ -29,7 +29,7 @@ use tokio::time::sleep;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Connect to webdriver instance that is listening on port 4444
-    let mut client = ClientBuilder::native()
+    let client = ClientBuilder::native()
         .connect("http://localhost:4444")
         .await?;
 
@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     button.click().await?;
 
     // Find the big textarea.
-    let mut code_area = client
+    let code_area = client
         .wait()
         .for_element(Locator::Css(".ace_text-input"))
         .await?;

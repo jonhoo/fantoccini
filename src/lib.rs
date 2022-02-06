@@ -41,12 +41,12 @@
 //! async fn main() -> Result<(), fantoccini::error::CmdError> {
 //!     // Connecting using "native" TLS (with feature `native-tls`; on by default)
 //!     # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-//!     let mut c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     let c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!     // Connecting using Rustls (with feature `rustls-tls`)
 //!     # #[cfg(feature = "rustls-tls")]
-//!     let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     let c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!     # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
-//!     # let mut c: fantoccini::Client = unreachable!("no tls provider available");
+//!     # let c: fantoccini::Client = unreachable!("no tls provider available");
 //!
 //!     // first, go to the Wikipedia page for Foobar
 //!     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
@@ -74,16 +74,16 @@
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
 //! # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-//! # let mut c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(feature = "rustls-tls")]
-//! # let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
-//! # let mut c: fantoccini::Client = unreachable!("no tls provider available");
+//! # let c: fantoccini::Client = unreachable!("no tls provider available");
 //! // -- snip wrapper code --
 //! // go to the Wikipedia frontpage this time
 //! c.goto("https://www.wikipedia.org/").await?;
 //! // find the search form, fill it out, and submit it
-//! let mut f = c.form(Locator::Css("#search-form")).await?;
+//! let f = c.form(Locator::Css("#search-form")).await?;
 //! f.set_by_name("search", "foobar").await?
 //!  .submit().await?;
 //!
@@ -103,16 +103,16 @@
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
 //! # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-//! # let mut c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(feature = "rustls-tls")]
-//! # let mut c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
-//! # let mut c: fantoccini::Client = unreachable!("no tls provider available");
+//! # let c: fantoccini::Client = unreachable!("no tls provider available");
 //! // -- snip wrapper code --
 //! // go back to the frontpage
 //! c.goto("https://www.wikipedia.org/").await?;
 //! // find the source for the Wikipedia globe
-//! let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
+//! let img = c.find(Locator::Css("img.central-featured-logo")).await?;
 //! let src = img.attr("src").await?.expect("image should have a src");
 //! // now build a raw HTTP client request (which also has all current cookies)
 //! let raw = img.client().raw_client_for(hyper::Method::GET, &src).await?;

@@ -91,7 +91,7 @@ impl Client {
     }
 
     /// Get the unique session ID assigned by the WebDriver server to this client.
-    pub async fn session_id(&mut self) -> Result<Option<String>, error::CmdError> {
+    pub async fn session_id(&self) -> Result<Option<String>, error::CmdError> {
         match self.issue(Cmd::GetSessionId).await? {
             Json::String(s) => Ok(Some(s)),
             Json::Null => Ok(None),
@@ -100,13 +100,13 @@ impl Client {
     }
 
     /// Set the User Agent string to use for all subsequent requests.
-    pub async fn set_ua<S: Into<String>>(&mut self, ua: S) -> Result<(), error::CmdError> {
+    pub async fn set_ua<S: Into<String>>(&self, ua: S) -> Result<(), error::CmdError> {
         self.issue(Cmd::SetUa(ua.into())).await?;
         Ok(())
     }
 
     /// Get the current User Agent string.
-    pub async fn get_ua(&mut self) -> Result<Option<String>, error::CmdError> {
+    pub async fn get_ua(&self) -> Result<Option<String>, error::CmdError> {
         match self.issue(Cmd::GetUa).await? {
             Json::String(s) => Ok(Some(s)),
             Json::Null => Ok(None),
@@ -126,7 +126,7 @@ impl Client {
     ///
     /// This function may be useful in conjunction with `raw_client_for`, as it allows you to close
     /// the automated browser window while doing e.g., a large download.
-    pub async fn close(&mut self) -> Result<(), error::CmdError> {
+    pub async fn close(&self) -> Result<(), error::CmdError> {
         self.issue(Cmd::Shutdown).await?;
         Ok(())
     }
@@ -141,7 +141,7 @@ impl Client {
     /// Note that an explicit call to [`Client::close`] will still terminate the session.
     ///
     /// This function is safe to call multiple times.
-    pub async fn persist(&mut self) -> Result<(), error::CmdError> {
+    pub async fn persist(&self) -> Result<(), error::CmdError> {
         self.issue(Cmd::Persist).await?;
         Ok(())
     }
@@ -155,7 +155,7 @@ impl Client {
     ///
     /// See [8.3 Status](https://www.w3.org/TR/webdriver1/#status) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Status"))]
-    pub async fn status(&mut self) -> Result<WebDriverStatus, error::CmdError> {
+    pub async fn status(&self) -> Result<WebDriverStatus, error::CmdError> {
         let res = self.issue(WebDriverCommand::Status).await?;
         let status: WebDriverStatus = serde_json::from_value(res)?;
         Ok(status)
@@ -166,7 +166,7 @@ impl Client {
     /// See [8.4 Get Timeouts](https://www.w3.org/TR/webdriver1/#get-timeouts) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Get Timeouts"))]
-    pub async fn get_timeouts(&mut self) -> Result<TimeoutConfiguration, error::CmdError> {
+    pub async fn get_timeouts(&self) -> Result<TimeoutConfiguration, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetTimeouts).await?;
         let timeouts: TimeoutConfiguration = serde_json::from_value(res)?;
         Ok(timeouts)
@@ -179,7 +179,7 @@ impl Client {
     #[cfg_attr(docsrs, doc(alias = "Set Timeouts"))]
     #[cfg_attr(docsrs, doc(alias = "Update Timeouts"))]
     pub async fn update_timeouts(
-        &mut self,
+        &self,
         timeouts: TimeoutConfiguration,
     ) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::SetTimeouts(timeouts.into_params()))
@@ -195,7 +195,7 @@ impl Client {
     /// See [9.1 Navigate To](https://www.w3.org/TR/webdriver1/#dfn-navigate-to) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Navigate To"))]
-    pub async fn goto(&mut self, url: &str) -> Result<(), error::CmdError> {
+    pub async fn goto(&self, url: &str) -> Result<(), error::CmdError> {
         let url = url.to_owned();
         let base = self.current_url_().await?;
         let url = base.join(&url)?;
@@ -211,11 +211,11 @@ impl Client {
     /// See [9.2 Get Current URL](https://www.w3.org/TR/webdriver1/#dfn-get-current-url) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Current URL"))]
-    pub async fn current_url(&mut self) -> Result<url::Url, error::CmdError> {
+    pub async fn current_url(&self) -> Result<url::Url, error::CmdError> {
         self.current_url_().await
     }
 
-    pub(crate) async fn current_url_(&mut self) -> Result<url::Url, error::CmdError> {
+    pub(crate) async fn current_url_(&self) -> Result<url::Url, error::CmdError> {
         let url = self.issue(WebDriverCommand::GetCurrentUrl).await?;
         if let Some(url) = url.as_str() {
             let url = if url.is_empty() { "about:blank" } else { url };
@@ -229,7 +229,7 @@ impl Client {
     ///
     /// See [9.3 Back](https://www.w3.org/TR/webdriver1/#dfn-back) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Back"))]
-    pub async fn back(&mut self) -> Result<(), error::CmdError> {
+    pub async fn back(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::GoBack).await?;
         Ok(())
     }
@@ -238,7 +238,7 @@ impl Client {
     ///
     /// See [9.4 Forward](https://www.w3.org/TR/webdriver1/#dfn-forward) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Forward"))]
-    pub async fn forward(&mut self) -> Result<(), error::CmdError> {
+    pub async fn forward(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::GoForward).await?;
         Ok(())
     }
@@ -247,7 +247,7 @@ impl Client {
     ///
     /// See [9.5 Refresh](https://www.w3.org/TR/webdriver1/#dfn-refresh) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Refresh"))]
-    pub async fn refresh(&mut self) -> Result<(), error::CmdError> {
+    pub async fn refresh(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::Refresh).await?;
         Ok(())
     }
@@ -256,7 +256,7 @@ impl Client {
     ///
     /// See [9.6 Get Title](https://www.w3.org/TR/webdriver1/#dfn-get-title) of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Title"))]
-    pub async fn title(&mut self) -> Result<String, error::CmdError> {
+    pub async fn title(&self) -> Result<String, error::CmdError> {
         let title = self.issue(WebDriverCommand::GetTitle).await?;
         if let Json::String(s) = title {
             Ok(s)
@@ -273,7 +273,7 @@ impl Client {
     /// See [10.1 Get Window Handle](https://www.w3.org/TR/webdriver1/#get-window-handle) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Handle"))]
-    pub async fn window(&mut self) -> Result<WindowHandle, error::CmdError> {
+    pub async fn window(&self) -> Result<WindowHandle, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandle).await?;
         match res {
             Json::String(x) => Ok(x.try_into()?),
@@ -292,7 +292,7 @@ impl Client {
     /// See [10.2 Close Window](https://www.w3.org/TR/webdriver1/#close-window) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Close Window"))]
-    pub async fn close_window(&mut self) -> Result<(), error::CmdError> {
+    pub async fn close_window(&self) -> Result<(), error::CmdError> {
         let _res = self.issue(WebDriverCommand::CloseWindow).await?;
         Ok(())
     }
@@ -302,7 +302,7 @@ impl Client {
     /// See [10.3 Switch To Window](https://www.w3.org/TR/webdriver1/#switch-to-window) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Window"))]
-    pub async fn switch_to_window(&mut self, window: WindowHandle) -> Result<(), error::CmdError> {
+    pub async fn switch_to_window(&self, window: WindowHandle) -> Result<(), error::CmdError> {
         let params = webdriver::command::SwitchToWindowParameters {
             handle: window.into(),
         };
@@ -315,7 +315,7 @@ impl Client {
     /// See [10.4 Get Window Handles](https://www.w3.org/TR/webdriver1/#get-window-handles) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Handles"))]
-    pub async fn windows(&mut self) -> Result<Vec<WindowHandle>, error::CmdError> {
+    pub async fn windows(&self) -> Result<Vec<WindowHandle>, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetWindowHandles).await?;
         match res {
             Json::Array(handles) => handles
@@ -343,7 +343,7 @@ impl Client {
     /// See [11.5 New Window](https://w3c.github.io/webdriver/#dfn-new-window) of the editor's
     /// draft standard.
     #[cfg_attr(docsrs, doc(alias = "New Window"))]
-    pub async fn new_window(&mut self, as_tab: bool) -> Result<NewWindowResponse, error::CmdError> {
+    pub async fn new_window(&self, as_tab: bool) -> Result<NewWindowResponse, error::CmdError> {
         let type_hint = if as_tab { "tab" } else { "window" }.to_string();
         let type_hint = Some(type_hint);
         let params = webdriver::command::NewWindowParameters { type_hint };
@@ -377,12 +377,12 @@ impl Client {
     /// See [10.5 Switch To Frame](https://www.w3.org/TR/webdriver1/#switch-to-frame) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Frame"))]
-    pub async fn enter_frame(mut self, index: Option<u16>) -> Result<Client, error::CmdError> {
+    pub async fn enter_frame(&self, index: Option<u16>) -> Result<(), error::CmdError> {
         let params = webdriver::command::SwitchToFrameParameters {
             id: index.map(FrameId::Short),
         };
         self.issue(WebDriverCommand::SwitchToFrame(params)).await?;
-        Ok(self)
+        Ok(())
     }
 
     /// Switches to the parent of the frame the client is currently contained within.
@@ -390,9 +390,9 @@ impl Client {
     /// See [10.6 Switch To Parent Frame](https://www.w3.org/TR/webdriver1/#switch-to-parent-frame)
     /// of the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Parent Frame"))]
-    pub async fn enter_parent_frame(mut self) -> Result<Client, error::CmdError> {
+    pub async fn enter_parent_frame(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::SwitchToParentFrame).await?;
-        Ok(self)
+        Ok(())
     }
 
     /// Sets the x, y, width, and height properties of the current window.
@@ -401,7 +401,7 @@ impl Client {
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Set Window Rect"))]
     pub async fn set_window_rect(
-        &mut self,
+        &self,
         x: u32,
         y: u32,
         width: u32,
@@ -423,7 +423,7 @@ impl Client {
     /// See [10.7.1 Get Window Rect](https://www.w3.org/TR/webdriver1/#dfn-get-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Rect"))]
-    pub async fn get_window_rect(&mut self) -> Result<(u64, u64, u64, u64), error::CmdError> {
+    pub async fn get_window_rect(&self) -> Result<(u64, u64, u64, u64), error::CmdError> {
         match self.issue(WebDriverCommand::GetWindowRect).await? {
             Json::Object(mut obj) => {
                 let x = match obj.remove("x").and_then(|x| x.as_u64()) {
@@ -457,11 +457,7 @@ impl Client {
     /// See [10.7.2 Set Window Rect](https://www.w3.org/TR/webdriver1/#dfn-set-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Set Window Rect"))]
-    pub async fn set_window_size(
-        &mut self,
-        width: u32,
-        height: u32,
-    ) -> Result<(), error::CmdError> {
+    pub async fn set_window_size(&self, width: u32, height: u32) -> Result<(), error::CmdError> {
         let cmd = WebDriverCommand::SetWindowRect(webdriver::command::WindowRectParameters {
             x: None,
             y: None,
@@ -478,7 +474,7 @@ impl Client {
     /// See [10.7.1 Get Window Rect](https://www.w3.org/TR/webdriver1/#dfn-get-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Rect"))]
-    pub async fn get_window_size(&mut self) -> Result<(u64, u64), error::CmdError> {
+    pub async fn get_window_size(&self) -> Result<(u64, u64), error::CmdError> {
         let (_, _, width, height) = self.get_window_rect().await?;
         Ok((width, height))
     }
@@ -488,7 +484,7 @@ impl Client {
     /// See [10.7.2 Set Window Rect](https://www.w3.org/TR/webdriver1/#dfn-set-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Set Window Rect"))]
-    pub async fn set_window_position(&mut self, x: u32, y: u32) -> Result<(), error::CmdError> {
+    pub async fn set_window_position(&self, x: u32, y: u32) -> Result<(), error::CmdError> {
         let cmd = WebDriverCommand::SetWindowRect(webdriver::command::WindowRectParameters {
             x: Some(x as i32),
             y: Some(y as i32),
@@ -505,7 +501,7 @@ impl Client {
     /// See [10.7.1 Get Window Rect](https://www.w3.org/TR/webdriver1/#dfn-get-window-rect) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Window Rect"))]
-    pub async fn get_window_position(&mut self) -> Result<(u64, u64), error::CmdError> {
+    pub async fn get_window_position(&self) -> Result<(u64, u64), error::CmdError> {
         let (x, y, _, _) = self.get_window_rect().await?;
         Ok((x, y))
     }
@@ -514,7 +510,7 @@ impl Client {
     ///
     /// See [10.7.3 Maximize Window](https://www.w3.org/TR/webdriver1/#dfn-maximize-window) of the
     /// WebDriver standard.
-    pub async fn maximize_window(&mut self) -> Result<(), error::CmdError> {
+    pub async fn maximize_window(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::MaximizeWindow).await?;
         Ok(())
     }
@@ -523,7 +519,7 @@ impl Client {
     ///
     /// See [10.7.4 Minimize Window](https://www.w3.org/TR/webdriver1/#dfn-minimize-window) of the
     /// WebDriver standard.
-    pub async fn minimize_window(&mut self) -> Result<(), error::CmdError> {
+    pub async fn minimize_window(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::MinimizeWindow).await?;
         Ok(())
     }
@@ -532,7 +528,7 @@ impl Client {
     ///
     /// See [10.7.5 Fullscreen Window](https://www.w3.org/TR/webdriver1/#dfn-fullscreen-window) of the
     /// WebDriver standard.
-    pub async fn fullscreen_window(&mut self) -> Result<(), error::CmdError> {
+    pub async fn fullscreen_window(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::FullscreenWindow).await?;
         Ok(())
     }
@@ -545,7 +541,7 @@ impl Client {
     /// See [12.2 Find Element](https://www.w3.org/TR/webdriver1/#find-element) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Find Element"))]
-    pub async fn find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn find(&self, search: Locator<'_>) -> Result<Element, error::CmdError> {
         self.by(search.into_parameters()).await
     }
 
@@ -554,7 +550,7 @@ impl Client {
     /// See [12.3 Find Elements](https://www.w3.org/TR/webdriver1/#find-elements) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Find Elements"))]
-    pub async fn find_all(&mut self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
+    pub async fn find_all(&self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
         let res = self
             .issue(WebDriverCommand::FindElements(search.into_parameters()))
             .await?;
@@ -580,7 +576,7 @@ impl Client {
     /// See [12.6 Get Active Element](https://www.w3.org/TR/webdriver1/#dfn-get-active-element) of
     /// the WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Active Element"))]
-    pub async fn active_element(&mut self) -> Result<Element, error::CmdError> {
+    pub async fn active_element(&self) -> Result<Element, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetActiveElement).await?;
         let e = self.parse_lookup(res)?;
         Ok(Element {
@@ -592,7 +588,7 @@ impl Client {
     /// Locate a form on the page.
     ///
     /// Through the returned `Form`, HTML forms can be filled out and submitted.
-    pub async fn form(&mut self, search: Locator<'_>) -> Result<Form, error::CmdError> {
+    pub async fn form(&self, search: Locator<'_>) -> Result<Form, error::CmdError> {
         let l = search.into_parameters();
         let res = self.issue(WebDriverCommand::FindElement(l)).await?;
         let f = self.parse_lookup(res)?;
@@ -610,7 +606,7 @@ impl Client {
     /// See [15.1 Get Page Source](https://www.w3.org/TR/webdriver1/#dfn-get-page-source) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Page Source"))]
-    pub async fn source(&mut self) -> Result<String, error::CmdError> {
+    pub async fn source(&self) -> Result<String, error::CmdError> {
         let src = self.issue(WebDriverCommand::GetPageSource).await?;
         if let Some(src) = src.as_str() {
             Ok(src.to_string())
@@ -631,7 +627,7 @@ impl Client {
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Execute Script"))]
     pub async fn execute(
-        &mut self,
+        &self,
         script: &str,
         mut args: Vec<Json>,
     ) -> Result<Json, error::CmdError> {
@@ -677,7 +673,7 @@ impl Client {
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Execute Async Script"))]
     pub async fn execute_async(
-        &mut self,
+        &self,
         script: &str,
         mut args: Vec<Json>,
     ) -> Result<Json, error::CmdError> {
@@ -718,7 +714,7 @@ impl Client {
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Perform Actions"))]
     pub async fn perform_actions(
-        &mut self,
+        &self,
         actions: impl Into<Actions>,
     ) -> Result<(), error::CmdError> {
         let params = webdriver::command::ActionsParameters {
@@ -734,7 +730,7 @@ impl Client {
     /// See [17.6 Release Actions](https://www.w3.org/TR/webdriver1/#release-actions) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Release Actions"))]
-    pub async fn release_actions(&mut self) -> Result<(), error::CmdError> {
+    pub async fn release_actions(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::ReleaseActions).await?;
         Ok(())
     }
@@ -747,7 +743,7 @@ impl Client {
     /// See [18.1 Dismiss Alert](https://www.w3.org/TR/webdriver1/#dismiss-alert) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Dismiss Alert"))]
-    pub async fn dismiss_alert(&mut self) -> Result<(), error::CmdError> {
+    pub async fn dismiss_alert(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::DismissAlert).await?;
         Ok(())
     }
@@ -757,7 +753,7 @@ impl Client {
     /// See [18.2 Accept Alert](https://www.w3.org/TR/webdriver1/#accept-alert) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Accept Alert"))]
-    pub async fn accept_alert(&mut self) -> Result<(), error::CmdError> {
+    pub async fn accept_alert(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::AcceptAlert).await?;
         Ok(())
     }
@@ -767,7 +763,7 @@ impl Client {
     /// See [18.3 Get Alert Text](https://www.w3.org/TR/webdriver1/#get-alert-text) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Get Alert Text"))]
-    pub async fn get_alert_text(&mut self) -> Result<String, error::CmdError> {
+    pub async fn get_alert_text(&self) -> Result<String, error::CmdError> {
         let res = self.issue(WebDriverCommand::GetAlertText).await?;
         if let Json::String(s) = res {
             Ok(s)
@@ -781,7 +777,7 @@ impl Client {
     /// See [18.4 Send Alert Text](https://www.w3.org/TR/webdriver1/#send-alert-text) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Send Alert Text"))]
-    pub async fn send_alert_text(&mut self, text: &str) -> Result<(), error::CmdError> {
+    pub async fn send_alert_text(&self, text: &str) -> Result<(), error::CmdError> {
         let params = SendKeysParameters {
             text: text.to_string(),
         };
@@ -797,7 +793,7 @@ impl Client {
     /// See [19.1 Take Screenshot](https://www.w3.org/TR/webdriver1/#dfn-take-screenshot) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Take Screenshot"))]
-    pub async fn screenshot(&mut self) -> Result<Vec<u8>, error::CmdError> {
+    pub async fn screenshot(&self) -> Result<Vec<u8>, error::CmdError> {
         let src = self.issue(WebDriverCommand::TakeScreenshot).await?;
         if let Some(src) = src.as_str() {
             base64::decode(src).map_err(error::CmdError::ImageDecodeError)
@@ -812,10 +808,7 @@ impl Client {
     /// Screenshot](https://www.w3.org/TR/webdriver1/#dfn-take-element-screenshot) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Take Element Screenshot"))]
-    pub async fn screenshot_element(
-        &mut self,
-        element: Element,
-    ) -> Result<Vec<u8>, error::CmdError> {
+    pub async fn screenshot_element(&self, element: Element) -> Result<Vec<u8>, error::CmdError> {
         let src = self
             .issue(WebDriverCommand::TakeElementScreenshot(element.element))
             .await?;
@@ -839,9 +832,9 @@ impl Client {
         since = "0.17.5",
         note = "This method might block forever. Please use client.wait().on(...) instead. You can still wait forever using: client.wait().forever().on(...)"
     )]
-    pub async fn wait_for<F, FF>(&mut self, mut is_ready: F) -> Result<(), error::CmdError>
+    pub async fn wait_for<F, FF>(&self, mut is_ready: F) -> Result<(), error::CmdError>
     where
-        F: FnMut(&mut Client) -> FF,
+        F: FnMut(&Client) -> FF,
         FF: Future<Output = Result<bool, error::CmdError>>,
     {
         while !is_ready(self).await? {}
@@ -858,7 +851,7 @@ impl Client {
         since = "0.17.5",
         note = "This method might block forever. Please use client.wait().on(locator) instead. You can still wait forever using: client.wait().forever().on(locator)"
     )]
-    pub async fn wait_for_find(&mut self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+    pub async fn wait_for_find(&self, search: Locator<'_>) -> Result<Element, error::CmdError> {
         self.wait().forever().for_element(search).await
     }
 
@@ -872,7 +865,7 @@ impl Client {
         note = "This method might block forever and has a chance of randomly blocking. Please use client.wait().on(url) instead, to check if you navigated successfully to the new URL."
     )]
     pub async fn wait_for_navigation(
-        &mut self,
+        &self,
         current: Option<url::Url>,
     ) -> Result<(), error::CmdError> {
         let current = match current {
@@ -885,7 +878,7 @@ impl Client {
             // TODO: get rid of this clone
             let current = current.clone();
             // TODO: and this one too
-            let mut c = c.clone();
+            let c = c.clone();
             async move { Ok(c.current_url().await? != current) }
         })
         .await
@@ -898,7 +891,7 @@ impl Client {
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
     pub async fn raw_client_for(
-        &mut self,
+        &self,
         method: Method,
         url: &str,
     ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
@@ -912,7 +905,7 @@ impl Client {
     /// Before the HTTP request is issued, the given `before` closure will be called with a handle
     /// to the `Request` about to be sent.
     pub async fn with_raw_client_for<F>(
-        &mut self,
+        &self,
         method: Method,
         url: &str,
         before: F,
@@ -1016,11 +1009,11 @@ impl Client {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), fantoccini::error::CmdError> {
     /// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-    /// # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(feature = "rustls-tls")]
-    /// # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # let client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
-    /// # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+    /// # let client: fantoccini::Client = unreachable!("no tls provider available");
     /// // -- snip wrapper code --
     /// let button = client.wait().for_element(Locator::Css(
     ///     r#"a.button-download[href="/learn/get-started"]"#,
@@ -1031,7 +1024,7 @@ impl Client {
     /// ```
     ///
     /// Also see: [`crate::wait`].
-    pub fn wait(&mut self) -> Wait<'_> {
+    pub fn wait(&self) -> Wait<'_> {
         Wait::new(self)
     }
 }
@@ -1039,7 +1032,7 @@ impl Client {
 /// Helper methods
 impl Client {
     pub(crate) async fn by(
-        &mut self,
+        &self,
         locator: webdriver::command::LocatorParameters,
     ) -> Result<Element, error::CmdError> {
         let res = self.issue(WebDriverCommand::FindElement(locator)).await?;

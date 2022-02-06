@@ -5,7 +5,7 @@ use serial_test::serial;
 
 mod common;
 
-async fn alert_accept(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn alert_accept(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
     c.find(Locator::Id("button-alert")).await?.click().await?;
@@ -31,7 +31,7 @@ async fn alert_accept(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     Ok(())
 }
 
-async fn alert_dismiss(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn alert_dismiss(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
     c.find(Locator::Id("button-alert")).await?.click().await?;
@@ -57,7 +57,7 @@ async fn alert_dismiss(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     Ok(())
 }
 
-async fn alert_text(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn alert_text(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
     c.find(Locator::Id("button-prompt")).await?.click().await?;
