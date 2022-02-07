@@ -121,12 +121,12 @@ impl Client {
     /// `Handle` given when creating this `Client`. This in turn means that any errors will be
     /// dropped.
     ///
-    /// This function is safe to call multiple times, but once it has been called on one instance
-    /// of a `Client`, all requests to other instances of that `Client` will fail.
+    /// Once it has been called on one instance of a `Client`, all requests to other instances
+    /// of that `Client` will fail.
     ///
     /// This function may be useful in conjunction with `raw_client_for`, as it allows you to close
     /// the automated browser window while doing e.g., a large download.
-    pub async fn close(&self) -> Result<(), error::CmdError> {
+    pub async fn close(self) -> Result<(), error::CmdError> {
         self.issue(Cmd::Shutdown).await?;
         Ok(())
     }
@@ -795,23 +795,6 @@ impl Client {
     #[cfg_attr(docsrs, doc(alias = "Take Screenshot"))]
     pub async fn screenshot(&self) -> Result<Vec<u8>, error::CmdError> {
         let src = self.issue(WebDriverCommand::TakeScreenshot).await?;
-        if let Some(src) = src.as_str() {
-            base64::decode(src).map_err(error::CmdError::ImageDecodeError)
-        } else {
-            Err(error::CmdError::NotW3C(src))
-        }
-    }
-
-    /// Get a PNG-encoded screenshot of an element.
-    ///
-    /// See [19.2 Take Element
-    /// Screenshot](https://www.w3.org/TR/webdriver1/#dfn-take-element-screenshot) of the WebDriver
-    /// standard.
-    #[cfg_attr(docsrs, doc(alias = "Take Element Screenshot"))]
-    pub async fn screenshot_element(&self, element: Element) -> Result<Vec<u8>, error::CmdError> {
-        let src = self
-            .issue(WebDriverCommand::TakeElementScreenshot(element.element))
-            .await?;
         if let Some(src) = src.as_str() {
             base64::decode(src).map_err(error::CmdError::ImageDecodeError)
         } else {

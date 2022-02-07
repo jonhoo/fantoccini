@@ -398,6 +398,28 @@ impl Element {
     }
 }
 
+/// [Screen Capture](https://www.w3.org/TR/webdriver1/#screen-capture)
+impl Element {
+    /// Get a PNG-encoded screenshot of this element.
+    ///
+    /// See [19.2 Take Element Screenshot](https://www.w3.org/TR/webdriver1/#dfn-take-element-screenshot) of the WebDriver
+    /// standard.
+    #[cfg_attr(docsrs, doc(alias = "Take Element Screenshot"))]
+    pub async fn screenshot(&self) -> Result<Vec<u8>, error::CmdError> {
+        let src = self
+            .client
+            .issue(WebDriverCommand::TakeElementScreenshot(
+                self.element.clone(),
+            ))
+            .await?;
+        if let Some(src) = src.as_str() {
+            base64::decode(src).map_err(error::CmdError::ImageDecodeError)
+        } else {
+            Err(error::CmdError::NotW3C(src))
+        }
+    }
+}
+
 /// Higher-level operations.
 impl Element {
     /// Follow the `href` target of the element matching the given CSS selector *without* causing a
