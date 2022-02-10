@@ -1,0 +1,4 @@
+#!/bin/bash
+brew install --cask firefox
+brew install geckodriver
+geckodriver &
