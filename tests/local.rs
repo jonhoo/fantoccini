@@ -7,7 +7,7 @@ use std::time::Duration;
 
 mod common;
 
-async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn goto(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let current_url = c.current_url().await?;
@@ -15,7 +15,7 @@ async fn goto(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn find_and_click_link(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.find(Locator::Css("#other_page_id"))
@@ -30,18 +30,18 @@ async fn find_and_click_link(mut c: Client, port: u16) -> Result<(), error::CmdE
     c.close().await
 }
 
-async fn get_active_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn get_active_element(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     c.find(Locator::Css("#select1")).await?.click().await?;
 
-    let mut active = c.active_element().await?;
+    let active = c.active_element().await?;
     assert_eq!(active.attr("id").await?, Some(String::from("select1")));
 
     c.close().await
 }
 
-async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn serialize_element(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let elem = c.find(Locator::Css("#other_page_id")).await?;
@@ -65,7 +65,7 @@ async fn serialize_element(mut c: Client, port: u16) -> Result<(), error::CmdErr
     c.close().await
 }
 
-async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn iframe_switch(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     // Go to the page that holds the iframe
@@ -91,20 +91,20 @@ async fn iframe_switch(mut c: Client, port: u16) -> Result<(), error::CmdError> 
         .expect_err("Should not be able to access content in the root context");
 
     // switch back to the root context and access content there.
-    let mut c = c.enter_parent_frame().await?;
+    c.enter_parent_frame().await?;
     c.find(Locator::Id("root_button")).await?;
 
     c.close().await
 }
 
-async fn new_window(mut c: Client) -> Result<(), error::CmdError> {
+async fn new_window(c: Client) -> Result<(), error::CmdError> {
     c.new_window(false).await?;
     let windows = c.windows().await?;
     assert_eq!(windows.len(), 2);
     c.close().await
 }
 
-async fn new_window_switch(mut c: Client) -> Result<(), error::CmdError> {
+async fn new_window_switch(c: Client) -> Result<(), error::CmdError> {
     let window_1 = c.window().await?;
     c.new_window(false).await?;
     let window_2 = c.window().await?;
@@ -131,7 +131,7 @@ async fn new_window_switch(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn new_tab_switch(mut c: Client) -> Result<(), error::CmdError> {
+async fn new_tab_switch(c: Client) -> Result<(), error::CmdError> {
     let window_1 = c.window().await?;
     c.new_window(true).await?;
     let window_2 = c.window().await?;
@@ -158,7 +158,7 @@ async fn new_tab_switch(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn close_window(mut c: Client) -> Result<(), error::CmdError> {
+async fn close_window(c: Client) -> Result<(), error::CmdError> {
     let window_1 = c.window().await?;
     c.new_window(true).await?;
     let window_2 = c.window().await?;
@@ -188,7 +188,7 @@ async fn close_window(mut c: Client) -> Result<(), error::CmdError> {
     Ok(())
 }
 
-async fn close_window_twice_errors(mut c: Client) -> Result<(), error::CmdError> {
+async fn close_window_twice_errors(c: Client) -> Result<(), error::CmdError> {
     c.close_window().await?;
     c.close_window()
         .await
@@ -196,11 +196,11 @@ async fn close_window_twice_errors(mut c: Client) -> Result<(), error::CmdError>
     Ok(())
 }
 
-async fn set_by_name_textarea(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn set_by_name_textarea(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
-    let mut form = c.form(Locator::Css("form")).await?;
+    let form = c.form(Locator::Css("form")).await?;
     form.set_by_name("some_textarea", "a value!").await?;
 
     let value = c
@@ -215,7 +215,7 @@ async fn set_by_name_textarea(mut c: Client, port: u16) -> Result<(), error::Cmd
     Ok(())
 }
 
-async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn stale_element(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
     let elem = c.find(Locator::Css("#other_page_id")).await?;
@@ -234,11 +234,11 @@ async fn stale_element(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     }
 }
 
-async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn select_by_index(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
-    let mut select_element = c.find(Locator::Css("#select1")).await?;
+    let select_element = c.find(Locator::Css("#select1")).await?;
 
     // Get first display text
     let initial_text = select_element.prop("value").await?;
@@ -260,7 +260,7 @@ async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError
     assert_eq!(Some("Select2-Option1".into()), select2_text);
 
     // Show off that it selects only options and skip any other elements
-    let mut select_element = c.find(Locator::Css("#select2")).await?;
+    let select_element = c.find(Locator::Css("#select2")).await?;
     select_element.clone().select_by_index(1).await?;
     let text = select_element.prop("value").await?;
     assert_eq!(Some("Select2-Option2".into()), text);
@@ -268,11 +268,11 @@ async fn select_by_index(mut c: Client, port: u16) -> Result<(), error::CmdError
     Ok(())
 }
 
-async fn select_by_label(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn select_by_label(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
-    let mut select_element = c.find(Locator::Css("#select1")).await?;
+    let select_element = c.find(Locator::Css("#select1")).await?;
 
     // Get first display text
     let initial_text = select_element.prop("value").await?;
@@ -299,11 +299,11 @@ async fn select_by_label(mut c: Client, port: u16) -> Result<(), error::CmdError
     Ok(())
 }
 
-async fn select_by(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn select_by(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
-    let mut select_element = c.find(Locator::Css("#select3")).await?;
+    let select_element = c.find(Locator::Css("#select3")).await?;
 
     // Get first display text
     let initial_text = select_element.prop("value").await?;
@@ -322,7 +322,7 @@ async fn select_by(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     Ok(())
 }
 
-async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn resolve_execute_async_value(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
     c.goto(&url).await?;
 
@@ -348,7 +348,7 @@ async fn resolve_execute_async_value(mut c: Client, port: u16) -> Result<(), err
     Ok(())
 }
 
-async fn back_and_forward(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn back_and_forward(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
 
@@ -367,28 +367,28 @@ async fn back_and_forward(mut c: Client, port: u16) -> Result<(), error::CmdErro
     Ok(())
 }
 
-async fn status_firefox(mut c: Client, _: u16) -> Result<(), error::CmdError> {
+async fn status_firefox(c: Client, _: u16) -> Result<(), error::CmdError> {
     // Geckodriver only supports a single session, and since we're already in a
     // session, it should return `false` here.
     assert!(!c.status().await?.ready);
     Ok(())
 }
 
-async fn status_chrome(mut c: Client, _: u16) -> Result<(), error::CmdError> {
+async fn status_chrome(c: Client, _: u16) -> Result<(), error::CmdError> {
     // Chromedriver supports multiple sessions, so it should always return
     // `true` here.
     assert!(c.status().await?.ready);
     Ok(())
 }
 
-async fn page_title(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn page_title(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
     assert_eq!(c.title().await?, "Sample Page");
     Ok(())
 }
 
-async fn timeouts(mut c: Client, _: u16) -> Result<(), error::CmdError> {
+async fn timeouts(c: Client, _: u16) -> Result<(), error::CmdError> {
     let new_timeouts = TimeoutConfiguration::new(
         Some(Duration::from_secs(60)),
         Some(Duration::from_secs(60)),

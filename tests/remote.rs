@@ -10,10 +10,10 @@ use url::Url;
 
 mod common;
 
-async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn works_inner(c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia page for Foobar
     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
-    let mut e = c.find(Locator::Id("History_and_etymology")).await?;
+    let e = c.find(Locator::Id("History_and_etymology")).await?;
     let text = e.text().await?;
     assert_eq!(text, "History and etymology");
     let url = c.current_url().await?;
@@ -31,12 +31,12 @@ async fn works_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
+async fn clicks_inner_by_locator(c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
     // find, fill out, and submit the search form
-    let mut f = c.form(Locator::Css("#search-form")).await?;
+    let f = c.form(Locator::Css("#search-form")).await?;
     let f = f
         .set(Locator::Css("input[name='search']"), "foobar")
         .await?;
@@ -49,12 +49,12 @@ async fn clicks_inner_by_locator(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn clicks_inner(c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
     // find, fill out, and submit the search form
-    let mut f = c.form(Locator::Css("#search-form")).await?;
+    let f = c.form(Locator::Css("#search-form")).await?;
     let f = f.set_by_name("search", "foobar").await?;
     f.submit().await?;
 
@@ -65,12 +65,12 @@ async fn clicks_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn send_keys_and_clear_input_inner(c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://www.wikipedia.org/").await?;
 
     // find search input element
-    let mut e = c.wait().for_element(Locator::Id("searchInput")).await?;
+    let e = c.wait().for_element(Locator::Id("searchInput")).await?;
     e.send_keys("foobar").await?;
     assert_eq!(
         e.prop("value")
@@ -89,16 +89,16 @@ async fn send_keys_and_clear_input_inner(mut c: Client) -> Result<(), error::Cmd
         ""
     );
 
-    let mut c = e.client();
+    let c = e.client();
     c.close().await
 }
 
-async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn raw_inner(c: Client) -> Result<(), error::CmdError> {
     // go back to the frontpage
     c.goto("https://www.wikipedia.org/").await?;
 
     // find the source for the Wikipedia globe
-    let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
+    let img = c.find(Locator::Css("img.central-featured-logo")).await?;
     let src = img.attr("src").await?.expect("image should have a src");
 
     // now build a raw HTTP client request (which also has all current cookies)
@@ -116,7 +116,7 @@ async fn raw_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_size_inner(c: Client) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(500, 400).await?;
     let (width, height) = c.get_window_size().await?;
@@ -126,7 +126,7 @@ async fn window_size_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_position_inner(c: Client) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_size(200, 100).await?;
     c.set_window_position(0, 0).await?;
@@ -138,7 +138,7 @@ async fn window_position_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
     c.set_window_rect(0, 0, 500, 400).await?;
     let (x, y) = c.get_window_position().await?;
@@ -158,14 +158,14 @@ async fn window_rect_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
     c.goto("https://en.wikipedia.org/").await?;
     let es = c.find_all(Locator::Css("#p-interaction li")).await?;
     let texts = futures_util::future::try_join_all(
         es.into_iter()
             .take(4)
-            .map(|mut e| async move { e.text().await }),
+            .map(|e| async move { e.text().await }),
     )
     .await?;
     assert_eq!(
@@ -181,11 +181,11 @@ async fn finds_all_inner(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
+async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
     // Go to the Wikipedia front page
     c.goto("https://en.wikipedia.org/").await?;
     // Get the main sidebar panel
-    let mut panel = c.find(Locator::Css("div#mw-panel")).await?;
+    let panel = c.find(Locator::Css("div#mw-panel")).await?;
     // Get all the ul elements in the sidebar
     let mut portals = panel.find_all(Locator::Css("nav.portal")).await?;
 
@@ -204,7 +204,7 @@ async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
 
     for (i, portal) in portals.iter_mut().enumerate() {
         // Each "portal" has an h3 element.
-        let mut portal_title = portal.find(Locator::Css("h3")).await?;
+        let portal_title = portal.find(Locator::Css("h3")).await?;
         let portal_title = portal_title.text().await?;
         assert_eq!(portal_title, portal_titles[i]);
         // And also an <ul>.
@@ -215,14 +215,14 @@ async fn finds_sub_elements(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn persist_inner(mut c: Client) -> Result<(), error::CmdError> {
+async fn persist_inner(c: Client) -> Result<(), error::CmdError> {
     c.goto("https://en.wikipedia.org/").await?;
     c.persist().await?;
 
     c.close().await
 }
 
-async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
+async fn simple_wait_test(c: Client) -> Result<(), error::CmdError> {
     #[allow(deprecated)]
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
@@ -233,7 +233,7 @@ async fn simple_wait_test(mut c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> {
+async fn wait_for_navigation_test(c: Client) -> Result<(), error::CmdError> {
     let mut path = std::env::current_dir().unwrap();
     path.push("tests/redirect_test.html");
 
@@ -260,7 +260,7 @@ async fn wait_for_navigation_test(mut c: Client) -> Result<(), error::CmdError> 
 }
 
 // Verifies that basic cookie handling works
-async fn handle_cookies_test(mut c: Client) -> Result<(), error::CmdError> {
+async fn handle_cookies_test(c: Client) -> Result<(), error::CmdError> {
     c.goto("https://www.wikipedia.org/").await?;
 
     let cookies = c.get_all_cookies().await?;

@@ -25,11 +25,11 @@
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
 //! # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-//! # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(feature = "rustls-tls")]
-//! # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
-//! # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+//! # let client: fantoccini::Client = unreachable!("no tls provider available");
 //! // -- snip wrapper code --
 //! let button = client.wait().for_element(Locator::Css(
 //!     r#"a.button-download[href="/learn/get-started"]"#,
@@ -56,7 +56,7 @@ const DEFAULT_PERIOD: Duration = Duration::from_millis(250);
 /// Used for setting up a wait operation on the client.
 #[derive(Debug)]
 pub struct Wait<'c> {
-    client: &'c mut Client,
+    client: &'c Client,
     timeout: Option<Duration>,
     period: Duration,
 }
@@ -90,11 +90,11 @@ impl<'c> Wait<'c> {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), fantoccini::error::CmdError> {
     /// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-    /// # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(feature = "rustls-tls")]
-    /// # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # let client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
-    /// # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+    /// # let client: fantoccini::Client = unreachable!("no tls provider available");
     /// // -- snip wrapper code --
     /// let button = client.wait().for_element(Locator::Css(
     ///     r#"a.button-download[href="/learn/get-started"]"#,
@@ -103,7 +103,7 @@ impl<'c> Wait<'c> {
     /// # client.close().await
     /// # }
     /// ```
-    pub fn new(client: &'c mut Client) -> Self {
+    pub fn new(client: &'c Client) -> Self {
         Self {
             client,
             timeout: Some(DEFAULT_TIMEOUT),

@@ -12,7 +12,7 @@ use time::Instant;
 
 mod common;
 
-async fn actions_null(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn actions_null(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
     let null_actions = NullActions::new("null".to_string()).pause(Duration::from_secs(1));
@@ -22,7 +22,7 @@ async fn actions_null(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     Ok(())
 }
 
-async fn actions_key(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn actions_key(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
 
@@ -33,7 +33,7 @@ async fn actions_key(mut c: Client, port: u16) -> Result<(), error::CmdError> {
     assert!(now.elapsed().as_seconds_f64() >= 1.0);
 
     // Test key down/up.
-    let mut elem = c.find(Locator::Id("text-input")).await?;
+    let elem = c.find(Locator::Id("text-input")).await?;
     elem.send_keys("a").await?;
     assert_eq!(elem.prop("value").await?.unwrap(), "a");
 
@@ -46,12 +46,12 @@ async fn actions_key(mut c: Client, port: u16) -> Result<(), error::CmdError> {
         });
     elem.click().await?;
     c.perform_actions(key_actions).await?;
-    let mut elem = c.find(Locator::Id("text-input")).await?;
+    let elem = c.find(Locator::Id("text-input")).await?;
     assert_eq!(elem.prop("value").await?.unwrap(), "");
     Ok(())
 }
 
-async fn actions_mouse(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn actions_mouse(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
 
@@ -84,14 +84,14 @@ async fn actions_mouse(mut c: Client, port: u16) -> Result<(), error::CmdError> 
     Ok(())
 }
 
-async fn actions_mouse_move(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn actions_mouse_move(c: Client, port: u16) -> Result<(), error::CmdError> {
     // Set window size to avoid moving the cursor out-of-bounds during actions.
     c.set_window_rect(0, 0, 800, 800).await?;
 
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
 
-    let mut elem = c.find(Locator::Id("button-alert")).await?;
+    let elem = c.find(Locator::Id("button-alert")).await?;
     let rect = elem.rectangle().await?;
     let elem_center_x = rect.0 + (rect.2 / 2.0);
     let elem_center_y = rect.1 + (rect.3 / 2.0);
@@ -133,7 +133,7 @@ async fn actions_mouse_move(mut c: Client, port: u16) -> Result<(), error::CmdEr
     Ok(())
 }
 
-async fn actions_release(mut c: Client, port: u16) -> Result<(), error::CmdError> {
+async fn actions_release(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
 
@@ -142,7 +142,7 @@ async fn actions_release(mut c: Client, port: u16) -> Result<(), error::CmdError
     elem.click().await?;
 
     // Add initial text.
-    let mut elem = c.find(Locator::Id("text-input")).await?;
+    let elem = c.find(Locator::Id("text-input")).await?;
     assert_eq!(elem.prop("value").await?.unwrap(), "");
 
     // Press CONTROL key down and hold it.

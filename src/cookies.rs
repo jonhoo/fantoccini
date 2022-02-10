@@ -136,7 +136,7 @@ impl Client {
     ///
     /// See [16.1 Get All Cookies](https://www.w3.org/TR/webdriver1/#get-all-cookies) of the
     /// WebDriver standard.
-    pub async fn get_all_cookies(&mut self) -> Result<Vec<Cookie<'static>>, error::CmdError> {
+    pub async fn get_all_cookies(&self) -> Result<Vec<Cookie<'static>>, error::CmdError> {
         let resp = self.issue(WebDriverCommand::GetCookies).await?;
 
         let webdriver_cookies: Vec<WebDriverCookie> = serde_json::from_value(resp)?;
@@ -152,10 +152,7 @@ impl Client {
     ///
     /// See [16.2 Get Named Cookie](https://www.w3.org/TR/webdriver1/#get-named-cookie) of the
     /// WebDriver standard.
-    pub async fn get_named_cookie(
-        &mut self,
-        name: &str,
-    ) -> Result<Cookie<'static>, error::CmdError> {
+    pub async fn get_named_cookie(&self, name: &str) -> Result<Cookie<'static>, error::CmdError> {
         let resp = self
             .issue(WebDriverCommand::GetNamedCookie(name.to_string()))
             .await?;
@@ -167,7 +164,7 @@ impl Client {
     ///
     /// See [16.3 Add Cookie](https://www.w3.org/TR/webdriver1/#add-cookie) of the
     /// WebDriver standard.
-    pub async fn add_cookie(&mut self, cookie: Cookie<'static>) -> Result<(), error::CmdError> {
+    pub async fn add_cookie(&self, cookie: Cookie<'static>) -> Result<(), error::CmdError> {
         let webdriver_cookie: WebDriverCookie = cookie.into();
         self.issue(WebDriverCommand::AddCookie(webdriver_cookie.into_params()))
             .await?;
@@ -178,7 +175,7 @@ impl Client {
     ///
     /// See [16.4 Delete Cookie](https://www.w3.org/TR/webdriver1/#delete-cookie) of the
     /// WebDriver standard.
-    pub async fn delete_cookie(&mut self, name: &str) -> Result<(), error::CmdError> {
+    pub async fn delete_cookie(&self, name: &str) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::DeleteCookie(name.to_string()))
             .await
             .map(|_| ())
@@ -188,7 +185,7 @@ impl Client {
     ///
     /// See [16.5 Delete All Cookies](https://www.w3.org/TR/webdriver1/#delete-all-cookies) of the
     /// WebDriver standard.
-    pub async fn delete_all_cookies(&mut self) -> Result<(), error::CmdError> {
+    pub async fn delete_all_cookies(&self) -> Result<(), error::CmdError> {
         self.issue(WebDriverCommand::DeleteCookies)
             .await
             .map(|_| ())

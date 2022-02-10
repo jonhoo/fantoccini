@@ -34,7 +34,7 @@ use fantoccini::{Client, Locator};
 // let's set up the sequence of steps we want the browser to take
 #[tokio::main]
 async fn main() -> Result<(), fantoccini::error::CmdError> {
-    let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    let c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 
     // first, go to the Wikipedia page for Foobar
     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
@@ -62,7 +62,7 @@ Let's make the program do that for us instead:
 // go to the Wikipedia frontpage this time
 c.goto("https://www.wikipedia.org/").await?;
 // find the search form, fill it out, and submit it
-let mut f = c.form(Locator::Css("#search-form")).await?;
+let f = c.form(Locator::Css("#search-form")).await?;
 f.set_by_name("search", "foobar").await?
  .submit().await?;
 
@@ -80,7 +80,7 @@ What if we want to download a raw file? Fantoccini has you covered:
 // go back to the frontpage
 c.goto("https://www.wikipedia.org/").await?;
 // find the source for the Wikipedia globe
-let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
+let img = c.find(Locator::Css("img.central-featured-logo")).await?;
 let src = img.attr("src").await?.expect("image should have a src");
 // now build a raw HTTP client request (which also has all current cookies)
 let raw = img.client().raw_client_for(fantoccini::Method::GET, &src).await?;
