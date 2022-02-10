@@ -317,17 +317,13 @@ where
                 Err(error::NewSessionError::NotW3C(Json::String(v)))
             }
             Err(error::CmdError::Standard(
-                e
-                @
-                error::WebDriver {
+                e @ error::WebDriver {
                     error: ErrorStatus::SessionNotCreated,
                     ..
                 },
             )) => Err(error::NewSessionError::SessionNotCreated(e)),
             Err(error::CmdError::Standard(
-                e
-                @
-                error::WebDriver {
+                e @ error::WebDriver {
                     error: ErrorStatus::UnknownError,
                     ..
                 },

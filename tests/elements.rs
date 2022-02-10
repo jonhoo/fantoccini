@@ -65,7 +65,11 @@ async fn element_tag_name(mut c: Client, port: u16) -> Result<(), error::CmdErro
     c.goto(&sample_url).await?;
     let mut elem = c.find(Locator::Id("checkbox-option-1")).await?;
     let tag_name = elem.tag_name().await?;
-    assert!(tag_name.eq_ignore_ascii_case("input"), "{} != input", tag_name);
+    assert!(
+        tag_name.eq_ignore_ascii_case("input"),
+        "{} != input",
+        tag_name
+    );
     Ok(())
 }
 
@@ -95,9 +99,13 @@ async fn element_send_keys(mut c: Client, port: u16) -> Result<(), error::CmdErr
     assert_eq!(elem.prop("value").await?.unwrap(), "");
     elem.send_keys("fantoccini").await?;
     assert_eq!(elem.prop("value").await?.unwrap(), "fantoccini");
-    let ctrl_a = Key::Control + "a";
+    let select_all = if cfg!(target_os = "macos") {
+        Key::Command + "a"
+    } else {
+        Key::Control + "a"
+    };
     let backspace = Key::Backspace.to_string();
-    elem.send_keys(&ctrl_a).await?;
+    elem.send_keys(&select_all).await?;
     elem.send_keys(&backspace).await?;
     assert_eq!(elem.prop("value").await?.unwrap(), "");
 
