@@ -2,7 +2,6 @@
 
 [![Crates.io](https://img.shields.io/crates/v/fantoccini.svg)](https://crates.io/crates/fantoccini)
 [![Documentation](https://docs.rs/fantoccini/badge.svg)](https://docs.rs/fantoccini/)
-[![cargo test](https://github.com/jonhoo/fantoccini/actions/workflows/test.yml/badge.svg)](https://github.com/jonhoo/fantoccini/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/jonhoo/fantoccini/branch/master/graph/badge.svg?token=NteBJ0F7Ok)](https://codecov.io/gh/jonhoo/fantoccini)
 [![Gitter chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fantoccini-rs/Lobby)
 
