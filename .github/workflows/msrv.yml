@@ -1,4 +1,4 @@
-on: [push]
+on: [push, pull_request]
 name: Minimum Supported Rust Version
 jobs:
   check:
