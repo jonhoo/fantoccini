@@ -2,7 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/fantoccini.svg)](https://crates.io/crates/fantoccini)
 [![Documentation](https://docs.rs/fantoccini/badge.svg)](https://docs.rs/fantoccini/)
-[![Build Status](https://travis-ci.com/jonhoo/fantoccini.svg?branch=master)](https://travis-ci.com/jonhoo/fantoccini)
+[![codecov](https://codecov.io/gh/jonhoo/fantoccini/branch/master/graph/badge.svg?token=NteBJ0F7Ok)](https://codecov.io/gh/jonhoo/fantoccini)
 [![Gitter chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fantoccini-rs/Lobby)
 
 A high-level API for programmatically interacting with web pages through WebDriver.
@@ -23,13 +23,7 @@ source code, and `Client::raw_client_for` to build a raw HTTP request for a part
 ## Examples
 
 These examples all assume that you have a [WebDriver compatible] process running on port 4444.
-A quick way to get one is to run [`geckodriver`] at the command line. The code also has
-partial support for the legacy WebDriver protocol used by `chromedriver` and `ghostdriver`.
-
-The examples will be using `panic!` or `unwrap` generously when errors occur (see `map_err`)
---- you should probably not do that in your code, and instead deal with errors when they occur.
-This is particularly true for methods that you *expect* might fail, such as lookups by CSS
-selector.
+A quick way to get one is to run [`geckodriver`] at the command line.
 
 Let's start out clicking around on Wikipedia:
 
@@ -39,7 +33,7 @@ use fantoccini::{Client, Locator};
 // let's set up the sequence of steps we want the browser to take
 #[tokio::main]
 async fn main() -> Result<(), fantoccini::error::CmdError> {
-    let mut c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    let c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
 
     // first, go to the Wikipedia page for Foobar
     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
@@ -67,7 +61,7 @@ Let's make the program do that for us instead:
 // go to the Wikipedia frontpage this time
 c.goto("https://www.wikipedia.org/").await?;
 // find the search form, fill it out, and submit it
-let mut f = c.form(Locator::Css("#search-form")).await?;
+let f = c.form(Locator::Css("#search-form")).await?;
 f.set_by_name("search", "foobar").await?
  .submit().await?;
 
@@ -85,14 +79,21 @@ What if we want to download a raw file? Fantoccini has you covered:
 // go back to the frontpage
 c.goto("https://www.wikipedia.org/").await?;
 // find the source for the Wikipedia globe
-let mut img = c.find(Locator::Css("img.central-featured-logo")).await?;
+let img = c.find(Locator::Css("img.central-featured-logo")).await?;
 let src = img.attr("src").await?.expect("image should have a src");
 // now build a raw HTTP client request (which also has all current cookies)
 let raw = img.client().raw_client_for(fantoccini::Method::GET, &src).await?;
 
 // we then read out the image bytes
 use futures_util::TryStreamExt;
-let pixels = raw.into_body().try_concat().await.map_err(fantoccini::error::CmdError::from)?;
+let pixels = raw
+    .into_body()
+    .try_fold(Vec::new(), |mut data, chunk| async move {
+        data.extend_from_slice(&chunk);
+        Ok(data)
+    })
+    .await
+    .map_err(fantoccini::error::CmdError::from)?;
 // and voilla, we now have the bytes for the Wikipedia logo!
 assert!(pixels.len() > 0);
 println!("Wikipedia logo is {}b", pixels.len());
@@ -102,9 +103,24 @@ println!("Wikipedia logo is {}b", pixels.len());
 
 For more examples, take a look at the `examples/` directory.
 
+# Contributing to fantoccini
+
+The following information applies only to developers interested in contributing
+to this project. If you simply want to use it to automate web browsers you can
+skip this section.
+
+## How to run tests
+
+The tests assume that you have [`chromedriver`] and [`geckodriver`] already running on your system.
+You can download them using the links above. Then run them from separate tabs in your terminal.
+They will stay running until terminated with Ctrl+C or until the terminal session is closed.
+
+Then run `cargo test` from this project directory.
+
 [WebDriver protocol]: https://www.w3.org/TR/webdriver/
 [CSS selectors]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors
 [powerful]: https://developer.mozilla.org/en-US/docs/Web/CSS/Pseudo-classes
 [operators]: https://developer.mozilla.org/en-US/docs/Web/CSS/Attribute_selectors
 [WebDriver compatible]: https://github.com/Fyrd/caniuse/issues/2757#issuecomment-304529217
 [`geckodriver`]: https://github.com/mozilla/geckodriver
+[`chromedriver`]: https://chromedriver.chromium.org/downloads

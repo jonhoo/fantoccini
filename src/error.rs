@@ -1,11 +1,14 @@
 use hyper::Error as HError;
+use serde::Serialize;
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
+use std::fmt::Debug;
 use std::io::Error as IOError;
 use url::ParseError;
-use webdriver::error as wderror;
+use webdriver::error as webdriver;
 
-/// An error occured while attempting to establish a session for a new `Client`.
+/// An error occurred while attempting to establish a session for a new `Client`.
 #[derive(Debug)]
 pub enum NewSessionError {
     /// The given WebDriver URL is invalid.
@@ -17,7 +20,7 @@ pub enum NewSessionError {
     /// The server did not give a WebDriver-conforming response.
     NotW3C(serde_json::Value),
     /// The WebDriver server refused to create a new session.
-    SessionNotCreated(wderror::WebDriverError),
+    SessionNotCreated(WebDriver),
 }
 
 impl Error for NewSessionError {
@@ -65,7 +68,7 @@ pub enum CmdError {
     /// convenience `NoSuchElement` has been extracted into its own top-level variant.
     ///
     /// [the spec]: https://www.w3.org/TR/webdriver/#handling-errors
-    Standard(wderror::WebDriverError),
+    Standard(WebDriver),
 
     /// No element was found matching the given locator.
     ///
@@ -76,7 +79,7 @@ pub enum CmdError {
     ///
     /// ["no such element"]: https://www.w3.org/TR/webdriver/#dfn-no-such-element
     /// ["stale element reference"]: https://www.w3.org/TR/webdriver/#dfn-stale-element-reference
-    NoSuchElement(wderror::WebDriverError),
+    NoSuchElement(WebDriver),
 
     /// The requested window does not exist.
     ///
@@ -84,7 +87,15 @@ pub enum CmdError {
     /// checking for it in user code.
     ///
     /// ["no such window"]: https://www.w3.org/TR/webdriver/#dfn-no-such-window
-    NoSuchWindow(wderror::WebDriverError),
+    NoSuchWindow(WebDriver),
+
+    /// The requested alert does not exist.
+    ///
+    /// This variant lifts the ["no such alert"] error variant from `Standard` to simplify
+    /// checking for it in user code.
+    ///
+    /// ["no such alert"]: https://www.w3.org/TR/webdriver/#dfn-no-such-alert
+    NoSuchAlert(WebDriver),
 
     /// A bad URL was encountered during parsing.
     ///
@@ -145,6 +156,24 @@ impl CmdError {
     pub fn is_miss(&self) -> bool {
         matches!(self, CmdError::NoSuchElement(..))
     }
+
+    pub(crate) fn from_webdriver_error(e: webdriver::WebDriverError) -> Self {
+        match e {
+            webdriver::WebDriverError {
+                error: webdriver::ErrorStatus::NoSuchElement,
+                ..
+            } => CmdError::NoSuchElement(WebDriver::from_upstream_error(e)),
+            webdriver::WebDriverError {
+                error: webdriver::ErrorStatus::NoSuchWindow,
+                ..
+            } => CmdError::NoSuchWindow(WebDriver::from_upstream_error(e)),
+            webdriver::WebDriverError {
+                error: webdriver::ErrorStatus::NoSuchAlert,
+                ..
+            } => CmdError::NoSuchAlert(WebDriver::from_upstream_error(e)),
+            _ => CmdError::Standard(WebDriver::from_upstream_error(e)),
+        }
+    }
 }
 
 impl Error for CmdError {
@@ -153,6 +182,7 @@ impl Error for CmdError {
             CmdError::Standard(..) => "webdriver returned error",
             CmdError::NoSuchElement(..) => "no element found matching selector",
             CmdError::NoSuchWindow(..) => "no window is currently selected",
+            CmdError::NoSuchAlert(..) => "no alert is currently visible",
             CmdError::BadUrl(..) => "bad url provided",
             CmdError::Failed(..) => "webdriver could not be reached",
             CmdError::Lost(..) => "webdriver connection lost",
@@ -169,7 +199,8 @@ impl Error for CmdError {
         match *self {
             CmdError::Standard(ref e)
             | CmdError::NoSuchElement(ref e)
-            | CmdError::NoSuchWindow(ref e) => Some(e),
+            | CmdError::NoSuchWindow(ref e)
+            | CmdError::NoSuchAlert(ref e) => Some(e),
             CmdError::BadUrl(ref e) => Some(e),
             CmdError::Failed(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
@@ -190,7 +221,8 @@ impl fmt::Display for CmdError {
         match *self {
             CmdError::Standard(ref e)
             | CmdError::NoSuchElement(ref e)
-            | CmdError::NoSuchWindow(ref e) => write!(f, "{}", e),
+            | CmdError::NoSuchWindow(ref e)
+            | CmdError::NoSuchAlert(ref e) => write!(f, "{}", e),
             CmdError::BadUrl(ref e) => write!(f, "{}", e),
             CmdError::Failed(ref e) => write!(f, "{}", e),
             CmdError::Lost(ref e) => write!(f, "{}", e),
@@ -224,23 +256,78 @@ impl From<HError> for CmdError {
     }
 }
 
-impl From<wderror::WebDriverError> for CmdError {
-    fn from(e: wderror::WebDriverError) -> Self {
-        if let wderror::WebDriverError {
-            error: wderror::ErrorStatus::NoSuchElement,
-            ..
-        } = e
-        {
-            CmdError::NoSuchElement(e)
-        } else {
-            CmdError::Standard(e)
-        }
-    }
-}
-
 impl From<serde_json::Error> for CmdError {
     fn from(e: serde_json::Error) -> Self {
         CmdError::Json(e)
+    }
+}
+
+/// Error of attempting to create an invalid [`WindowHandle`] from a
+/// [`"current"` string][1].
+///
+/// [`WindowHandle`]: crate::wd::WindowHandle
+/// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
+#[derive(Clone, Copy, Debug)]
+pub struct InvalidWindowHandle;
+
+impl fmt::Display for InvalidWindowHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, r#"Window handle cannot be "current""#)
+    }
+}
+
+impl Error for InvalidWindowHandle {}
+
+impl From<InvalidWindowHandle> for CmdError {
+    fn from(_: InvalidWindowHandle) -> Self {
+        Self::NotW3C(serde_json::Value::String("current".to_string()))
+    }
+}
+
+/// Error returned by WebDriver.
+#[derive(Debug, Serialize)]
+pub struct WebDriver {
+    /// Code of this error provided by WebDriver.
+    ///
+    /// Intentionally made private, so library users cannot match on it.
+    pub(crate) error: webdriver::ErrorStatus,
+
+    /// Description of this error provided by WebDriver.
+    pub message: Cow<'static, str>,
+
+    /// Stacktrace of this error provided by WebDriver.
+    pub stacktrace: Cow<'static, str>,
+}
+
+impl fmt::Display for WebDriver {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.message)
+    }
+}
+
+impl Error for WebDriver {}
+
+impl WebDriver {
+    pub(crate) fn from_upstream_error(e: webdriver::WebDriverError) -> Self {
+        Self {
+            error: e.error,
+            message: e.message,
+            stacktrace: e.stack,
+        }
+    }
+
+    /// Returns [code] of this error provided by WebDriver.
+    ///
+    /// [code]: https://www.w3.org/TR/webdriver/#dfn-error-code
+    pub fn error(&self) -> &'static str {
+        self.error.error_code()
+    }
+
+    /// Returns [HTTP Status] of this error provided by WebDriver.
+    ///
+    /// [HTTP Status]: https://www.w3.org/TR/webdriver/#dfn-error-code
+    pub fn http_status(&self) -> http::StatusCode {
+        self.error.http_status()
     }
 }
 

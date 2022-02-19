@@ -5,7 +5,7 @@ use std::time::Duration;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Connect to webdriver instance that is listening on port 4444
-    let mut client = ClientBuilder::native()
+    let client = ClientBuilder::native()
         .connect("http://localhost:4444")
         .await?;
 

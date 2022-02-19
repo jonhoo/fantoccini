@@ -25,11 +25,11 @@
 //! # #[tokio::main]
 //! # async fn main() -> Result<(), fantoccini::error::CmdError> {
 //! # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-//! # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(feature = "rustls-tls")]
-//! # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
-//! # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+//! # let client: fantoccini::Client = unreachable!("no tls provider available");
 //! // -- snip wrapper code --
 //! let button = client.wait().for_element(Locator::Css(
 //!     r#"a.button-download[href="/learn/get-started"]"#,
@@ -44,8 +44,10 @@
 //! When a wait operation times out, it will return a [`CmdError::WaitTimeout`]. When a wait
 //! condition check returns an error, the wait operation will be aborted, and the error returned.
 
+use crate::elements::Element;
 use crate::error::CmdError;
-use crate::{elements::Element, Client, Locator};
+use crate::wd::Locator;
+use crate::Client;
 use std::time::{Duration, Instant};
 
 const DEFAULT_TIMEOUT: Duration = Duration::from_secs(30);
@@ -54,7 +56,7 @@ const DEFAULT_PERIOD: Duration = Duration::from_millis(250);
 /// Used for setting up a wait operation on the client.
 #[derive(Debug)]
 pub struct Wait<'c> {
-    client: &'c mut Client,
+    client: &'c Client,
     timeout: Option<Duration>,
     period: Duration,
 }
@@ -88,11 +90,11 @@ impl<'c> Wait<'c> {
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), fantoccini::error::CmdError> {
     /// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
-    /// # let mut client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(feature = "rustls-tls")]
-    /// # let mut client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # let client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
-    /// # let mut client: fantoccini::Client = unreachable!("no tls provider available");
+    /// # let client: fantoccini::Client = unreachable!("no tls provider available");
     /// // -- snip wrapper code --
     /// let button = client.wait().for_element(Locator::Css(
     ///     r#"a.button-download[href="/learn/get-started"]"#,
@@ -101,7 +103,7 @@ impl<'c> Wait<'c> {
     /// # client.close().await
     /// # }
     /// ```
-    pub fn new(client: &'c mut Client) -> Self {
+    pub fn new(client: &'c Client) -> Self {
         Self {
             client,
             timeout: Some(DEFAULT_TIMEOUT),
@@ -110,18 +112,21 @@ impl<'c> Wait<'c> {
     }
 
     /// Set the timeout until the operation should wait.
+    #[must_use]
     pub fn at_most(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
 
     /// Wait forever.
+    #[must_use]
     pub fn forever(mut self) -> Self {
         self.timeout = None;
         self
     }
 
     /// Sets the period to delay checks.
+    #[must_use]
     pub fn every(mut self, period: Duration) -> Self {
         self.period = period;
         self
@@ -130,8 +135,7 @@ impl<'c> Wait<'c> {
     /// Wait until a particular element can be found.
     pub async fn for_element(self, search: Locator<'_>) -> Result<Element, CmdError> {
         wait_on!(self, {
-            let locator: webdriver::command::LocatorParameters = search.into();
-            match self.client.by(locator).await {
+            match self.client.by(search.into_parameters()).await {
                 Ok(element) => Ok(Some(element)),
                 Err(CmdError::NoSuchElement(_)) => Ok(None),
                 Err(err) => Err(err),

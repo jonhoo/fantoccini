@@ -130,7 +130,7 @@ macro_rules! tester_inner {
                 .enable_all()
                 .build()
                 .unwrap();
-            let mut c = rt.block_on(c).expect("failed to construct test client");
+            let c = rt.block_on(c).expect("failed to construct test client");
             *sid.lock().unwrap() = rt.block_on(c.session_id()).unwrap();
             // make sure we close, even if an assertion fails
             let x = rt.block_on(async move {
@@ -230,4 +230,12 @@ fn file_not_found() -> Response<Body> {
         .status(StatusCode::NOT_FOUND)
         .body(Body::empty())
         .unwrap()
+}
+
+pub fn sample_page_url(port: u16) -> String {
+    format!("http://localhost:{}/sample_page.html", port)
+}
+
+pub fn other_page_url(port: u16) -> String {
+    format!("http://localhost:{}/other_page.html", port)
 }
