@@ -39,7 +39,7 @@ pub(crate) enum Cmd {
 impl WebDriverCompatibleCommand for Wcmd {
     /// Helper for determining what URL endpoint to use for various requests.
     ///
-    /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
+    /// This mapping is essentially that of <https://www.w3.org/TR/webdriver/#list-of-endpoints>.
     fn endpoint(
         &self,
         base_url: &url::Url,

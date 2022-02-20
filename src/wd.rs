@@ -40,7 +40,7 @@ pub trait WebDriverCompatibleCommand: Debug {
     /// This only applies to the obsolete JSON Wire Protocol and should return `false`
     /// for all implementations that follow the W3C specification.
     ///
-    /// See https://www.selenium.dev/documentation/legacy/json_wire_protocol/ for more
+    /// See <https://www.selenium.dev/documentation/legacy/json_wire_protocol/> for more
     /// details about JSON Wire Protocol.
     fn is_legacy(&self) -> bool {
         false
