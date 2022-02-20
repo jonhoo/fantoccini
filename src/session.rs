@@ -4,7 +4,6 @@ use crate::{error, Client};
 use futures_core::ready;
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt};
-use http::Method;
 use hyper::client::connect;
 use serde_json::Value as Json;
 use std::future::Future;
@@ -14,7 +13,6 @@ use std::pin::Pin;
 use std::task::Context;
 use std::task::Poll;
 use tokio::sync::{mpsc, oneshot};
-use url::{ParseError, Url};
 use webdriver::command::WebDriverCommand;
 use webdriver::error::ErrorStatus;
 use webdriver::error::WebDriverError;
@@ -42,7 +40,11 @@ impl WebDriverCompatibleCommand for Wcmd {
     /// Helper for determining what URL endpoint to use for various requests.
     ///
     /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
-    fn endpoint(&self, base_url: &Url, session_id: Option<&str>) -> Result<Url, ParseError> {
+    fn endpoint(
+        &self,
+        base_url: &url::Url,
+        session_id: Option<&str>,
+    ) -> Result<url::Url, url::ParseError> {
         if let WebDriverCommand::NewSession(..) = self {
             return base_url.join("session");
         }
@@ -141,7 +143,8 @@ impl WebDriverCompatibleCommand for Wcmd {
         }
     }
 
-    fn method_and_body(&self, url: &Url) -> (Method, Option<String>) {
+    fn method_and_body(&self, request_url: &url::Url) -> (http::Method, Option<String>) {
+        use http::Method;
         use webdriver::command;
 
         // Most actions are just GET requests with no parameters
@@ -153,13 +156,13 @@ impl WebDriverCompatibleCommand for Wcmd {
             WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
                 // TODO: awful hacks
                 let mut also = String::new();
-                if !url.username().is_empty() {
+                if !request_url.username().is_empty() {
                     also.push_str(&format!(
                         r#", "user": {}"#,
-                        serde_json::to_string(url.username()).unwrap()
+                        serde_json::to_string(request_url.username()).unwrap()
                     ));
                 }
-                if let Some(pwd) = url.password() {
+                if let Some(pwd) = request_url.password() {
                     also.push_str(&format!(
                         r#", "password": {}"#,
                         serde_json::to_string(pwd).unwrap()

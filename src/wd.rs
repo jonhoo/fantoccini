@@ -26,7 +26,7 @@ pub trait WebDriverCompatibleCommand: Debug {
     /// The HTTP request method to use, and the request body for the request.
     ///
     /// The `url` will be the one returned from the `endpoint()` method above.
-    fn method_and_body(&self, url: &url::Url) -> (http::Method, Option<String>);
+    fn method_and_body(&self, request_url: &url::Url) -> (http::Method, Option<String>);
 
     /// Return true if this command starts a new WebDriver session.
     fn is_new_session(&self) -> bool {
