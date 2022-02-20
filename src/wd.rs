@@ -7,8 +7,37 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
+use std::fmt::Debug;
 use std::time::Duration;
 use webdriver::command::TimeoutsParameters;
+
+/// A command that can be sent to the WebDriver.
+///
+/// Anything that implements this command can be sent to [`Client::issue_cmd()`] in order
+/// to send custom commands to the WebDriver instance.
+pub trait WebDriverCompatibleCommand: Debug {
+    /// The endpoint to send the request to.
+    fn endpoint(
+        &self,
+        base_url: &url::Url,
+        session_id: Option<&str>,
+    ) -> Result<url::Url, url::ParseError>;
+
+    /// The HTTP request method to use, and the request body for the request.
+    ///
+    /// The `url` will be the one returned from the `endpoint()` method above.
+    fn method_and_body(&self, url: &url::Url) -> (http::Method, Option<String>);
+
+    /// Return true if this command starts a new WebDriver session.
+    fn is_new_session(&self) -> bool {
+        false
+    }
+
+    /// Return true if this command is a legacy WebDriver command (prior to W3C).
+    fn is_legacy(&self) -> bool {
+        false
+    }
+}
 
 /// A [handle][1] to a browser window.
 ///
