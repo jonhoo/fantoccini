@@ -3,12 +3,14 @@
 use crate::error;
 #[cfg(doc)]
 use crate::Client;
+use http::Method;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Debug;
 use std::time::Duration;
+use url::{ParseError, Url};
 use webdriver::command::TimeoutsParameters;
 
 /// A command that can be sent to the WebDriver.
@@ -33,9 +35,59 @@ pub trait WebDriverCompatibleCommand: Debug {
         false
     }
 
-    /// Return true if this command is a legacy WebDriver command (prior to W3C).
+    /// Return true if this session should only support the legacy webdriver protocol.
+    ///
+    /// This only applies to the obsolete JSON Wire Protocol and should return `false`
+    /// for all implementations that follow the W3C specification.
+    ///
+    /// See https://www.selenium.dev/documentation/legacy/json_wire_protocol/ for more
+    /// details about JSON Wire Protocol.
     fn is_legacy(&self) -> bool {
         false
+    }
+}
+
+/// Blanket implementation for &T, for better ergonomics.
+impl<T> WebDriverCompatibleCommand for &T
+where
+    T: WebDriverCompatibleCommand,
+{
+    fn endpoint(&self, base_url: &Url, session_id: Option<&str>) -> Result<Url, ParseError> {
+        T::endpoint(self, base_url, session_id)
+    }
+
+    fn method_and_body(&self, request_url: &Url) -> (Method, Option<String>) {
+        T::method_and_body(self, request_url)
+    }
+
+    fn is_new_session(&self) -> bool {
+        T::is_new_session(self)
+    }
+
+    fn is_legacy(&self) -> bool {
+        T::is_legacy(self)
+    }
+}
+
+/// Blanket implementation for Box<T>, for better ergonomics.
+impl<T> WebDriverCompatibleCommand for Box<T>
+where
+    T: WebDriverCompatibleCommand,
+{
+    fn endpoint(&self, base_url: &Url, session_id: Option<&str>) -> Result<Url, ParseError> {
+        T::endpoint(self, base_url, session_id)
+    }
+
+    fn method_and_body(&self, request_url: &Url) -> (Method, Option<String>) {
+        T::method_and_body(self, request_url)
+    }
+
+    fn is_new_session(&self) -> bool {
+        T::is_new_session(self)
+    }
+
+    fn is_legacy(&self) -> bool {
+        T::is_legacy(self)
     }
 }
 

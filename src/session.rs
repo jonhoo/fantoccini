@@ -322,11 +322,11 @@ impl Client {
     }
 
     /// Issue the specified [`WebDriverCompatibleCommand`] to the WebDriver instance.
-    pub async fn issue_cmd(
-        &self,
-        cmd: Box<dyn WebDriverCompatibleCommand + Send>,
-    ) -> Result<Json, error::CmdError> {
-        self.issue(Cmd::WebDriver(cmd)).await
+    pub async fn issue_cmd<C>(&self, cmd: C) -> Result<Json, error::CmdError>
+    where
+        C: WebDriverCompatibleCommand + Send + 'static,
+    {
+        self.issue(Cmd::WebDriver(Box::new(cmd))).await
     }
 
     pub(crate) fn is_legacy(&self) -> bool {
@@ -677,7 +677,7 @@ where
 
                 // we're dealing with an implementation that only supports the legacy
                 // WebDriver protocol:
-                // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
+                // https://www.selenium.dev/documentation/legacy/json_wire_protocol/
                 let session_config = webdriver::capabilities::LegacyNewSessionParameters {
                     desired: cap,
                     required: webdriver::capabilities::Capabilities::new(),
