@@ -91,6 +91,7 @@ where
     }
 }
 
+// TODO: does this work?
 // impl<T> From<Box<T>> for Box<dyn WebDriverCompatibleCommand + Send + 'static>
 // where
 //     T: WebDriverCompatibleCommand + Send + 'static,
@@ -99,6 +100,15 @@ where
 //         t
 //     }
 // }
+
+impl<T> From<T> for Box<dyn WebDriverCompatibleCommand + Send + 'static>
+where
+    T: WebDriverCompatibleCommand + Send + 'static,
+{
+    fn from(t: T) -> Self {
+        Box::new(t)
+    }
+}
 
 /// A [handle][1] to a browser window.
 ///

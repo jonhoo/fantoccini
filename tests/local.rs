@@ -4,6 +4,7 @@ use fantoccini::wd::TimeoutConfiguration;
 use fantoccini::{error, Client, Locator};
 use serial_test::serial;
 use std::time::Duration;
+use webdriver::command::WebDriverCommand;
 
 mod common;
 
@@ -416,6 +417,16 @@ async fn timeouts(c: Client, _: u16) -> Result<(), error::CmdError> {
     Ok(())
 }
 
+async fn dynamic_commands(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let sample_url = sample_page_url(port);
+    c.goto(&sample_url).await?;
+    let title = c.issue_cmd(WebDriverCommand::GetTitle).await?;
+    assert_eq!(title.as_str(), Some("Sample Page"));
+    let title = c.issue_cmd(Box::new(WebDriverCommand::GetTitle)).await?;
+    assert_eq!(title.as_str(), Some("Sample Page"));
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -537,6 +548,12 @@ mod firefox {
     fn timeouts_test() {
         local_tester!(timeouts, "firefox");
     }
+
+    #[test]
+    #[serial]
+    fn dynamic_commands_test() {
+        local_tester!(dynamic_commands, "firefox");
+    }
 }
 
 mod chrome {
@@ -630,5 +647,10 @@ mod chrome {
     #[test]
     fn timeouts_test() {
         local_tester!(timeouts, "chrome");
+    }
+
+    #[test]
+    fn dynamic_commands_test() {
+        local_tester!(dynamic_commands, "chrome");
     }
 }

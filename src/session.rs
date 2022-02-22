@@ -322,9 +322,9 @@ impl Client {
     }
 
     /// Issue the specified [`WebDriverCompatibleCommand`] to the WebDriver instance.
-    pub async fn issue_cmd<C>(&self, cmd: C) -> Result<Json, error::CmdError>
+    pub async fn issue_cmd<T>(&self, cmd: T) -> Result<Json, error::CmdError>
     where
-        C: Into<Box<dyn WebDriverCompatibleCommand + Send + 'static>>,
+        T: Into<Box<dyn WebDriverCompatibleCommand + Send + 'static>>,
     {
         self.issue(Cmd::WebDriver(cmd.into())).await
     }
@@ -708,7 +708,7 @@ where
     /// [the spec]: https://www.w3.org/TR/webdriver/#list-of-endpoints
     fn issue_wd_cmd(
         &self,
-        cmd: impl WebDriverCompatibleCommand + Send + 'static,
+        cmd: Box<dyn WebDriverCompatibleCommand + Send + 'static>,
     ) -> impl Future<Output = Result<Json, error::CmdError>> {
         // TODO: make this an async fn
         // will take some doing as returned future must be independent of self
