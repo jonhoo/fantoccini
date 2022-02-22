@@ -324,9 +324,9 @@ impl Client {
     /// Issue the specified [`WebDriverCompatibleCommand`] to the WebDriver instance.
     pub async fn issue_cmd<C>(&self, cmd: C) -> Result<Json, error::CmdError>
     where
-        C: WebDriverCompatibleCommand + Send + 'static,
+        C: Into<Box<dyn WebDriverCompatibleCommand + Send + 'static>>,
     {
-        self.issue(Cmd::WebDriver(Box::new(cmd))).await
+        self.issue(Cmd::WebDriver(cmd.into())).await
     }
 
     pub(crate) fn is_legacy(&self) -> bool {
@@ -707,12 +707,11 @@ where
     ///
     /// [the spec]: https://www.w3.org/TR/webdriver/#list-of-endpoints
     fn issue_wd_cmd(
-        &mut self,
-        cmd: Box<dyn WebDriverCompatibleCommand + Send>,
+        &self,
+        cmd: impl WebDriverCompatibleCommand + Send + 'static,
     ) -> impl Future<Output = Result<Json, error::CmdError>> {
         // TODO: make this an async fn
         // will take some doing as returned future must be independent of self
-
         let url = match cmd.endpoint(&self.wdb, self.session.as_deref()) {
             Ok(url) => url,
             Err(e) => return Either::Right(future::err(error::CmdError::from(e))),
