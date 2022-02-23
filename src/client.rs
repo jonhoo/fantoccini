@@ -873,6 +873,8 @@ impl Client {
     /// Issue an HTTP request to the given `url` with all the same cookies as the current session.
     ///
     /// Calling this method is equivalent to calling `with_raw_client_for` with an empty closure.
+    ///
+    /// If greater control over cookie handling is desired, see `raw_cookie_client_for`.
     pub async fn raw_client_for(
         &self,
         method: Method,
@@ -887,6 +889,8 @@ impl Client {
     ///
     /// Before the HTTP request is issued, the given `before` closure will be called with a handle
     /// to the `Request` about to be sent.
+    ///
+    /// If greater control over cookie handling is desired, see `with_raw_cookie_client_for`.
     pub async fn with_raw_client_for<F>(
         &self,
         method: Method,
@@ -896,7 +900,6 @@ impl Client {
     where
         F: FnOnce(http::request::Builder) -> hyper::Request<hyper::Body>,
     {
-        let url = url.to_owned();
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
         // *current* domain, whereas we want the cookies for `url`'s domain. So, we navigate to the
         // URL in question, fetch its cookies, and then navigate back. *Except* that we can't do
@@ -912,16 +915,64 @@ impl Client {
         // Imagine if a cookie is set with path=/download/some_identifier. How do we get that
         // cookie without triggering a request for the (large) file? I don't know. Hence: TODO.
         let old_url = self.current_url_().await?;
-        let url = old_url.clone().join(&url)?;
-        let cookie_url = url.clone().join("/please_give_me_your_cookies")?;
-        self.goto(cookie_url.as_str()).await?;
+        let cookie_url = old_url.join(url)?.join("/please_give_me_your_cookies")?;
+        self.with_raw_cookie_client_for(method, url, Some(cookie_url.as_str()), before)
+            .await
+    }
 
-        // TODO: go back before we return if this call errors:
+    /// Issue an HTTP request to the given `url` with all the same cookies as the current
+    /// session. If set, the client will first navigate to
+    /// `cookie_url` to retrieve cookies.
+    ///
+    /// Calling this method is equivalent to calling `with_raw_cookie_client_for` with an empty closure.
+    ///
+    /// `raw_client_for` is an alternative that automatically handles cookies.
+    pub async fn raw_cookie_client_for(
+        &self,
+        method: Method,
+        url: &str,
+        cookie_url: Option<&str>,
+    ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
+        self.with_raw_cookie_client_for(method, url, cookie_url, |req| {
+            req.body(hyper::Body::empty()).unwrap()
+        })
+        .await
+    }
+
+    /// Build and issue an HTTP request to the given `url` with all the same cookies as the current
+    /// session. If set, the client will first navigate to
+    /// `cookie_url` to retrieve cookies.
+    ///
+    /// Before the HTTP request is issued, the given `before` closure will be called with a handle
+    /// to the `Request` about to be sent.
+    ///
+    /// `with_raw_client_for` is an alternative that automatically handles cookies.
+    pub async fn with_raw_cookie_client_for<F>(
+        &self,
+        method: Method,
+        url: &str,
+        cookie_url: Option<&str>,
+        before: F,
+    ) -> Result<hyper::Response<hyper::Body>, error::CmdError>
+    where
+        F: FnOnce(http::request::Builder) -> hyper::Request<hyper::Body>,
+    {
+        let old_url = self.current_url_().await?;
+        let url = old_url.clone().join(url)?;
+
+        if let Some(cookie_url) = cookie_url {
+            self.goto(cookie_url).await?;
+            self.back().await?;
+        }
+
         let cookies = self.issue(WebDriverCommand::GetCookies).await?;
+
+        // TODO: go back before we return if this call errors and we were given a
+        // `cookie_url`.
         if !cookies.is_array() {
             return Err(error::CmdError::NotW3C(cookies));
         }
-        self.back().await?;
+
         let ua = self.get_ua().await?;
 
         // now add all the cookies
