@@ -1,4 +1,5 @@
 use crate::cookies::AddCookieParametersWrapper;
+use crate::wd::WebDriverCompatibleCommand;
 use crate::{error, Client};
 use futures_core::ready;
 use futures_util::future::{self, Either};
@@ -32,12 +33,257 @@ pub(crate) enum Cmd {
         req: hyper::Request<hyper::Body>,
         rsp: oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
     },
-    WebDriver(Wcmd),
+    WebDriver(Box<dyn WebDriverCompatibleCommand + Send>),
+}
+
+impl WebDriverCompatibleCommand for Wcmd {
+    /// Helper for determining what URL endpoint to use for various requests.
+    ///
+    /// This mapping is essentially that of <https://www.w3.org/TR/webdriver/#list-of-endpoints>.
+    fn endpoint(
+        &self,
+        base_url: &url::Url,
+        session_id: Option<&str>,
+    ) -> Result<url::Url, url::ParseError> {
+        if let WebDriverCommand::NewSession(..) = self {
+            return base_url.join("session");
+        }
+
+        if let WebDriverCommand::Status = self {
+            return base_url.join("status");
+        }
+
+        let base = { base_url.join(&format!("session/{}/", session_id.as_ref().unwrap()))? };
+        match self {
+            WebDriverCommand::NewSession(..) => unreachable!(),
+            WebDriverCommand::DeleteSession => unreachable!(),
+            WebDriverCommand::Get(..) | WebDriverCommand::GetCurrentUrl => base.join("url"),
+            WebDriverCommand::GoBack => base.join("back"),
+            WebDriverCommand::GoForward => base.join("forward"),
+            WebDriverCommand::Refresh => base.join("refresh"),
+            WebDriverCommand::GetTitle => base.join("title"),
+            WebDriverCommand::GetPageSource => base.join("source"),
+            WebDriverCommand::GetWindowHandle => base.join("window"),
+            WebDriverCommand::GetWindowHandles => base.join("window/handles"),
+            WebDriverCommand::NewWindow(..) => base.join("window/new"),
+            WebDriverCommand::CloseWindow => base.join("window"),
+            WebDriverCommand::GetWindowRect => base.join("window/rect"),
+            WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
+            WebDriverCommand::MinimizeWindow => base.join("window/minimize"),
+            WebDriverCommand::MaximizeWindow => base.join("window/maximize"),
+            WebDriverCommand::FullscreenWindow => base.join("window/fullscreen"),
+            WebDriverCommand::SwitchToWindow(..) => base.join("window"),
+            WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
+            WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
+            WebDriverCommand::FindElement(..) => base.join("element"),
+            WebDriverCommand::FindElements(..) => base.join("elements"),
+            WebDriverCommand::FindElementElement(ref p, _) => {
+                base.join(&format!("element/{}/element", p.0))
+            }
+            WebDriverCommand::FindElementElements(ref p, _) => {
+                base.join(&format!("element/{}/elements", p.0))
+            }
+            WebDriverCommand::GetActiveElement => base.join("element/active"),
+            WebDriverCommand::IsDisplayed(ref we) => {
+                base.join(&format!("element/{}/displayed", we.0))
+            }
+            WebDriverCommand::IsSelected(ref we) => {
+                base.join(&format!("element/{}/selected", we.0))
+            }
+            WebDriverCommand::GetElementAttribute(ref we, ref attr) => {
+                base.join(&format!("element/{}/attribute/{}", we.0, attr))
+            }
+            WebDriverCommand::GetElementProperty(ref we, ref prop) => {
+                base.join(&format!("element/{}/property/{}", we.0, prop))
+            }
+            WebDriverCommand::GetCSSValue(ref we, ref attr) => {
+                base.join(&format!("element/{}/css/{}", we.0, attr))
+            }
+            WebDriverCommand::GetElementText(ref we) => {
+                base.join(&format!("element/{}/text", we.0))
+            }
+            WebDriverCommand::GetElementTagName(ref we) => {
+                base.join(&format!("element/{}/name", we.0))
+            }
+            WebDriverCommand::GetElementRect(ref we) => {
+                base.join(&format!("element/{}/rect", we.0))
+            }
+            WebDriverCommand::IsEnabled(ref we) => base.join(&format!("element/{}/enabled", we.0)),
+            WebDriverCommand::ExecuteScript(..) if self.is_legacy() => base.join("execute"),
+            WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
+            WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
+            WebDriverCommand::GetCookies
+            | WebDriverCommand::AddCookie(_)
+            | WebDriverCommand::DeleteCookies => base.join("cookie"),
+            WebDriverCommand::GetNamedCookie(ref name)
+            | WebDriverCommand::DeleteCookie(ref name) => base.join(&format!("cookie/{}", name)),
+            WebDriverCommand::GetTimeouts | WebDriverCommand::SetTimeouts(..) => {
+                base.join("timeouts")
+            }
+            WebDriverCommand::ElementClick(ref we) => base.join(&format!("element/{}/click", we.0)),
+            WebDriverCommand::ElementClear(ref we) => base.join(&format!("element/{}/clear", we.0)),
+            WebDriverCommand::ElementSendKeys(ref we, _) => {
+                base.join(&format!("element/{}/value", we.0))
+            }
+            WebDriverCommand::PerformActions(..) | WebDriverCommand::ReleaseActions => {
+                base.join("actions")
+            }
+            WebDriverCommand::DismissAlert => base.join("alert/dismiss"),
+            WebDriverCommand::AcceptAlert => base.join("alert/accept"),
+            WebDriverCommand::GetAlertText | WebDriverCommand::SendAlertText(..) => {
+                base.join("alert/text")
+            }
+            WebDriverCommand::TakeScreenshot => base.join("screenshot"),
+            WebDriverCommand::TakeElementScreenshot(ref we) => {
+                base.join(&format!("element/{}/screenshot", we.0))
+            }
+            WebDriverCommand::Print(..) => base.join("print"),
+            WebDriverCommand::Status => unreachable!(),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn method_and_body(&self, request_url: &url::Url) -> (http::Method, Option<String>) {
+        use http::Method;
+        use webdriver::command;
+
+        // Most actions are just GET requests with no parameters
+        let mut method = Method::GET;
+        let mut body = None;
+
+        // but some have a request body
+        match self {
+            WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
+                // TODO: awful hacks
+                let mut also = String::new();
+                if !request_url.username().is_empty() {
+                    also.push_str(&format!(
+                        r#", "user": {}"#,
+                        serde_json::to_string(request_url.username()).unwrap()
+                    ));
+                }
+                if let Some(pwd) = request_url.password() {
+                    also.push_str(&format!(
+                        r#", "password": {}"#,
+                        serde_json::to_string(pwd).unwrap()
+                    ));
+                }
+                body = Some(format!(
+                    r#"{{"capabilities": {}{}}}"#,
+                    serde_json::to_string(conf).unwrap(),
+                    also
+                ));
+
+                method = Method::POST;
+            }
+            WebDriverCommand::NewSession(command::NewSessionParameters::Legacy(ref conf)) => {
+                body = Some(serde_json::to_string(conf).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::Get(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::FindElement(ref loc)
+            | WebDriverCommand::FindElements(ref loc)
+            | WebDriverCommand::FindElementElement(_, ref loc)
+            | WebDriverCommand::FindElementElements(_, ref loc) => {
+                body = Some(serde_json::to_string(loc).unwrap());
+                method = Method::POST;
+            }
+
+            WebDriverCommand::ExecuteScript(ref script) => {
+                body = Some(serde_json::to_string(script).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::ExecuteAsyncScript(ref script) => {
+                body = Some(serde_json::to_string(script).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::ElementSendKeys(_, ref keys) => {
+                body = Some(serde_json::to_string(keys).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::ElementClick(..)
+            | WebDriverCommand::ElementClear(..)
+            | WebDriverCommand::GoBack
+            | WebDriverCommand::GoForward
+            | WebDriverCommand::Refresh
+            | WebDriverCommand::MinimizeWindow
+            | WebDriverCommand::MaximizeWindow
+            | WebDriverCommand::FullscreenWindow
+            | WebDriverCommand::DismissAlert
+            | WebDriverCommand::AcceptAlert => {
+                body = Some("{}".to_string());
+                method = Method::POST;
+            }
+            WebDriverCommand::NewWindow(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::CloseWindow => {
+                method = Method::DELETE;
+            }
+            WebDriverCommand::SetWindowRect(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::SwitchToWindow(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::SwitchToFrame(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::SwitchToParentFrame => {
+                body = Some("{}".to_string());
+                method = Method::POST;
+            }
+            WebDriverCommand::AddCookie(ref params) => {
+                let wrapper = AddCookieParametersWrapper { cookie: params };
+                body = Some(serde_json::to_string(&wrapper).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::DeleteCookie(_) | WebDriverCommand::DeleteCookies => {
+                method = Method::DELETE;
+            }
+            WebDriverCommand::SetTimeouts(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::PerformActions(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+            WebDriverCommand::ReleaseActions => {
+                method = Method::DELETE;
+            }
+            WebDriverCommand::SendAlertText(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
+
+            _ => {}
+        }
+        (method, body)
+    }
+
+    fn is_new_session(&self) -> bool {
+        matches!(self, WebDriverCommand::NewSession(..))
+    }
+
+    fn is_legacy(&self) -> bool {
+        matches!(
+            self,
+            WebDriverCommand::NewSession(webdriver::command::NewSessionParameters::Legacy(..)),
+        )
+    }
 }
 
 impl From<Wcmd> for Cmd {
     fn from(o: Wcmd) -> Self {
-        Cmd::WebDriver(o)
+        Cmd::WebDriver(Box::new(o))
     }
 }
 
@@ -48,7 +294,7 @@ pub(crate) struct Task {
 }
 
 impl Client {
-    pub(crate) fn issue<C>(&self, cmd: C) -> impl Future<Output = Result<Json, error::CmdError>>
+    pub(crate) async fn issue<C>(&self, cmd: C) -> Result<Json, error::CmdError>
     where
         C: Into<Cmd>,
     {
@@ -59,22 +305,28 @@ impl Client {
             ack: tx,
         });
 
-        async move {
-            if r.is_err() {
-                return Err(error::CmdError::Lost(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    "WebDriver session has been closed",
-                )));
-            }
-
-            let r = rx.await;
-            r.unwrap_or_else(|_| {
-                Err(error::CmdError::Lost(io::Error::new(
-                    io::ErrorKind::BrokenPipe,
-                    "WebDriver session was closed while waiting",
-                )))
-            })
+        if r.is_err() {
+            return Err(error::CmdError::Lost(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "WebDriver session has been closed",
+            )));
         }
+
+        let r = rx.await;
+        r.unwrap_or_else(|_| {
+            Err(error::CmdError::Lost(io::Error::new(
+                io::ErrorKind::BrokenPipe,
+                "WebDriver session was closed while waiting",
+            )))
+        })
+    }
+
+    /// Issue the specified [`WebDriverCompatibleCommand`] to the WebDriver instance.
+    pub async fn issue_cmd(
+        &self,
+        cmd: impl WebDriverCompatibleCommand + Send + 'static,
+    ) -> Result<Json, error::CmdError> {
+        self.issue(Cmd::WebDriver(Box::new(cmd))).await
     }
 
     pub(crate) fn is_legacy(&self) -> bool {
@@ -240,12 +492,10 @@ where
                     Cmd::WebDriver(request) => {
                         // looks like the client setup is falling back to legacy params
                         // keep track of that for later
-                        if let WebDriverCommand::NewSession(
-                            webdriver::command::NewSessionParameters::Legacy(..),
-                        ) = request
-                        {
+                        if request.is_legacy() {
                             self.is_legacy = true;
                         }
+
                         self.ongoing = Ongoing::WebDriver {
                             ack,
                             fut: Box::pin(self.issue_wd_cmd(request)),
@@ -427,7 +677,7 @@ where
 
                 // we're dealing with an implementation that only supports the legacy
                 // WebDriver protocol:
-                // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol
+                // https://www.selenium.dev/documentation/legacy/json_wire_protocol/
                 let session_config = webdriver::capabilities::LegacyNewSessionParameters {
                     desired: cap,
                     required: webdriver::capabilities::Capabilities::new(),
@@ -449,111 +699,6 @@ where
         }
     }
 
-    /// Helper for determining what URL endpoint to use for various requests.
-    ///
-    /// This mapping is essentially that of https://www.w3.org/TR/webdriver/#list-of-endpoints.
-    fn endpoint_for(&self, cmd: &Wcmd) -> Result<url::Url, url::ParseError> {
-        if let WebDriverCommand::NewSession(..) = *cmd {
-            return self.wdb.join("session");
-        }
-
-        if let WebDriverCommand::Status = *cmd {
-            return self.wdb.join("status");
-        }
-
-        let base = {
-            self.wdb
-                .join(&format!("session/{}/", self.session.as_ref().unwrap()))?
-        };
-        match *cmd {
-            WebDriverCommand::NewSession(..) => unreachable!(),
-            WebDriverCommand::DeleteSession => unreachable!(),
-            WebDriverCommand::Get(..) | WebDriverCommand::GetCurrentUrl => base.join("url"),
-            WebDriverCommand::GoBack => base.join("back"),
-            WebDriverCommand::GoForward => base.join("forward"),
-            WebDriverCommand::Refresh => base.join("refresh"),
-            WebDriverCommand::GetTitle => base.join("title"),
-            WebDriverCommand::GetPageSource => base.join("source"),
-            WebDriverCommand::GetWindowHandle => base.join("window"),
-            WebDriverCommand::GetWindowHandles => base.join("window/handles"),
-            WebDriverCommand::NewWindow(..) => base.join("window/new"),
-            WebDriverCommand::CloseWindow => base.join("window"),
-            WebDriverCommand::GetWindowRect => base.join("window/rect"),
-            WebDriverCommand::SetWindowRect(..) => base.join("window/rect"),
-            WebDriverCommand::MinimizeWindow => base.join("window/minimize"),
-            WebDriverCommand::MaximizeWindow => base.join("window/maximize"),
-            WebDriverCommand::FullscreenWindow => base.join("window/fullscreen"),
-            WebDriverCommand::SwitchToWindow(..) => base.join("window"),
-            WebDriverCommand::SwitchToFrame(_) => base.join("frame"),
-            WebDriverCommand::SwitchToParentFrame => base.join("frame/parent"),
-            WebDriverCommand::FindElement(..) => base.join("element"),
-            WebDriverCommand::FindElements(..) => base.join("elements"),
-            WebDriverCommand::FindElementElement(ref p, _) => {
-                base.join(&format!("element/{}/element", p.0))
-            }
-            WebDriverCommand::FindElementElements(ref p, _) => {
-                base.join(&format!("element/{}/elements", p.0))
-            }
-            WebDriverCommand::GetActiveElement => base.join("element/active"),
-            WebDriverCommand::IsDisplayed(ref we) => {
-                base.join(&format!("element/{}/displayed", we.0))
-            }
-            WebDriverCommand::IsSelected(ref we) => {
-                base.join(&format!("element/{}/selected", we.0))
-            }
-            WebDriverCommand::GetElementAttribute(ref we, ref attr) => {
-                base.join(&format!("element/{}/attribute/{}", we.0, attr))
-            }
-            WebDriverCommand::GetElementProperty(ref we, ref prop) => {
-                base.join(&format!("element/{}/property/{}", we.0, prop))
-            }
-            WebDriverCommand::GetCSSValue(ref we, ref attr) => {
-                base.join(&format!("element/{}/css/{}", we.0, attr))
-            }
-            WebDriverCommand::GetElementText(ref we) => {
-                base.join(&format!("element/{}/text", we.0))
-            }
-            WebDriverCommand::GetElementTagName(ref we) => {
-                base.join(&format!("element/{}/name", we.0))
-            }
-            WebDriverCommand::GetElementRect(ref we) => {
-                base.join(&format!("element/{}/rect", we.0))
-            }
-            WebDriverCommand::IsEnabled(ref we) => base.join(&format!("element/{}/enabled", we.0)),
-            WebDriverCommand::ExecuteScript(..) if self.is_legacy => base.join("execute"),
-            WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
-            WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
-            WebDriverCommand::GetCookies
-            | WebDriverCommand::AddCookie(_)
-            | WebDriverCommand::DeleteCookies => base.join("cookie"),
-            WebDriverCommand::GetNamedCookie(ref name)
-            | WebDriverCommand::DeleteCookie(ref name) => base.join(&format!("cookie/{}", name)),
-            WebDriverCommand::GetTimeouts | WebDriverCommand::SetTimeouts(..) => {
-                base.join("timeouts")
-            }
-            WebDriverCommand::ElementClick(ref we) => base.join(&format!("element/{}/click", we.0)),
-            WebDriverCommand::ElementClear(ref we) => base.join(&format!("element/{}/clear", we.0)),
-            WebDriverCommand::ElementSendKeys(ref we, _) => {
-                base.join(&format!("element/{}/value", we.0))
-            }
-            WebDriverCommand::PerformActions(..) | WebDriverCommand::ReleaseActions => {
-                base.join("actions")
-            }
-            WebDriverCommand::DismissAlert => base.join("alert/dismiss"),
-            WebDriverCommand::AcceptAlert => base.join("alert/accept"),
-            WebDriverCommand::GetAlertText | WebDriverCommand::SendAlertText(..) => {
-                base.join("alert/text")
-            }
-            WebDriverCommand::TakeScreenshot => base.join("screenshot"),
-            WebDriverCommand::TakeElementScreenshot(ref we) => {
-                base.join(&format!("element/{}/screenshot", we.0))
-            }
-            WebDriverCommand::Print(..) => base.join("print"),
-            WebDriverCommand::Status => unreachable!(),
-            _ => unimplemented!(),
-        }
-    }
-
     /// Helper for issuing a WebDriver command, and then reading and parsing the response.
     ///
     /// Since most `WebDriverCommand` arguments can already be turned directly into JSON, this is
@@ -562,137 +707,17 @@ where
     ///
     /// [the spec]: https://www.w3.org/TR/webdriver/#list-of-endpoints
     fn issue_wd_cmd(
-        &mut self,
-        cmd: WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>,
+        &self,
+        cmd: Box<impl WebDriverCompatibleCommand + Send + 'static + ?Sized>,
     ) -> impl Future<Output = Result<Json, error::CmdError>> {
         // TODO: make this an async fn
         // will take some doing as returned future must be independent of self
-
-        use webdriver::command;
-
-        // most actions are just GET requests with no parameters
-        let url = match self.endpoint_for(&cmd) {
+        let url = match cmd.endpoint(&self.wdb, self.session.as_deref()) {
             Ok(url) => url,
             Err(e) => return Either::Right(future::err(error::CmdError::from(e))),
         };
-        use hyper::Method;
-        let mut method = Method::GET;
-        let mut body = None;
 
-        // but some have a request body
-        match cmd {
-            WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
-                // TODO: awful hacks
-                let mut also = String::new();
-                if !url.username().is_empty() {
-                    also.push_str(&format!(
-                        r#", "user": {}"#,
-                        serde_json::to_string(url.username()).unwrap()
-                    ));
-                }
-                if let Some(pwd) = url.password() {
-                    also.push_str(&format!(
-                        r#", "password": {}"#,
-                        serde_json::to_string(pwd).unwrap()
-                    ));
-                }
-                body = Some(format!(
-                    r#"{{"capabilities": {}{}}}"#,
-                    serde_json::to_string(conf).unwrap(),
-                    also
-                ));
-
-                method = Method::POST;
-            }
-            WebDriverCommand::NewSession(command::NewSessionParameters::Legacy(ref conf)) => {
-                body = Some(serde_json::to_string(conf).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::Get(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::FindElement(ref loc)
-            | WebDriverCommand::FindElements(ref loc)
-            | WebDriverCommand::FindElementElement(_, ref loc)
-            | WebDriverCommand::FindElementElements(_, ref loc) => {
-                body = Some(serde_json::to_string(loc).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::ExecuteScript(ref script) => {
-                body = Some(serde_json::to_string(script).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::ExecuteAsyncScript(ref script) => {
-                body = Some(serde_json::to_string(script).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::ElementSendKeys(_, ref keys) => {
-                body = Some(serde_json::to_string(keys).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::ElementClick(..)
-            | WebDriverCommand::ElementClear(..)
-            | WebDriverCommand::GoBack
-            | WebDriverCommand::GoForward
-            | WebDriverCommand::Refresh
-            | WebDriverCommand::MinimizeWindow
-            | WebDriverCommand::MaximizeWindow
-            | WebDriverCommand::FullscreenWindow
-            | WebDriverCommand::DismissAlert
-            | WebDriverCommand::AcceptAlert => {
-                body = Some("{}".to_string());
-                method = Method::POST;
-            }
-            WebDriverCommand::NewWindow(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::CloseWindow => {
-                method = Method::DELETE;
-            }
-            WebDriverCommand::SetWindowRect(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::SwitchToWindow(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::SwitchToFrame(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::SwitchToParentFrame => {
-                body = Some("{}".to_string());
-                method = Method::POST;
-            }
-            WebDriverCommand::AddCookie(ref params) => {
-                let wrapper = AddCookieParametersWrapper { cookie: params };
-                body = Some(serde_json::to_string(&wrapper).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::DeleteCookie(_) | WebDriverCommand::DeleteCookies => {
-                method = Method::DELETE;
-            }
-            WebDriverCommand::SetTimeouts(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::PerformActions(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-            WebDriverCommand::ReleaseActions => {
-                method = Method::DELETE;
-            }
-            WebDriverCommand::SendAlertText(ref params) => {
-                body = Some(serde_json::to_string(params).unwrap());
-                method = Method::POST;
-            }
-
-            _ => {}
-        }
+        let (method, mut body) = cmd.method_and_body(&url);
 
         // issue the command to the webdriver server
         let mut req = hyper::Request::builder();
@@ -764,7 +789,7 @@ where
             })
             .map(move |r| {
                 let (body, status) = r?;
-                let is_new_session = matches!(cmd, WebDriverCommand::NewSession(..));
+                let is_new_session = cmd.is_new_session();
 
                 let mut is_success = status.is_success();
                 let mut legacy_status = 0;
