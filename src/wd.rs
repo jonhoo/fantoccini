@@ -345,3 +345,128 @@ impl TimeoutConfiguration {
         }
     }
 }
+
+/// "Extensions" to the core webdriver code that are useful for fantoccini.
+pub(crate) mod extensions {
+    use serde::{Deserialize, Serialize};
+
+    #[derive(Debug)]
+    pub struct ExtendedActionCommand {
+        pub actions: ActionsParameters,
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    pub struct ActionsParameters {
+        pub actions: Vec<ActionSequence>,
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    pub struct ActionSequence {
+        pub id: String,
+        /// Hackery to enable the use of core webdriver actions and the "extended" actions - this
+        /// allows us to implement new actions that are defined in the webdriver protocol but haven't
+        /// made it into the webdriver crate (notably, `wheel` actions).
+        #[serde(flatten)]
+        pub actions: ActionsType,
+    }
+
+    impl From<webdriver::actions::ActionSequence> for ActionSequence {
+        fn from(seq: webdriver::actions::ActionSequence) -> Self {
+            Self {
+                id: seq.id,
+                actions: seq.actions.into(),
+            }
+        }
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum ActionsType {
+        Base(webdriver::actions::ActionsType),
+        Extension(ActionExtension),
+    }
+
+    impl From<webdriver::actions::ActionsType> for ActionsType {
+        fn from(a: webdriver::actions::ActionsType) -> Self {
+            Self::Base(a)
+        }
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    #[serde(tag = "type")]
+    pub enum ActionExtension {
+        #[serde(rename = "wheel")]
+        Wheel { actions: Vec<WheelActionItem> },
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    #[serde(untagged)]
+    pub enum WheelActionItem {
+        General(webdriver::actions::GeneralAction),
+        Wheel(WheelAction),
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    #[serde(tag = "type")]
+    pub enum WheelAction {
+        #[serde(rename = "scroll")]
+        Scroll(WheelScrollAction),
+    }
+
+    #[derive(Debug, PartialEq, Serialize, Deserialize)]
+    pub struct WheelScrollAction {
+        pub x: i64,
+        pub y: i64,
+        #[serde(rename = "deltaX")]
+        pub delta_x: i64,
+        #[serde(rename = "deltaY")]
+        pub delta_y: i64,
+        #[serde(default)]
+        pub origin: WheelOrigin,
+        #[serde(
+            default,
+            skip_serializing_if = "Option::is_none",
+            deserialize_with = "deserialize_to_option_u64"
+        )]
+        pub duration: Option<u64>,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+    pub enum WheelOrigin {
+        #[serde(rename = "viewport")]
+        Viewport,
+    }
+
+    impl Default for WheelOrigin {
+        fn default() -> WheelOrigin {
+            WheelOrigin::Viewport
+        }
+    }
+
+    impl super::WebDriverCompatibleCommand for ExtendedActionCommand {
+        fn endpoint(
+            &self,
+            base_url: &url::Url,
+            session_id: Option<&str>,
+        ) -> std::result::Result<url::Url, url::ParseError> {
+            let base = { base_url.join(&format!("session/{}/", session_id.as_ref().unwrap()))? };
+            base.join("actions")
+        }
+
+        fn method_and_body(&self, _: &url::Url) -> (http::Method, Option<String>) {
+            let body = Some(serde_json::to_string(&self.actions).unwrap());
+            let method = http::Method::POST;
+            (method, body)
+        }
+    }
+
+    fn deserialize_to_option_u64<'de, D>(
+        deserializer: D,
+    ) -> std::result::Result<Option<u64>, D::Error>
+    where
+        D: serde::de::Deserializer<'de>,
+    {
+        Option::deserialize(deserializer)?
+            .ok_or_else(|| serde::de::Error::custom("invalid type: null, expected i64"))
+    }
+}

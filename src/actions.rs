@@ -241,12 +241,15 @@ impl NullActions {
 
 impl From<NullActions> for ActionSequence {
     fn from(na: NullActions) -> Self {
-        ActionSequence(WDActions::ActionSequence {
-            id: na.id,
-            actions: WDActions::ActionsType::Null {
-                actions: na.actions.into_iter().map(|x| x.into_item()).collect(),
-            },
-        })
+        ActionSequence(
+            WDActions::ActionSequence {
+                id: na.id,
+                actions: WDActions::ActionsType::Null {
+                    actions: na.actions.into_iter().map(|x| x.into_item()).collect(),
+                },
+            }
+            .into(),
+        )
     }
 }
 
@@ -280,12 +283,15 @@ impl KeyActions {
 
 impl From<KeyActions> for ActionSequence {
     fn from(ka: KeyActions) -> Self {
-        ActionSequence(WDActions::ActionSequence {
-            id: ka.id,
-            actions: WDActions::ActionsType::Key {
-                actions: ka.actions.into_iter().map(|x| x.into_item()).collect(),
-            },
-        })
+        ActionSequence(
+            WDActions::ActionSequence {
+                id: ka.id,
+                actions: WDActions::ActionsType::Key {
+                    actions: ka.actions.into_iter().map(|x| x.into_item()).collect(),
+                },
+            }
+            .into(),
+        )
     }
 }
 
@@ -320,19 +326,27 @@ impl MouseActions {
     pub fn len(&self) -> usize {
         self.actions.len()
     }
+
+    /// Returns true if the sequence is empty.
+    pub fn is_empty(&self) -> bool {
+        self.actions.is_empty()
+    }
 }
 
 impl From<MouseActions> for ActionSequence {
     fn from(ma: MouseActions) -> Self {
-        ActionSequence(WDActions::ActionSequence {
-            id: ma.id,
-            actions: WDActions::ActionsType::Pointer {
-                parameters: WDActions::PointerActionParameters {
-                    pointer_type: WDActions::PointerType::Mouse,
+        ActionSequence(
+            WDActions::ActionSequence {
+                id: ma.id,
+                actions: WDActions::ActionsType::Pointer {
+                    parameters: WDActions::PointerActionParameters {
+                        pointer_type: WDActions::PointerType::Mouse,
+                    },
+                    actions: ma.actions.into_iter().map(|x| x.into_item()).collect(),
                 },
-                actions: ma.actions.into_iter().map(|x| x.into_item()).collect(),
-            },
-        })
+            }
+            .into(),
+        )
     }
 }
 
@@ -361,15 +375,18 @@ impl PenActions {
 
 impl From<PenActions> for ActionSequence {
     fn from(pa: PenActions) -> Self {
-        ActionSequence(WDActions::ActionSequence {
-            id: pa.id,
-            actions: WDActions::ActionsType::Pointer {
-                parameters: WDActions::PointerActionParameters {
-                    pointer_type: WDActions::PointerType::Pen,
+        ActionSequence(
+            WDActions::ActionSequence {
+                id: pa.id,
+                actions: WDActions::ActionsType::Pointer {
+                    parameters: WDActions::PointerActionParameters {
+                        pointer_type: WDActions::PointerType::Pen,
+                    },
+                    actions: pa.actions.into_iter().map(|x| x.into_item()).collect(),
                 },
-                actions: pa.actions.into_iter().map(|x| x.into_item()).collect(),
-            },
-        })
+            }
+            .into(),
+        )
     }
 }
 
@@ -398,15 +415,117 @@ impl TouchActions {
 
 impl From<TouchActions> for ActionSequence {
     fn from(ta: TouchActions) -> Self {
-        ActionSequence(WDActions::ActionSequence {
-            id: ta.id,
-            actions: WDActions::ActionsType::Pointer {
-                parameters: WDActions::PointerActionParameters {
-                    pointer_type: WDActions::PointerType::Touch,
+        ActionSequence(
+            WDActions::ActionSequence {
+                id: ta.id,
+                actions: WDActions::ActionsType::Pointer {
+                    parameters: WDActions::PointerActionParameters {
+                        pointer_type: WDActions::PointerType::Touch,
+                    },
+                    actions: ta.actions.into_iter().map(|x| x.into_item()).collect(),
                 },
-                actions: ta.actions.into_iter().map(|x| x.into_item()).collect(),
-            },
+            }
+            .into(),
+        )
+    }
+}
+
+/// A sequence containing [`Wheel` actions](WheelAction) for a wheel device.
+#[derive(Debug, Clone)]
+pub struct WheelActions {
+    /// A unique identifier to distinguish this input source from others.
+    ///
+    /// Choose a meaningful string as it may be useful for debugging.
+    id: String,
+    /// The list of actions for this sequence.
+    actions: Vec<WheelAction>,
+}
+
+impl WheelActions {
+    /// Create a new `WheelActions` sequence.
+    ///
+    /// The id can be any string but must uniquely identify this input source.
+    pub fn new(id: String) -> Self {
+        Self {
+            id,
+            actions: Vec::new(),
+        }
+    }
+
+    /// Pushes a new action.
+    pub fn push(&mut self, action: WheelAction) {
+        self.actions.push(action);
+    }
+}
+
+impl From<WheelActions> for ActionSequence {
+    fn from(wa: WheelActions) -> Self {
+        ActionSequence(crate::wd::extensions::ActionSequence {
+            id: wa.id,
+            actions: crate::wd::extensions::ActionsType::Extension(
+                crate::wd::extensions::ActionExtension::Wheel {
+                    actions: wa.actions.into_iter().map(|x| x.into_item()).collect(),
+                },
+            ),
         })
+    }
+}
+
+/// An action performed with a wheel device.
+///
+/// See [15.4.4 Wheel Actions](https://www.w3.org/TR/webdriver/#wheel-actions) of the
+/// WebDriver standard.
+
+#[derive(Debug, Clone)]
+pub enum WheelAction {
+    /// Pause action.
+    /// Useful for adding pauses between other key actions.
+    Pause {
+        /// The pause duration, given in milliseconds.
+        duration: Duration,
+    },
+    /// Wheel scroll event.
+    Scroll {
+        /// The scroll duration.
+        duration: Option<Duration>,
+        /// `x` offset of the scroll origin, in pixels.
+        x: i64,
+        /// `y` offset of the scroll origin, in pixels.
+        y: i64,
+        /// The change of the number of pixels to be scrolled on the `x`-axis.
+        delta_x: i64,
+        /// The change of the number of pixels to be scrolled on the `y`-axis.
+        delta_y: i64,
+    },
+}
+
+impl WheelAction {
+    fn into_item(self) -> crate::wd::extensions::WheelActionItem {
+        match self {
+            WheelAction::Pause { duration } => crate::wd::extensions::WheelActionItem::General(
+                WDActions::GeneralAction::Pause(WDActions::PauseAction {
+                    duration: Some(duration.as_millis() as u64),
+                }),
+            ),
+            WheelAction::Scroll {
+                x,
+                y,
+                delta_x,
+                delta_y,
+                duration,
+            } => crate::wd::extensions::WheelActionItem::Wheel(
+                crate::wd::extensions::WheelAction::Scroll(
+                    crate::wd::extensions::WheelScrollAction {
+                        origin: crate::wd::extensions::WheelOrigin::Viewport,
+                        duration: duration.map(|d| d.as_millis() as u64),
+                        x,
+                        y,
+                        delta_x,
+                        delta_y,
+                    },
+                ),
+            ),
+        }
     }
 }
 
@@ -414,7 +533,7 @@ impl From<TouchActions> for ActionSequence {
 ///
 /// See the documentation for [`Actions`] for more details.
 #[derive(Debug)]
-pub struct ActionSequence(pub(crate) WDActions::ActionSequence);
+pub struct ActionSequence(pub(crate) crate::wd::extensions::ActionSequence);
 
 /// A source capable of providing inputs for a browser action chain.
 ///
@@ -493,6 +612,19 @@ impl InputSource for TouchActions {
 
     fn pause(self, duration: Duration) -> Self {
         self.then(PointerAction::Pause { duration })
+    }
+
+    fn then(mut self, action: Self::Action) -> Self {
+        self.actions.push(action);
+        self
+    }
+}
+
+impl InputSource for WheelActions {
+    type Action = WheelAction;
+
+    fn pause(self, duration: Duration) -> Self {
+        self.then(WheelAction::Pause { duration })
     }
 
     fn then(mut self, action: Self::Action) -> Self {
