@@ -157,6 +157,12 @@ impl CmdError {
         matches!(self, CmdError::NoSuchElement(..))
     }
 
+    /// Returns true if this error indicates that a used element has gone stale since it was
+    /// selected.
+    pub fn is_stale_element(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == webdriver::ErrorStatus::StaleElementReference)
+    }
+
     pub(crate) fn from_webdriver_error(e: webdriver::WebDriverError) -> Self {
         match e {
             webdriver::WebDriverError {

@@ -271,6 +271,11 @@ impl KeyActions {
             actions: Vec::new(),
         }
     }
+
+    /// Pushes a new action.
+    pub fn push(&mut self, action: KeyAction) {
+        self.actions.push(action);
+    }
 }
 
 impl From<KeyActions> for ActionSequence {
@@ -304,6 +309,16 @@ impl MouseActions {
             id,
             actions: Vec::new(),
         }
+    }
+
+    /// Pushes a new action.
+    pub fn push(&mut self, action: PointerAction) {
+        self.actions.push(action);
+    }
+
+    /// Returns the number of actions currently in this sequence.
+    pub fn len(&self) -> usize {
+        self.actions.len()
     }
 }
 
