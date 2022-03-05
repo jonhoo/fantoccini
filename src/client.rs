@@ -329,7 +329,7 @@ impl Client {
         }
     }
 
-    /// Creates a new window. If `is_tab` is `true`, then a tab will be created instead.
+    /// Creates a new window. If `as_tab` is `true`, then a tab will be created instead.
     ///
     /// Windows are treated the same as tabs by the WebDriver protocol. The functions `new_window`,
     /// `switch_to_window`, `close_window`, `window` and `windows` all operate on both tabs and
