@@ -65,7 +65,7 @@ let f = c.form(Locator::Css("#search-form")).await?;
 f.set_by_name("search", "foobar").await?
  .submit().await?;
 
-// we should now have ended up in the rigth place
+// we should now have ended up in the right place
 let url = c.current_url().await?;
 assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 
@@ -94,7 +94,7 @@ let pixels = raw
     })
     .await
     .map_err(fantoccini::error::CmdError::from)?;
-// and voilla, we now have the bytes for the Wikipedia logo!
+// and voilà, we now have the bytes for the Wikipedia logo!
 assert!(pixels.len() > 0);
 println!("Wikipedia logo is {}b", pixels.len());
 
