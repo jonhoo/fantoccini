@@ -203,8 +203,10 @@ async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
     assert_eq!(portals.len(), portal_titles.len());
 
     for (i, portal) in portals.iter_mut().enumerate() {
-        // Each "portal" has an h3 element.
-        let portal_title = portal.find(Locator::Css("h3")).await?;
+        // Each "portal" has a title element.
+        let portal_title = portal
+            .find(Locator::Css(".vector-menu-heading-label"))
+            .await?;
         let portal_title = portal_title.text().await?;
         assert_eq!(portal_title, portal_titles[i]);
         // And also an <ul>.
