@@ -10,7 +10,7 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: 1.56.0 # 2021 edition
+          toolchain: 1.57.0 # time crate
           override: true
       - uses: actions/checkout@v2
       - name: cargo +1.56.0 check
