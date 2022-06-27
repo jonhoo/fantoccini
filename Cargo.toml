@@ -47,7 +47,7 @@ _time01 = { version = "0.1.34", package = "time" }
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 hyper = { version = "0.14", features = ["server", "tcp"] }
-serial_test = "0.7"
+serial_test = "0.8"
 
 [package.metadata.docs.rs]
 all-features = true
