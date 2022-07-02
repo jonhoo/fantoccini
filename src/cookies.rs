@@ -140,12 +140,10 @@ impl Client {
         let resp = self.issue(WebDriverCommand::GetCookies).await?;
 
         let webdriver_cookies: Vec<WebDriverCookie> = serde_json::from_value(resp)?;
-        let cookies: Result<Vec<Cookie<'static>>, error::CmdError> = webdriver_cookies
+        webdriver_cookies
             .into_iter()
             .map(|raw_cookie| raw_cookie.try_into())
-            .collect();
-
-        Ok(cookies?)
+            .collect()
     }
 
     /// Get a single named cookie associated with the current document.
@@ -157,7 +155,7 @@ impl Client {
             .issue(WebDriverCommand::GetNamedCookie(name.to_string()))
             .await?;
         let webdriver_cookie: WebDriverCookie = serde_json::from_value(resp)?;
-        Ok(webdriver_cookie.try_into()?)
+        webdriver_cookie.try_into()
     }
 
     /// Add the specified cookie.

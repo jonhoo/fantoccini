@@ -175,10 +175,16 @@ impl PointerAction {
                 }),
             ),
             PointerAction::Down { button } => WDActions::PointerActionItem::Pointer(
-                WDActions::PointerAction::Down(WDActions::PointerDownAction { button }),
+                WDActions::PointerAction::Down(WDActions::PointerDownAction {
+                    button,
+                    ..Default::default()
+                }),
             ),
             PointerAction::Up { button } => WDActions::PointerActionItem::Pointer(
-                WDActions::PointerAction::Up(WDActions::PointerUpAction { button }),
+                WDActions::PointerAction::Up(WDActions::PointerUpAction {
+                    button,
+                    ..Default::default()
+                }),
             ),
             PointerAction::MoveBy { duration, x, y } => WDActions::PointerActionItem::Pointer(
                 WDActions::PointerAction::Move(WDActions::PointerMoveAction {
@@ -186,6 +192,7 @@ impl PointerAction {
                     origin: WDActions::PointerOrigin::Pointer,
                     x: Some(x),
                     y: Some(y),
+                    ..Default::default()
                 }),
             ),
             PointerAction::MoveTo { duration, x, y } => WDActions::PointerActionItem::Pointer(
@@ -194,6 +201,7 @@ impl PointerAction {
                     origin: WDActions::PointerOrigin::Viewport,
                     x: Some(x),
                     y: Some(y),
+                    ..Default::default()
                 }),
             ),
             PointerAction::MoveToElement {
@@ -207,6 +215,7 @@ impl PointerAction {
                     origin: WDActions::PointerOrigin::Element(element.element),
                     x: Some(x),
                     y: Some(y),
+                    ..Default::default()
                 },
             )),
             PointerAction::Cancel => {
