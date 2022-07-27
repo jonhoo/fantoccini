@@ -624,7 +624,9 @@ where
         // https://www.w3.org/TR/webdriver/#dfn-new-session
         // https://www.w3.org/TR/webdriver/#capabilities
         //  - we want the browser to wait for the page to load
-        cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
+        if (!cap.contains_key("pageLoadStrategy")) {
+            cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
+        }
 
         // make chrome comply with w3c
         cap.entry("goog:chromeOptions".to_string())
