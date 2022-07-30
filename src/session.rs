@@ -624,7 +624,7 @@ where
         // https://www.w3.org/TR/webdriver/#dfn-new-session
         // https://www.w3.org/TR/webdriver/#capabilities
         //  - we want the browser to wait for the page to load
-        if (!cap.contains_key("pageLoadStrategy")) {
+        if !cap.contains_key("pageLoadStrategy") {
             cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
         }
 
