@@ -742,8 +742,12 @@ where
             );
         }
 
+        let json_mime: mime::Mime = "application/json; charset=utf-8"
+            .parse::<mime::Mime>()
+            .unwrap_or(mime::APPLICATION_JSON);
+
         let req = if let Some(body) = body.take() {
-            req = req.header(hyper::header::CONTENT_TYPE, mime::APPLICATION_JSON.as_ref());
+            req = req.header(hyper::header::CONTENT_TYPE, json_mime.as_ref());
             req = req.header(hyper::header::CONTENT_LENGTH, body.len());
             self.client.request(req.body(body.into()).unwrap())
         } else {
