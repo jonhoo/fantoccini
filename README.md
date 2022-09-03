@@ -28,12 +28,12 @@ A quick way to get one is to run [`geckodriver`] at the command line.
 Let's start out clicking around on Wikipedia:
 
 ```rust
-use fantoccini::{Client, Locator};
+use fantoccini::{ClientBuilder, Locator};
 
 // let's set up the sequence of steps we want the browser to take
 #[tokio::main]
 async fn main() -> Result<(), fantoccini::error::CmdError> {
-    let c = Client::new("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    let c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 
     // first, go to the Wikipedia page for Foobar
     c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
