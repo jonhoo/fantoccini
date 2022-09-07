@@ -8,7 +8,6 @@ use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use webdriver::command::WebDriverCommand;
 use webdriver::common::FrameId;
-use webdriver::error::WebDriverError;
 
 /// Web element reference.
 ///
@@ -430,13 +429,11 @@ impl Element {
         let href = match href {
             Json::String(v) => v,
             Json::Null => {
-                let e = WebDriverError::new(
-                    webdriver::error::ErrorStatus::InvalidArgument,
-                    "cannot follow element without href attribute",
+                let e = error::WebDriver::new(
+                    error::ErrorStatus::InvalidArgument,
+                    "cannot follow element without href attribute".to_string(),
                 );
-                return Err(error::CmdError::Standard(
-                    error::WebDriver::from_upstream_error(e),
-                ));
+                return Err(error::CmdError::Standard(e));
             }
             v => return Err(error::CmdError::NotW3C(v)),
         };

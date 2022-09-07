@@ -1,6 +1,7 @@
+use http::StatusCode;
 use hyper::Error as HError;
-use serde::Serialize;
-use std::borrow::Cow;
+use serde::{Serialize, Serializer};
+use serde_json::Value;
 use std::error::Error;
 use std::fmt;
 use std::fmt::Debug;
@@ -157,21 +158,12 @@ impl CmdError {
         matches!(self, CmdError::NoSuchElement(..))
     }
 
-    pub(crate) fn from_webdriver_error(e: webdriver::WebDriverError) -> Self {
-        match e {
-            webdriver::WebDriverError {
-                error: webdriver::ErrorStatus::NoSuchElement,
-                ..
-            } => CmdError::NoSuchElement(WebDriver::from_upstream_error(e)),
-            webdriver::WebDriverError {
-                error: webdriver::ErrorStatus::NoSuchWindow,
-                ..
-            } => CmdError::NoSuchWindow(WebDriver::from_upstream_error(e)),
-            webdriver::WebDriverError {
-                error: webdriver::ErrorStatus::NoSuchAlert,
-                ..
-            } => CmdError::NoSuchAlert(WebDriver::from_upstream_error(e)),
-            _ => CmdError::Standard(WebDriver::from_upstream_error(e)),
+    pub(crate) fn from_webdriver_error(e: WebDriver) -> Self {
+        match e.error {
+            ErrorStatus::NoSuchElement => CmdError::NoSuchElement(e),
+            ErrorStatus::NoSuchWindow => CmdError::NoSuchWindow(e),
+            ErrorStatus::NoSuchAlert => CmdError::NoSuchAlert(e),
+            _ => CmdError::Standard(e),
         }
     }
 }
@@ -284,19 +276,330 @@ impl From<InvalidWindowHandle> for CmdError {
     }
 }
 
+/// The error code returned from the WebDriver.
+#[derive(Debug, PartialEq)]
+#[non_exhaustive]
+pub enum ErrorStatus {
+    /// The [element]'s [ShadowRoot] is not attached to the active document,
+    /// or the reference is stale
+    /// [element]: https://www.w3.org/TR/webdriver2/#dfn-elements
+    /// [ShadowRoot]: https://www.w3.org/TR/webdriver2/#dfn-shadow-roots
+    DetachedShadowRoot,
+
+    /// The [`ElementClick`] command could not be completed because the
+    /// [element] receiving the events is obscuring the element that was
+    /// requested clicked.
+    ///
+    /// [`ElementClick`]: https://www.w3.org/TR/webdriver1/#dfn-element-click
+    /// [element]: https://www.w3.org/TR/webdriver1/#dfn-elements
+    ElementClickIntercepted,
+
+    /// A [command] could not be completed because the element is not pointer-
+    /// or keyboard interactable.
+    ///
+    /// [command]: https://www.w3.org/TR/webdriver1/#dfn-commands
+    ElementNotInteractable,
+
+    /// An attempt was made to select an [element] that cannot be selected.
+    ///
+    /// [element]: https://www.w3.org/TR/webdriver1/#dfn-elements
+    ElementNotSelectable,
+
+    /// Navigation caused the user agent to hit a certificate warning, which is
+    /// usually the result of an expired or invalid TLS certificate.
+    InsecureCertificate,
+
+    /// The arguments passed to a [command] are either invalid or malformed.
+    ///
+    /// [command]: https://www.w3.org/TR/webdriver1/#dfn-commands
+    InvalidArgument,
+
+    /// An illegal attempt was made to set a cookie under a different domain
+    /// than the current page.
+    InvalidCookieDomain,
+
+    /// The coordinates provided to an interactions operation are invalid.
+    InvalidCoordinates,
+
+    /// A [command] could not be completed because the element is an invalid
+    /// state, e.g. attempting to click an element that is no longer attached
+    /// to the document.
+    ///
+    /// [command]: https://www.w3.org/TR/webdriver1/#dfn-commands
+    InvalidElementState,
+
+    /// Argument was an invalid selector.
+    InvalidSelector,
+
+    /// Occurs if the given session ID is not in the list of active sessions,
+    /// meaning the session either does not exist or that it’s not active.
+    InvalidSessionId,
+
+    /// An error occurred while executing JavaScript supplied by the user.
+    JavascriptError,
+
+    /// The target for mouse interaction is not in the browser’s viewport and
+    /// cannot be brought into that viewport.
+    MoveTargetOutOfBounds,
+
+    /// An attempt was made to operate on a modal dialogue when one was not
+    /// open.
+    NoSuchAlert,
+
+    /// No cookie matching the given path name was found amongst the associated
+    /// cookies of the current browsing context’s active document.
+    NoSuchCookie,
+
+    /// An [element] could not be located on the page using the given search
+    /// parameters.
+    ///
+    /// [element]: https://www.w3.org/TR/webdriver1/#dfn-elements
+    NoSuchElement,
+
+    /// A [command] to switch to a frame could not be satisfied because the
+    /// frame could not be found.
+    ///
+    /// [command]: https://www.w3.org/TR/webdriver1/#dfn-commands
+    NoSuchFrame,
+
+    /// An [element]'s [ShadowRoot] was not found attached to the element.
+    ///
+    /// [element]: https://www.w3.org/TR/webdriver2/#dfn-elements
+    /// [ShadowRoot]: https://www.w3.org/TR/webdriver2/#dfn-shadow-roots
+    NoSuchShadowRoot,
+
+    /// A [command] to switch to a window could not be satisfied because the
+    /// window could not be found.
+    ///
+    /// [command]: https://www.w3.org/TR/webdriver1/#dfn-commands
+    NoSuchWindow,
+
+    /// A script did not complete before its timeout expired.
+    ScriptTimeout,
+
+    /// A new session could not be created.
+    SessionNotCreated,
+
+    /// A [command] failed because the referenced [element] is no longer
+    /// attached to the DOM.
+    ///
+    /// [command]: https://www.w3.org/TR/webdriver1/#dfn-commands
+    /// [element]: https://www.w3.org/TR/webdriver1/#dfn-elements
+    StaleElementReference,
+
+    /// An operation did not complete before its timeout expired.
+    Timeout,
+
+    /// A screen capture was made impossible.
+    UnableToCaptureScreen,
+
+    /// Setting the cookie’s value could not be done.
+    UnableToSetCookie,
+
+    /// A modal dialogue was open, blocking this operation.
+    UnexpectedAlertOpen,
+
+    /// The requested command could not be executed because it does not exist.
+    UnknownCommand,
+
+    /// An unknown error occurred in the remote end whilst processing the
+    /// [command].
+    ///
+    /// [command]: https://www.w3.org/TR/webdriver1/#dfn-commands
+    UnknownError,
+
+    /// The requested [command] matched a known endpoint, but did not match a
+    /// method for that endpoint.
+    ///
+    /// [command]: https://www.w3.org/TR/webdriver1/#dfn-commands
+    UnknownMethod,
+
+    /// Unknown WebDriver command.
+    UnknownPath,
+
+    /// Indicates that a command that should have executed properly is not
+    /// currently supported.
+    UnsupportedOperation,
+}
+
+impl ErrorStatus {
+    /// Returns the string serialisation of the error type.
+    pub fn error_code(&self) -> &'static str {
+        use self::ErrorStatus::*;
+        match *self {
+            DetachedShadowRoot => "detached shadow root",
+            ElementClickIntercepted => "element click intercepted",
+            ElementNotInteractable => "element not interactable",
+            ElementNotSelectable => "element not selectable",
+            InsecureCertificate => "insecure certificate",
+            InvalidArgument => "invalid argument",
+            InvalidCookieDomain => "invalid cookie domain",
+            InvalidCoordinates => "invalid coordinates",
+            InvalidElementState => "invalid element state",
+            InvalidSelector => "invalid selector",
+            InvalidSessionId => "invalid session id",
+            JavascriptError => "javascript error",
+            MoveTargetOutOfBounds => "move target out of bounds",
+            NoSuchAlert => "no such alert",
+            NoSuchCookie => "no such cookie",
+            NoSuchElement => "no such element",
+            NoSuchFrame => "no such frame",
+            NoSuchShadowRoot => "no such shadow root",
+            NoSuchWindow => "no such window",
+            ScriptTimeout => "script timeout",
+            SessionNotCreated => "session not created",
+            StaleElementReference => "stale element reference",
+            Timeout => "timeout",
+            UnableToCaptureScreen => "unable to capture screen",
+            UnableToSetCookie => "unable to set cookie",
+            UnexpectedAlertOpen => "unexpected alert open",
+            UnknownCommand | UnknownError => "unknown error",
+            UnknownMethod => "unknown method",
+            UnknownPath => "unknown command",
+            UnsupportedOperation => "unsupported operation",
+        }
+    }
+
+    /// Returns the correct HTTP status code associated with the error type.
+    pub fn http_status(&self) -> StatusCode {
+        use self::ErrorStatus::*;
+        match *self {
+            DetachedShadowRoot => StatusCode::NOT_FOUND,
+            ElementClickIntercepted => StatusCode::BAD_REQUEST,
+            ElementNotInteractable => StatusCode::BAD_REQUEST,
+            ElementNotSelectable => StatusCode::BAD_REQUEST,
+            InsecureCertificate => StatusCode::BAD_REQUEST,
+            InvalidArgument => StatusCode::BAD_REQUEST,
+            InvalidCookieDomain => StatusCode::BAD_REQUEST,
+            InvalidCoordinates => StatusCode::BAD_REQUEST,
+            InvalidElementState => StatusCode::BAD_REQUEST,
+            InvalidSelector => StatusCode::BAD_REQUEST,
+            InvalidSessionId => StatusCode::NOT_FOUND,
+            JavascriptError => StatusCode::INTERNAL_SERVER_ERROR,
+            MoveTargetOutOfBounds => StatusCode::INTERNAL_SERVER_ERROR,
+            NoSuchAlert => StatusCode::NOT_FOUND,
+            NoSuchCookie => StatusCode::NOT_FOUND,
+            NoSuchElement => StatusCode::NOT_FOUND,
+            NoSuchFrame => StatusCode::NOT_FOUND,
+            NoSuchShadowRoot => StatusCode::NOT_FOUND,
+            NoSuchWindow => StatusCode::NOT_FOUND,
+            ScriptTimeout => StatusCode::INTERNAL_SERVER_ERROR,
+            SessionNotCreated => StatusCode::INTERNAL_SERVER_ERROR,
+            StaleElementReference => StatusCode::NOT_FOUND,
+            Timeout => StatusCode::INTERNAL_SERVER_ERROR,
+            UnableToCaptureScreen => StatusCode::BAD_REQUEST,
+            UnableToSetCookie => StatusCode::INTERNAL_SERVER_ERROR,
+            UnexpectedAlertOpen => StatusCode::INTERNAL_SERVER_ERROR,
+            UnknownCommand => StatusCode::NOT_FOUND,
+            UnknownError => StatusCode::INTERNAL_SERVER_ERROR,
+            UnknownMethod => StatusCode::METHOD_NOT_ALLOWED,
+            UnknownPath => StatusCode::NOT_FOUND,
+            UnsupportedOperation => StatusCode::INTERNAL_SERVER_ERROR,
+        }
+    }
+}
+
+impl Serialize for ErrorStatus {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.error_code().serialize(serializer)
+    }
+}
+
+impl From<webdriver::ErrorStatus> for ErrorStatus {
+    fn from(e: webdriver::ErrorStatus) -> Self {
+        use self::webdriver::ErrorStatus::*;
+        match e {
+            DetachedShadowRoot => ErrorStatus::DetachedShadowRoot,
+            ElementClickIntercepted => ErrorStatus::ElementClickIntercepted,
+            ElementNotInteractable => ErrorStatus::ElementNotInteractable,
+            ElementNotSelectable => ErrorStatus::ElementNotSelectable,
+            InsecureCertificate => ErrorStatus::InsecureCertificate,
+            InvalidArgument => ErrorStatus::InvalidArgument,
+            InvalidCookieDomain => ErrorStatus::InvalidCookieDomain,
+            InvalidCoordinates => ErrorStatus::InvalidCoordinates,
+            InvalidElementState => ErrorStatus::InvalidElementState,
+            InvalidSelector => ErrorStatus::InvalidSelector,
+            InvalidSessionId => ErrorStatus::InvalidSessionId,
+            JavascriptError => ErrorStatus::JavascriptError,
+            MoveTargetOutOfBounds => ErrorStatus::MoveTargetOutOfBounds,
+            NoSuchAlert => ErrorStatus::NoSuchAlert,
+            NoSuchCookie => ErrorStatus::NoSuchCookie,
+            NoSuchElement => ErrorStatus::NoSuchElement,
+            NoSuchFrame => ErrorStatus::NoSuchFrame,
+            NoSuchShadowRoot => ErrorStatus::NoSuchShadowRoot,
+            NoSuchWindow => ErrorStatus::NoSuchWindow,
+            ScriptTimeout => ErrorStatus::ScriptTimeout,
+            SessionNotCreated => ErrorStatus::SessionNotCreated,
+            StaleElementReference => ErrorStatus::StaleElementReference,
+            Timeout => ErrorStatus::Timeout,
+            UnableToCaptureScreen => ErrorStatus::UnableToCaptureScreen,
+            UnableToSetCookie => ErrorStatus::UnableToSetCookie,
+            UnexpectedAlertOpen => ErrorStatus::UnexpectedAlertOpen,
+            UnknownCommand => ErrorStatus::UnknownCommand,
+            UnknownError => ErrorStatus::UnknownError,
+            UnknownMethod => ErrorStatus::UnknownMethod,
+            UnknownPath => ErrorStatus::UnknownPath,
+            UnsupportedOperation => ErrorStatus::UnsupportedOperation,
+        }
+    }
+}
+
+impl From<&str> for ErrorStatus {
+    fn from(s: &str) -> ErrorStatus {
+        use self::ErrorStatus::*;
+        match s {
+            "detached shadow root" => DetachedShadowRoot,
+            "element click intercepted" => ElementClickIntercepted,
+            "element not interactable" | "element not visible" => ElementNotInteractable,
+            "element not selectable" => ElementNotSelectable,
+            "insecure certificate" => InsecureCertificate,
+            "invalid argument" => InvalidArgument,
+            "invalid cookie domain" => InvalidCookieDomain,
+            "invalid coordinates" | "invalid element coordinates" => InvalidCoordinates,
+            "invalid element state" => InvalidElementState,
+            "invalid selector" => InvalidSelector,
+            "invalid session id" => InvalidSessionId,
+            "javascript error" => JavascriptError,
+            "move target out of bounds" => MoveTargetOutOfBounds,
+            "no such alert" => NoSuchAlert,
+            "no such element" => NoSuchElement,
+            "no such frame" => NoSuchFrame,
+            "no such shadow root" => NoSuchShadowRoot,
+            "no such window" => NoSuchWindow,
+            "script timeout" => ScriptTimeout,
+            "session not created" => SessionNotCreated,
+            "stale element reference" => StaleElementReference,
+            "timeout" => Timeout,
+            "unable to capture screen" => UnableToCaptureScreen,
+            "unable to set cookie" => UnableToSetCookie,
+            "unexpected alert open" => UnexpectedAlertOpen,
+            "unknown command" => UnknownCommand,
+            "unknown error" => UnknownError,
+            "unsupported operation" => UnsupportedOperation,
+            _ => UnknownError,
+        }
+    }
+}
+
 /// Error returned by WebDriver.
 #[derive(Debug, Serialize)]
 pub struct WebDriver {
     /// Code of this error provided by WebDriver.
-    ///
-    /// Intentionally made private, so library users cannot match on it.
-    pub(crate) error: webdriver::ErrorStatus,
+    pub error: ErrorStatus,
 
     /// Description of this error provided by WebDriver.
-    pub message: Cow<'static, str>,
+    pub message: String,
 
     /// Stacktrace of this error provided by WebDriver.
-    pub stacktrace: Cow<'static, str>,
+    pub stacktrace: String,
+
+    /// Optional [error data], populated by some commands.
+    ///
+    /// [error data]: https://www.w3.org/TR/webdriver1/#dfn-error-data
+    pub data: Option<Value>,
 }
 
 impl fmt::Display for WebDriver {
@@ -308,12 +611,28 @@ impl fmt::Display for WebDriver {
 impl Error for WebDriver {}
 
 impl WebDriver {
-    pub(crate) fn from_upstream_error(e: webdriver::WebDriverError) -> Self {
+    /// Create a new WebDriver error struct.
+    pub fn new(error: ErrorStatus, message: String) -> Self {
         Self {
-            error: e.error,
-            message: e.message,
-            stacktrace: e.stack,
+            error,
+            message,
+            stacktrace: String::new(),
+            data: None,
         }
+    }
+
+    /// Include a stacktrace in the error details.
+    pub fn with_stacktrace(mut self, stacktrace: String) -> Self {
+        self.stacktrace = stacktrace;
+        self
+    }
+
+    /// Include optional [error data].
+    ///
+    /// [error data]: https://www.w3.org/TR/webdriver1/#dfn-error-data
+    pub fn with_data(mut self, data: Value) -> Self {
+        self.data = Some(data);
+        self
     }
 
     /// Returns [code] of this error provided by WebDriver.
