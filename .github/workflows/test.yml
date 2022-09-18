@@ -1,12 +1,12 @@
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-name: cargo test
+name: test
 jobs:
-  test:
+  required:
     runs-on: ${{ matrix.os }}
-    name: ${{ matrix.os }} / ${{ matrix.browser }} (${{ matrix.toolchain }})
+    name: ${{ matrix.os }} / ${{ matrix.browser }} / ${{ matrix.toolchain }}
     strategy:
       fail-fast: false
       matrix:
@@ -17,20 +17,89 @@ jobs:
           - os: ubuntu-latest
             browser: chrome
             toolchain: beta
-          - os: ubuntu-latest
-            browser: chrome
-            toolchain: nightly
     steps:
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
         with:
-          profile: minimal
-          toolchain: ${{ matrix.toolchain }}
-      - uses: actions/checkout@v2
+          submodules: true
       - name: Install ${{ matrix.browser }}
         run: |
           ./ci/${{ matrix.os }}-${{ matrix.browser }}
+      - name: Install ${{ matrix.toolchain }}
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.toolchain }}
+          default: true
+      - name: cargo generate-lockfile
+        if: hashFiles('Cargo.lock') == ''
+        uses: actions-rs/cargo@v1
+        with:
+          command: generate-lockfile
+      # https://twitter.com/jonhoo/status/1571290371124260865
+      - name: cargo test --locked
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --locked --all-features --all-targets ${{ matrix.browser }}
+  minimal:
+    runs-on: ubuntu-latest
+    name: ubuntu / stable / minimal-versions
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install browsers
+        run: |
+          ./ci/ubuntu-latest-firefox
+          ./ci/ubuntu-latest-chrome
+      - name: Install stable
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+      - name: Install nightly for -Zminimal-versions
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+      - name: cargo update -Zminimal-versions
+        uses: actions-rs/cargo@v1
+        with:
+          command: update
+          toolchain: nightly
+          args: -Zminimal-versions
       - name: cargo test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: ${{ matrix.browser }}
+          args: --locked --all-features --all-targets
+  coverage:
+    runs-on: ubuntu-latest
+    name: ubuntu / stable / coverage
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - name: Install browsers
+        run: |
+          ./ci/ubuntu-latest-firefox
+          ./ci/ubuntu-latest-chrome
+      - name: Install stable
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: llvm-tools-preview
+      - name: cargo install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: cargo generate-lockfile
+        if: hashFiles('Cargo.lock') == ''
+        uses: actions-rs/cargo@v1
+        with:
+          command: generate-lockfile
+      - name: cargo llvm-cov
+        run: cargo llvm-cov --locked --all-features --lcov --output-path lcov.info
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error: true
