@@ -882,7 +882,7 @@ where
                     _ => String::new(),
                 };
 
-                let mut wd_error = error::WebDriver::new(es, message.into());
+                let mut wd_error = error::WebDriver::new(es, message);
 
                 // Add the stacktrace if there is one.
                 if let Some(Json::String(x)) = body.remove("stacktrace") {

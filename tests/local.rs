@@ -1,6 +1,6 @@
 //! Tests that don't make use of external websites.
 use crate::common::{other_page_url, sample_page_url};
-use fantoccini::error::{CmdError, ErrorStatus};
+use fantoccini::error::CmdError;
 use fantoccini::wd::TimeoutConfiguration;
 use fantoccini::{error, Client, Locator};
 use serial_test::serial;
@@ -231,7 +231,7 @@ async fn stale_element(c: Client, port: u16) -> Result<(), error::CmdError> {
     .await?;
 
     match elem.click().await {
-        Err(CmdError::Standard(w)) if w.error == ErrorStatus::StaleElementReference => Ok(()),
+        Err(e) if e.is_stale_element_reference() => Ok(()),
         _ => panic!("Expected a stale element reference error"),
     }
 }

@@ -113,24 +113,154 @@ pub enum CmdError {
 }
 
 impl CmdError {
-    /// Returns true if this error indicates that a matching element was not found.
-    ///
-    /// Equivalent to
-    /// ```no_run
-    /// # use fantoccini::error::{CmdError, ErrorStatus};
-    /// # let e = CmdError::NotJson(String::new());
-    /// let is_miss = if let CmdError::Standard(w) = e {
-    ///     matches!(w.error, ErrorStatus::NoSuchElement)
-    /// } else {
-    ///     false
-    /// };
-    /// ```
-    pub fn is_miss(&self) -> bool {
-        if let CmdError::Standard(w) = self {
-            matches!(w.error, ErrorStatus::NoSuchElement)
-        } else {
-            false
-        }
+    /// Return true if this error matches [`ErrorStatus::DetachedShadowRoot`].
+    pub fn is_detached_shadow_root(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::DetachedShadowRoot)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::ElementNotInteractable`].
+    pub fn is_element_not_interactable(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::ElementNotInteractable)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::ElementNotSelectable`].
+    pub fn is_element_not_selectable(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::ElementNotSelectable)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::InsecureCertificate`].
+    pub fn is_insecure_certificate(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::InsecureCertificate)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::InvalidArgument`].
+    pub fn is_invalid_argument(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::InvalidArgument)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::InvalidCookieDomain`].
+    pub fn is_invalid_cookie_domain(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::InvalidCookieDomain)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::InvalidCoordinates`].
+    pub fn is_invalid_coordinates(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::InvalidCoordinates)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::InvalidElementState`].
+    pub fn is_invalid_element_state(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::InvalidElementState)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::InvalidSelector`].
+    pub fn is_invalid_selector(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::InvalidSelector)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::InvalidSessionId`].
+    pub fn is_invalid_session_id(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::InvalidSessionId)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::JavascriptError`].
+    pub fn is_javascript_error(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::JavascriptError)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::MoveTargetOutOfBounds`].
+    pub fn is_move_target_out_of_bounds(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::MoveTargetOutOfBounds)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::NoSuchAlert`].
+    pub fn is_no_such_alert(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::NoSuchAlert)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::NoSuchCookie`].
+    pub fn is_no_such_cookie(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::NoSuchCookie)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::NoSuchElement`].
+    pub fn is_no_such_element(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::NoSuchElement)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::NoSuchFrame`].
+    pub fn is_no_such_frame(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::NoSuchFrame)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::NoSuchShadowRoot`].
+    pub fn is_no_such_shadow_root(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::NoSuchShadowRoot)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::NoSuchWindow`].
+    pub fn is_no_such_window(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::NoSuchWindow)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::ScriptTimeout`].
+    pub fn is_script_timeout(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::ScriptTimeout)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::SessionNotCreated`].
+    pub fn is_session_not_created(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::SessionNotCreated)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::StaleElementReference`].
+    pub fn is_stale_element_reference(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::StaleElementReference)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::Timeout`].
+    pub fn is_timeout(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::Timeout)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::UnableToCaptureScreen`].
+    pub fn is_unable_to_capture_screen(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::UnableToCaptureScreen)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::UnableToSetCookie`].
+    pub fn is_unable_to_set_cookie(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::UnableToSetCookie)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::UnexpectedAlertOpen`].
+    pub fn is_unexpected_alert_open(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::UnexpectedAlertOpen)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::UnknownCommand`].
+    pub fn is_unknown_command(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::UnknownCommand)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::UnknownError`].
+    pub fn is_unknown_error(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::UnknownError)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::UnknownMethod`].
+    pub fn is_unknown_method(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::UnknownMethod)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::UnknownPath`].
+    pub fn is_unknown_path(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::UnknownPath)
+    }
+
+    /// Return true if this error matches [`ErrorStatus::UnsupportedOperation`].
+    pub fn is_unsupported_operation(&self) -> bool {
+        matches!(self, CmdError::Standard(w) if w.error == ErrorStatus::UnsupportedOperation)
     }
 
     pub(crate) fn from_webdriver_error(e: WebDriver) -> Self {
@@ -243,6 +373,7 @@ impl From<InvalidWindowHandle> for CmdError {
 pub enum ErrorStatus {
     /// The [element]'s [ShadowRoot] is not attached to the active document,
     /// or the reference is stale
+    ///
     /// [element]: https://www.w3.org/TR/webdriver2/#dfn-elements
     /// [ShadowRoot]: https://www.w3.org/TR/webdriver2/#dfn-shadow-roots
     DetachedShadowRoot,
@@ -384,6 +515,43 @@ pub enum ErrorStatus {
 }
 
 impl ErrorStatus {
+    /// Get the error string associated with this `ErrorStatus`.
+    pub fn description(&self) -> &'static str {
+        use self::ErrorStatus::*;
+        match self {
+            DetachedShadowRoot => "detached shadow root",
+            ElementClickIntercepted => "element click intercepted",
+            ElementNotInteractable => "element not interactable",
+            ElementNotSelectable => "element not selectable",
+            InsecureCertificate => "insecure certificate",
+            InvalidArgument => "invalid argument",
+            InvalidCookieDomain => "invalid cookie domain",
+            InvalidCoordinates => "invalid coordinates",
+            InvalidElementState => "invalid element state",
+            InvalidSelector => "invalid selector",
+            InvalidSessionId => "invalid session id",
+            JavascriptError => "javascript error",
+            MoveTargetOutOfBounds => "move target out of bounds",
+            NoSuchAlert => "no such alert",
+            NoSuchCookie => "no such cookie",
+            NoSuchElement => "no such element",
+            NoSuchFrame => "no such frame",
+            NoSuchShadowRoot => "no such shadow root",
+            NoSuchWindow => "no such window",
+            ScriptTimeout => "script timeout",
+            SessionNotCreated => "session not created",
+            StaleElementReference => "stale element reference",
+            Timeout => "timeout",
+            UnableToCaptureScreen => "unable to capture screen",
+            UnableToSetCookie => "unable to set cookie",
+            UnexpectedAlertOpen => "unexpected alert open",
+            UnknownCommand | UnknownError => "unknown error",
+            UnknownMethod => "unknown method",
+            UnknownPath => "unknown command",
+            UnsupportedOperation => "unsupported operation",
+        }
+    }
+
     /// Returns the correct HTTP status code associated with the error type.
     pub fn http_status(&self) -> StatusCode {
         use self::ErrorStatus::*;
@@ -425,40 +593,7 @@ impl ErrorStatus {
 
 impl fmt::Display for ErrorStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use self::ErrorStatus::*;
-        let error_message = match self {
-            DetachedShadowRoot => "detached shadow root",
-            ElementClickIntercepted => "element click intercepted",
-            ElementNotInteractable => "element not interactable",
-            ElementNotSelectable => "element not selectable",
-            InsecureCertificate => "insecure certificate",
-            InvalidArgument => "invalid argument",
-            InvalidCookieDomain => "invalid cookie domain",
-            InvalidCoordinates => "invalid coordinates",
-            InvalidElementState => "invalid element state",
-            InvalidSelector => "invalid selector",
-            InvalidSessionId => "invalid session id",
-            JavascriptError => "javascript error",
-            MoveTargetOutOfBounds => "move target out of bounds",
-            NoSuchAlert => "no such alert",
-            NoSuchCookie => "no such cookie",
-            NoSuchElement => "no such element",
-            NoSuchFrame => "no such frame",
-            NoSuchShadowRoot => "no such shadow root",
-            NoSuchWindow => "no such window",
-            ScriptTimeout => "script timeout",
-            SessionNotCreated => "session not created",
-            StaleElementReference => "stale element reference",
-            Timeout => "timeout",
-            UnableToCaptureScreen => "unable to capture screen",
-            UnableToSetCookie => "unable to set cookie",
-            UnexpectedAlertOpen => "unexpected alert open",
-            UnknownCommand | UnknownError => "unknown error",
-            UnknownMethod => "unknown method",
-            UnknownPath => "unknown command",
-            UnsupportedOperation => "unsupported operation",
-        };
-        write!(f, "{}", error_message)
+        write!(f, "{}", self.description())
     }
 }
 
@@ -469,7 +604,7 @@ impl Serialize for ErrorStatus {
     where
         S: Serializer,
     {
-        self.to_string().serialize(serializer)
+        self.description().serialize(serializer)
     }
 }
 
@@ -560,10 +695,10 @@ impl Error for WebDriver {}
 
 impl WebDriver {
     /// Create a new WebDriver error struct.
-    pub fn new(error: ErrorStatus, message: Cow<'static, str>) -> Self {
+    pub fn new(error: ErrorStatus, message: impl Into<Cow<'static, str>>) -> Self {
         Self {
             error,
-            message,
+            message: message.into(),
             stacktrace: String::new(),
             data: None,
         }
