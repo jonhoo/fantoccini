@@ -431,7 +431,7 @@ impl Element {
             Json::Null => {
                 let e = error::WebDriver::new(
                     error::ErrorStatus::InvalidArgument,
-                    "cannot follow element without href attribute".to_string(),
+                    "cannot follow element without href attribute".into(),
                 );
                 return Err(error::CmdError::Standard(e));
             }

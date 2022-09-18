@@ -45,7 +45,7 @@
 //! condition check returns an error, the wait operation will be aborted, and the error returned.
 
 use crate::elements::Element;
-use crate::error::CmdError;
+use crate::error::{CmdError, ErrorStatus};
 use crate::wd::Locator;
 use crate::Client;
 use std::time::{Duration, Instant};
@@ -137,7 +137,7 @@ impl<'c> Wait<'c> {
         wait_on!(self, {
             match self.client.by(search.into_parameters()).await {
                 Ok(element) => Ok(Some(element)),
-                Err(CmdError::NoSuchElement(_)) => Ok(None),
+                Err(CmdError::Standard(w)) if w.error == ErrorStatus::NoSuchElement => Ok(None),
                 Err(err) => Err(err),
             }
         })

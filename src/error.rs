@@ -1,13 +1,12 @@
 use http::StatusCode;
 use hyper::Error as HError;
 use serde::{Serialize, Serializer};
-use serde_json::Value;
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt;
-use std::fmt::Debug;
 use std::io::Error as IOError;
+use std::str::FromStr;
 use url::ParseError;
-use webdriver::error as webdriver;
 
 /// An error occurred while attempting to establish a session for a new `Client`.
 #[derive(Debug)]
@@ -65,38 +64,10 @@ impl fmt::Display for NewSessionError {
 pub enum CmdError {
     /// A standard WebDriver error occurred.
     ///
-    /// See [the spec] for details about what each of these errors represent. Note that for
-    /// convenience `NoSuchElement` has been extracted into its own top-level variant.
+    /// See [the spec] for details about what each of these errors represent.
     ///
     /// [the spec]: https://www.w3.org/TR/webdriver/#handling-errors
     Standard(WebDriver),
-
-    /// No element was found matching the given locator.
-    ///
-    /// This variant lifts the ["no such element"] error variant from `Standard` to simplify
-    /// checking for it in user code.
-    ///
-    /// It is also used for the ["stale element reference"] error variant.
-    ///
-    /// ["no such element"]: https://www.w3.org/TR/webdriver/#dfn-no-such-element
-    /// ["stale element reference"]: https://www.w3.org/TR/webdriver/#dfn-stale-element-reference
-    NoSuchElement(WebDriver),
-
-    /// The requested window does not exist.
-    ///
-    /// This variant lifts the ["no such window"] error variant from `Standard` to simplify
-    /// checking for it in user code.
-    ///
-    /// ["no such window"]: https://www.w3.org/TR/webdriver/#dfn-no-such-window
-    NoSuchWindow(WebDriver),
-
-    /// The requested alert does not exist.
-    ///
-    /// This variant lifts the ["no such alert"] error variant from `Standard` to simplify
-    /// checking for it in user code.
-    ///
-    /// ["no such alert"]: https://www.w3.org/TR/webdriver/#dfn-no-such-alert
-    NoSuchAlert(WebDriver),
 
     /// A bad URL was encountered during parsing.
     ///
@@ -131,7 +102,7 @@ pub enum CmdError {
     InvalidArgument(String, String),
 
     /// Could not decode a base64 image
-    ImageDecodeError(::base64::DecodeError),
+    ImageDecodeError(base64::DecodeError),
 
     /// Timeout of a wait condition.
     ///
@@ -146,25 +117,24 @@ impl CmdError {
     ///
     /// Equivalent to
     /// ```no_run
-    /// # use fantoccini::error::CmdError;
+    /// # use fantoccini::error::{CmdError, ErrorStatus};
     /// # let e = CmdError::NotJson(String::new());
-    /// let is_miss = if let CmdError::NoSuchElement(..) = e {
-    ///   true
+    /// let is_miss = if let CmdError::Standard(w) = e {
+    ///     matches!(w.error, ErrorStatus::NoSuchElement)
     /// } else {
-    ///   false
+    ///     false
     /// };
     /// ```
     pub fn is_miss(&self) -> bool {
-        matches!(self, CmdError::NoSuchElement(..))
+        if let CmdError::Standard(w) = self {
+            matches!(w.error, ErrorStatus::NoSuchElement)
+        } else {
+            false
+        }
     }
 
     pub(crate) fn from_webdriver_error(e: WebDriver) -> Self {
-        match e.error {
-            ErrorStatus::NoSuchElement => CmdError::NoSuchElement(e),
-            ErrorStatus::NoSuchWindow => CmdError::NoSuchWindow(e),
-            ErrorStatus::NoSuchAlert => CmdError::NoSuchAlert(e),
-            _ => CmdError::Standard(e),
-        }
+        CmdError::Standard(e)
     }
 }
 
@@ -172,9 +142,6 @@ impl Error for CmdError {
     fn description(&self) -> &str {
         match *self {
             CmdError::Standard(..) => "webdriver returned error",
-            CmdError::NoSuchElement(..) => "no element found matching selector",
-            CmdError::NoSuchWindow(..) => "no window is currently selected",
-            CmdError::NoSuchAlert(..) => "no alert is currently visible",
             CmdError::BadUrl(..) => "bad url provided",
             CmdError::Failed(..) => "webdriver could not be reached",
             CmdError::Lost(..) => "webdriver connection lost",
@@ -189,10 +156,7 @@ impl Error for CmdError {
 
     fn cause(&self) -> Option<&dyn Error> {
         match *self {
-            CmdError::Standard(ref e)
-            | CmdError::NoSuchElement(ref e)
-            | CmdError::NoSuchWindow(ref e)
-            | CmdError::NoSuchAlert(ref e) => Some(e),
+            CmdError::Standard(ref e) => Some(e),
             CmdError::BadUrl(ref e) => Some(e),
             CmdError::Failed(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
@@ -211,10 +175,7 @@ impl fmt::Display for CmdError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}: ", self.description())?;
         match *self {
-            CmdError::Standard(ref e)
-            | CmdError::NoSuchElement(ref e)
-            | CmdError::NoSuchWindow(ref e)
-            | CmdError::NoSuchAlert(ref e) => write!(f, "{}", e),
+            CmdError::Standard(ref e) => write!(f, "{}", e),
             CmdError::BadUrl(ref e) => write!(f, "{}", e),
             CmdError::Failed(ref e) => write!(f, "{}", e),
             CmdError::Lost(ref e) => write!(f, "{}", e),
@@ -277,7 +238,7 @@ impl From<InvalidWindowHandle> for CmdError {
 }
 
 /// The error code returned from the WebDriver.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum ErrorStatus {
     /// The [element]'s [ShadowRoot] is not attached to the active document,
@@ -423,43 +384,6 @@ pub enum ErrorStatus {
 }
 
 impl ErrorStatus {
-    /// Returns the string serialisation of the error type.
-    pub fn error_code(&self) -> &'static str {
-        use self::ErrorStatus::*;
-        match *self {
-            DetachedShadowRoot => "detached shadow root",
-            ElementClickIntercepted => "element click intercepted",
-            ElementNotInteractable => "element not interactable",
-            ElementNotSelectable => "element not selectable",
-            InsecureCertificate => "insecure certificate",
-            InvalidArgument => "invalid argument",
-            InvalidCookieDomain => "invalid cookie domain",
-            InvalidCoordinates => "invalid coordinates",
-            InvalidElementState => "invalid element state",
-            InvalidSelector => "invalid selector",
-            InvalidSessionId => "invalid session id",
-            JavascriptError => "javascript error",
-            MoveTargetOutOfBounds => "move target out of bounds",
-            NoSuchAlert => "no such alert",
-            NoSuchCookie => "no such cookie",
-            NoSuchElement => "no such element",
-            NoSuchFrame => "no such frame",
-            NoSuchShadowRoot => "no such shadow root",
-            NoSuchWindow => "no such window",
-            ScriptTimeout => "script timeout",
-            SessionNotCreated => "session not created",
-            StaleElementReference => "stale element reference",
-            Timeout => "timeout",
-            UnableToCaptureScreen => "unable to capture screen",
-            UnableToSetCookie => "unable to set cookie",
-            UnexpectedAlertOpen => "unexpected alert open",
-            UnknownCommand | UnknownError => "unknown error",
-            UnknownMethod => "unknown method",
-            UnknownPath => "unknown command",
-            UnsupportedOperation => "unsupported operation",
-        }
-    }
-
     /// Returns the correct HTTP status code associated with the error type.
     pub fn http_status(&self) -> StatusCode {
         use self::ErrorStatus::*;
@@ -499,58 +423,62 @@ impl ErrorStatus {
     }
 }
 
+impl fmt::Display for ErrorStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        use self::ErrorStatus::*;
+        let error_message = match self {
+            DetachedShadowRoot => "detached shadow root",
+            ElementClickIntercepted => "element click intercepted",
+            ElementNotInteractable => "element not interactable",
+            ElementNotSelectable => "element not selectable",
+            InsecureCertificate => "insecure certificate",
+            InvalidArgument => "invalid argument",
+            InvalidCookieDomain => "invalid cookie domain",
+            InvalidCoordinates => "invalid coordinates",
+            InvalidElementState => "invalid element state",
+            InvalidSelector => "invalid selector",
+            InvalidSessionId => "invalid session id",
+            JavascriptError => "javascript error",
+            MoveTargetOutOfBounds => "move target out of bounds",
+            NoSuchAlert => "no such alert",
+            NoSuchCookie => "no such cookie",
+            NoSuchElement => "no such element",
+            NoSuchFrame => "no such frame",
+            NoSuchShadowRoot => "no such shadow root",
+            NoSuchWindow => "no such window",
+            ScriptTimeout => "script timeout",
+            SessionNotCreated => "session not created",
+            StaleElementReference => "stale element reference",
+            Timeout => "timeout",
+            UnableToCaptureScreen => "unable to capture screen",
+            UnableToSetCookie => "unable to set cookie",
+            UnexpectedAlertOpen => "unexpected alert open",
+            UnknownCommand | UnknownError => "unknown error",
+            UnknownMethod => "unknown method",
+            UnknownPath => "unknown command",
+            UnsupportedOperation => "unsupported operation",
+        };
+        write!(f, "{}", error_message)
+    }
+}
+
+impl Error for ErrorStatus {}
+
 impl Serialize for ErrorStatus {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        self.error_code().serialize(serializer)
+        self.to_string().serialize(serializer)
     }
 }
 
-impl From<webdriver::ErrorStatus> for ErrorStatus {
-    fn from(e: webdriver::ErrorStatus) -> Self {
-        use self::webdriver::ErrorStatus::*;
-        match e {
-            DetachedShadowRoot => ErrorStatus::DetachedShadowRoot,
-            ElementClickIntercepted => ErrorStatus::ElementClickIntercepted,
-            ElementNotInteractable => ErrorStatus::ElementNotInteractable,
-            ElementNotSelectable => ErrorStatus::ElementNotSelectable,
-            InsecureCertificate => ErrorStatus::InsecureCertificate,
-            InvalidArgument => ErrorStatus::InvalidArgument,
-            InvalidCookieDomain => ErrorStatus::InvalidCookieDomain,
-            InvalidCoordinates => ErrorStatus::InvalidCoordinates,
-            InvalidElementState => ErrorStatus::InvalidElementState,
-            InvalidSelector => ErrorStatus::InvalidSelector,
-            InvalidSessionId => ErrorStatus::InvalidSessionId,
-            JavascriptError => ErrorStatus::JavascriptError,
-            MoveTargetOutOfBounds => ErrorStatus::MoveTargetOutOfBounds,
-            NoSuchAlert => ErrorStatus::NoSuchAlert,
-            NoSuchCookie => ErrorStatus::NoSuchCookie,
-            NoSuchElement => ErrorStatus::NoSuchElement,
-            NoSuchFrame => ErrorStatus::NoSuchFrame,
-            NoSuchShadowRoot => ErrorStatus::NoSuchShadowRoot,
-            NoSuchWindow => ErrorStatus::NoSuchWindow,
-            ScriptTimeout => ErrorStatus::ScriptTimeout,
-            SessionNotCreated => ErrorStatus::SessionNotCreated,
-            StaleElementReference => ErrorStatus::StaleElementReference,
-            Timeout => ErrorStatus::Timeout,
-            UnableToCaptureScreen => ErrorStatus::UnableToCaptureScreen,
-            UnableToSetCookie => ErrorStatus::UnableToSetCookie,
-            UnexpectedAlertOpen => ErrorStatus::UnexpectedAlertOpen,
-            UnknownCommand => ErrorStatus::UnknownCommand,
-            UnknownError => ErrorStatus::UnknownError,
-            UnknownMethod => ErrorStatus::UnknownMethod,
-            UnknownPath => ErrorStatus::UnknownPath,
-            UnsupportedOperation => ErrorStatus::UnsupportedOperation,
-        }
-    }
-}
+impl FromStr for ErrorStatus {
+    type Err = CmdError;
 
-impl From<&str> for ErrorStatus {
-    fn from(s: &str) -> ErrorStatus {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         use self::ErrorStatus::*;
-        match s {
+        let status: ErrorStatus = match s {
             "detached shadow root" => DetachedShadowRoot,
             "element click intercepted" => ElementClickIntercepted,
             "element not interactable" | "element not visible" => ElementNotInteractable,
@@ -579,7 +507,27 @@ impl From<&str> for ErrorStatus {
             "unknown command" => UnknownCommand,
             "unknown error" => UnknownError,
             "unsupported operation" => UnsupportedOperation,
-            _ => UnknownError,
+            _ => return Err(CmdError::NotW3C(serde_json::Value::String(s.to_string()))),
+        };
+        Ok(status)
+    }
+}
+
+impl TryFrom<&str> for ErrorStatus {
+    type Error = CmdError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl TryFrom<CmdError> for ErrorStatus {
+    type Error = CmdError;
+
+    fn try_from(value: CmdError) -> Result<Self, Self::Error> {
+        match value {
+            CmdError::Standard(w) => Ok(w.error),
+            e => Err(e),
         }
     }
 }
@@ -591,7 +539,7 @@ pub struct WebDriver {
     pub error: ErrorStatus,
 
     /// Description of this error provided by WebDriver.
-    pub message: String,
+    pub message: Cow<'static, str>,
 
     /// Stacktrace of this error provided by WebDriver.
     pub stacktrace: String,
@@ -599,7 +547,7 @@ pub struct WebDriver {
     /// Optional [error data], populated by some commands.
     ///
     /// [error data]: https://www.w3.org/TR/webdriver1/#dfn-error-data
-    pub data: Option<Value>,
+    pub data: Option<serde_json::Value>,
 }
 
 impl fmt::Display for WebDriver {
@@ -612,7 +560,7 @@ impl Error for WebDriver {}
 
 impl WebDriver {
     /// Create a new WebDriver error struct.
-    pub fn new(error: ErrorStatus, message: String) -> Self {
+    pub fn new(error: ErrorStatus, message: Cow<'static, str>) -> Self {
         Self {
             error,
             message,
@@ -630,7 +578,7 @@ impl WebDriver {
     /// Include optional [error data].
     ///
     /// [error data]: https://www.w3.org/TR/webdriver1/#dfn-error-data
-    pub fn with_data(mut self, data: Value) -> Self {
+    pub fn with_data(mut self, data: serde_json::Value) -> Self {
         self.data = Some(data);
         self
     }
@@ -638,14 +586,14 @@ impl WebDriver {
     /// Returns [code] of this error provided by WebDriver.
     ///
     /// [code]: https://www.w3.org/TR/webdriver/#dfn-error-code
-    pub fn error(&self) -> &'static str {
-        self.error.error_code()
+    pub fn error(&self) -> String {
+        self.error.to_string()
     }
 
     /// Returns [HTTP Status] of this error provided by WebDriver.
     ///
     /// [HTTP Status]: https://www.w3.org/TR/webdriver/#dfn-error-code
-    pub fn http_status(&self) -> http::StatusCode {
+    pub fn http_status(&self) -> StatusCode {
         self.error.http_status()
     }
 }

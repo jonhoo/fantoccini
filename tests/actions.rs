@@ -5,7 +5,7 @@ use fantoccini::actions::{
     MOUSE_BUTTON_LEFT,
 };
 use fantoccini::key::Key;
-use fantoccini::{error, Client, Locator};
+use fantoccini::{error, error::ErrorStatus, Client, Locator};
 use serial_test::serial;
 use std::time::Duration;
 use time::Instant;
@@ -122,7 +122,7 @@ async fn actions_mouse_move(c: Client, port: u16) -> Result<(), error::CmdError>
     // Sanity check - ensure no alerts are displayed prior to actions.
     assert!(matches!(
         c.get_alert_text().await,
-        Err(error::CmdError::NoSuchAlert(..))
+        Err(error::CmdError::Standard(w)) if w.error == ErrorStatus::NoSuchAlert
     ));
 
     let actions = Actions::from(mouse_actions);

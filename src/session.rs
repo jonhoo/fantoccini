@@ -871,10 +871,10 @@ where
                         return Err(error::CmdError::NotW3C(Json::Object(body)));
                     }
 
-                    body["error"]
-                        .as_str()
-                        .map(ErrorStatus::from)
-                        .unwrap_or(ErrorStatus::UnknownError)
+                    match body["error"].as_str() {
+                        Some(s) => s.parse()?,
+                        None => return Err(error::CmdError::NotW3C(Json::Object(body))),
+                    }
                 };
 
                 let message = match body.remove("message") {
@@ -882,7 +882,7 @@ where
                     _ => String::new(),
                 };
 
-                let mut wd_error = error::WebDriver::new(es, message);
+                let mut wd_error = error::WebDriver::new(es, message.into());
 
                 // Add the stacktrace if there is one.
                 if let Some(Json::String(x)) = body.remove("stacktrace") {
