@@ -13,7 +13,7 @@ async fn alert_accept(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.accept_alert().await?;
     assert!(matches!(
         c.get_alert_text().await,
-        Err(error::CmdError::NoSuchAlert(..))
+        Err(e) if e.is_no_such_alert()
     ));
 
     c.find(Locator::Id("button-confirm")).await?.click().await?;
@@ -21,7 +21,7 @@ async fn alert_accept(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.accept_alert().await?;
     assert!(matches!(
         c.get_alert_text().await,
-        Err(error::CmdError::NoSuchAlert(..))
+        Err(e) if e.is_no_such_alert()
     ));
     assert_eq!(
         c.find(Locator::Id("alert-answer")).await?.text().await?,
@@ -39,7 +39,7 @@ async fn alert_dismiss(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.dismiss_alert().await?;
     assert!(matches!(
         c.get_alert_text().await,
-        Err(error::CmdError::NoSuchAlert(..))
+        Err(e) if e.is_no_such_alert()
     ));
 
     c.find(Locator::Id("button-confirm")).await?.click().await?;
@@ -47,7 +47,7 @@ async fn alert_dismiss(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.dismiss_alert().await?;
     assert!(matches!(
         c.get_alert_text().await,
-        Err(error::CmdError::NoSuchAlert(..))
+        Err(e) if e.is_no_such_alert()
     ));
     assert_eq!(
         c.find(Locator::Id("alert-answer")).await?.text().await?,
@@ -66,7 +66,7 @@ async fn alert_text(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.accept_alert().await?;
     assert!(matches!(
         c.get_alert_text().await,
-        Err(error::CmdError::NoSuchAlert(..))
+        Err(e) if e.is_no_such_alert()
     ));
     assert_eq!(
         c.find(Locator::Id("alert-answer")).await?.text().await?,

@@ -122,7 +122,7 @@ async fn actions_mouse_move(c: Client, port: u16) -> Result<(), error::CmdError>
     // Sanity check - ensure no alerts are displayed prior to actions.
     assert!(matches!(
         c.get_alert_text().await,
-        Err(error::CmdError::NoSuchAlert(..))
+        Err(e) if e.is_no_such_alert()
     ));
 
     let actions = Actions::from(mouse_actions);

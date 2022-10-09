@@ -8,7 +8,6 @@ use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use webdriver::command::WebDriverCommand;
 use webdriver::common::FrameId;
-use webdriver::error::WebDriverError;
 
 /// Web element reference.
 ///
@@ -430,13 +429,11 @@ impl Element {
         let href = match href {
             Json::String(v) => v,
             Json::Null => {
-                let e = WebDriverError::new(
-                    webdriver::error::ErrorStatus::InvalidArgument,
+                let e = error::WebDriver::new(
+                    error::ErrorStatus::InvalidArgument,
                     "cannot follow element without href attribute",
                 );
-                return Err(error::CmdError::Standard(
-                    error::WebDriver::from_upstream_error(e),
-                ));
+                return Err(error::CmdError::Standard(e));
             }
             v => return Err(error::CmdError::NotW3C(v)),
         };
@@ -450,7 +447,6 @@ impl Element {
     /// Find and click an `<option>` child element by a locator.
     ///
     /// This method clicks the first `<option>` element that is found.
-    /// If the element wasn't found, [`CmdError::NoSuchElement`](error::CmdError::NoSuchElement) will be issued.
     pub async fn select_by(&self, locator: Locator<'_>) -> Result<(), error::CmdError> {
         self.find(locator).await?.click().await
     }

@@ -230,7 +230,7 @@ async fn stale_element(c: Client, port: u16) -> Result<(), error::CmdError> {
     .await?;
 
     match elem.click().await {
-        Err(error::CmdError::NoSuchElement(_)) => Ok(()),
+        Err(e) if e.is_stale_element_reference() => Ok(()),
         _ => panic!("Expected a stale element reference error"),
     }
 }
@@ -614,7 +614,11 @@ mod chrome {
     }
 
     #[test]
-    #[serial]
+    fn stale_element_test() {
+        local_tester!(stale_element, "chrome");
+    }
+
+    #[test]
     fn select_by_label_test() {
         local_tester!(select_by_label, "chrome");
     }
