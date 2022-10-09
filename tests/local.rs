@@ -1,6 +1,5 @@
 //! Tests that don't make use of external websites.
 use crate::common::{other_page_url, sample_page_url};
-use fantoccini::error::CmdError;
 use fantoccini::wd::TimeoutConfiguration;
 use fantoccini::{error, Client, Locator};
 use serial_test::serial;
