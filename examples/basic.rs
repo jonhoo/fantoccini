@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     code_area.send_keys("// Hello from Fantoccini\n").await?;
 
     // Now, let's run it!
-    let button = r#"//div[@class="segmented-button"]/button[1]"#;
+    let button = r#"//button/div[.='Run']"#;
     let button = client.wait().for_element(Locator::XPath(button)).await?;
     button.click().await?;
 
