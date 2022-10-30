@@ -286,6 +286,14 @@ async fn handle_cookies_test(c: Client) -> Result<(), error::CmdError> {
     c.delete_cookie(cookie.name()).await?;
     assert!(c.get_named_cookie(cookie.name()).await.is_err());
 
+    // Verify same_site None corner-case is correctly parsed
+    cookie.set_same_site(None);
+    c.add_cookie(cookie.clone()).await?;
+    assert_eq!(
+        c.get_named_cookie(cookie.name()).await?.same_site(),
+        Some(SameSite::None)
+    );
+
     c.delete_all_cookies().await?;
     let cookies = c.get_all_cookies().await?;
     assert!(dbg!(cookies).is_empty());
