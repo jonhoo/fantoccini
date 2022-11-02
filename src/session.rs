@@ -262,7 +262,10 @@ impl WebDriverCompatibleCommand for Wcmd {
                 body = Some(serde_json::to_string(params).unwrap());
                 method = Method::POST;
             }
-
+            WebDriverCommand::Print(ref params) => {
+                body = Some(serde_json::to_string(params).unwrap());
+                method = Method::POST;
+            }
             _ => {}
         }
         (method, body)
