@@ -628,11 +628,18 @@ where
         }
 
         // make chrome comply with w3c
-        cap.entry("goog:chromeOptions".to_string())
-            .or_insert_with(|| Json::Object(serde_json::Map::new()))
-            .as_object_mut()
-            .expect("goog:chromeOptions wasn't a JSON object")
-            .insert("w3c".to_string(), Json::from(true));
+        if cap.contains_key("goog:chromeOptions") 
+            || cap.get("browserName")
+            .and_then(|v| v.as_str())
+            .filter(|s| s.to_lowercase().contains("chrom"))
+            .is_some()
+        {
+            cap.entry("goog:chromeOptions".to_string())
+                .or_insert_with(|| Json::Object(serde_json::Map::new()))
+                .as_object_mut()
+                .expect("goog:chromeOptions wasn't a JSON object")
+                .insert("w3c".to_string(), Json::from(true));
+        }
 
         let session_config = webdriver::capabilities::SpecNewSessionParameters {
             alwaysMatch: cap.clone(),
