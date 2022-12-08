@@ -9,83 +9,61 @@ use std::str::FromStr;
 use url::ParseError;
 
 /// An error occurred while attempting to establish a session for a new `Client`.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum NewSessionError {
     /// The given WebDriver URL is invalid.
-    BadWebdriverUrl(ParseError),
+    #[error("webdriver url is invalid: {0}")]
+    BadWebdriverUrl(#[from] ParseError),
     /// The WebDriver server could not be reached.
-    Failed(HError),
+    #[error("webdriver server did not respond: {0}")]
+    Failed(#[from] HError),
     /// The connection to the WebDriver server was lost.
-    Lost(IOError),
+    #[error("webdriver server disconnected: {0}")]
+    Lost(#[from] IOError),
     /// The server did not give a WebDriver-conforming response.
+    #[error("webdriver server gave non-conformant response")]
     NotW3C(serde_json::Value),
     /// The WebDriver server refused to create a new session.
-    SessionNotCreated(WebDriver),
-}
-
-impl Error for NewSessionError {
-    fn description(&self) -> &str {
-        match *self {
-            NewSessionError::BadWebdriverUrl(..) => "webdriver url is invalid",
-            NewSessionError::Failed(..) => "webdriver server did not respond",
-            NewSessionError::Lost(..) => "webdriver server disconnected",
-            NewSessionError::NotW3C(..) => "webdriver server gave non-conformant response",
-            NewSessionError::SessionNotCreated(..) => "webdriver did not create session",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        match *self {
-            NewSessionError::BadWebdriverUrl(ref e) => Some(e),
-            NewSessionError::Failed(ref e) => Some(e),
-            NewSessionError::Lost(ref e) => Some(e),
-            NewSessionError::NotW3C(..) => None,
-            NewSessionError::SessionNotCreated(ref e) => Some(e),
-        }
-    }
-}
-
-impl fmt::Display for NewSessionError {
-    #[allow(deprecated)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self.description())?;
-        match *self {
-            NewSessionError::BadWebdriverUrl(ref e) => write!(f, "{}", e),
-            NewSessionError::Failed(ref e) => write!(f, "{}", e),
-            NewSessionError::Lost(ref e) => write!(f, "{}", e),
-            NewSessionError::NotW3C(ref e) => write!(f, "{:?}", e),
-            NewSessionError::SessionNotCreated(ref e) => write!(f, "{}", e),
-        }
-    }
+    #[error("webdriver did not create session: {0}")]
+    SessionNotCreated(#[from] WebDriver),
+    /// Unexpected and unrecoverable error when creating a session.
+    #[error("unexpected webdriver error; {0}")]
+    UnexpectedError(#[from] CmdError),
 }
 
 /// An error occurred while executing some browser action.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub enum CmdError {
     /// A standard WebDriver error occurred.
     ///
     /// See [the spec] for details about what each of these errors represent.
     ///
     /// [the spec]: https://www.w3.org/TR/webdriver/#handling-errors
-    Standard(WebDriver),
+    #[error("webdriver returned error: {0}")]
+    Standard(#[from] WebDriver),
 
     /// A bad URL was encountered during parsing.
     ///
     /// This normally happens if a link is clicked or the current URL is requested, but the URL in
     /// question is invalid or otherwise malformed.
-    BadUrl(ParseError),
+    #[error("bad url provided: {0}")]
+    BadUrl(#[from] ParseError),
 
     /// A request to the WebDriver server failed.
-    Failed(HError),
+    #[error("webdriver could not be reached: {0}")]
+    Failed(#[from] HError),
 
     /// The connection to the WebDriver server was lost.
-    Lost(IOError),
+    #[error("webdriver connection lost: {0}")]
+    Lost(#[from] IOError),
 
     /// The WebDriver server responded with a non-standard, non-JSON reply.
+    #[error("webdriver returned invalid response: {0}")]
     NotJson(String),
 
     /// The WebDriver server responded to a command with an invalid JSON response.
-    Json(serde_json::Error),
+    #[error("webdriver returned incoherent response: {0}")]
+    Json(#[from] serde_json::Error),
 
     /// The WebDriver server produced a response that does not conform to the [W3C WebDriver
     /// specification][spec].
@@ -96,19 +74,23 @@ pub enum CmdError {
     /// and does not correctly encode and decode `WebElement` references.
     ///
     /// [spec]: https://www.w3.org/TR/webdriver/
+    #[error("webdriver returned non-conforming response: {0}")]
     NotW3C(serde_json::Value),
 
     /// A function was invoked with an invalid argument.
+    #[error("Invalid argument `{0}`: {1}")]
     InvalidArgument(String, String),
 
     /// Could not decode a base64 image
-    ImageDecodeError(base64::DecodeError),
+    #[error("error decoding image: {0}")]
+    ImageDecodeError(#[from] base64::DecodeError),
 
     /// Timeout of a wait condition.
     ///
     /// When waiting for a for a condition using [`Client::wait`](crate::Client::wait), any of the
     /// consuming methods, waiting on some condition, may return this error, indicating that the
     /// timeout waiting for the condition occurred.
+    #[error("timeout waiting on condition")]
     WaitTimeout,
 }
 
@@ -163,98 +145,14 @@ impl CmdError {
     }
 }
 
-impl Error for CmdError {
-    fn description(&self) -> &str {
-        match *self {
-            CmdError::Standard(..) => "webdriver returned error",
-            CmdError::BadUrl(..) => "bad url provided",
-            CmdError::Failed(..) => "webdriver could not be reached",
-            CmdError::Lost(..) => "webdriver connection lost",
-            CmdError::NotJson(..) => "webdriver returned invalid response",
-            CmdError::Json(..) => "webdriver returned incoherent response",
-            CmdError::NotW3C(..) => "webdriver returned non-conforming response",
-            CmdError::InvalidArgument(..) => "invalid argument provided",
-            CmdError::ImageDecodeError(..) => "error decoding image",
-            CmdError::WaitTimeout => "timeout waiting on condition",
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
-        match *self {
-            CmdError::Standard(ref e) => Some(e),
-            CmdError::BadUrl(ref e) => Some(e),
-            CmdError::Failed(ref e) => Some(e),
-            CmdError::Lost(ref e) => Some(e),
-            CmdError::Json(ref e) => Some(e),
-            CmdError::ImageDecodeError(ref e) => Some(e),
-            CmdError::NotJson(_)
-            | CmdError::NotW3C(_)
-            | CmdError::InvalidArgument(..)
-            | CmdError::WaitTimeout => None,
-        }
-    }
-}
-
-impl fmt::Display for CmdError {
-    #[allow(deprecated)]
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: ", self.description())?;
-        match *self {
-            CmdError::Standard(ref e) => write!(f, "{}", e),
-            CmdError::BadUrl(ref e) => write!(f, "{}", e),
-            CmdError::Failed(ref e) => write!(f, "{}", e),
-            CmdError::Lost(ref e) => write!(f, "{}", e),
-            CmdError::NotJson(ref e) => write!(f, "{}", e),
-            CmdError::Json(ref e) => write!(f, "{}", e),
-            CmdError::NotW3C(ref e) => write!(f, "{:?}", e),
-            CmdError::ImageDecodeError(ref e) => write!(f, "{:?}", e),
-            CmdError::InvalidArgument(ref arg, ref msg) => {
-                write!(f, "Invalid argument `{}`: {}", arg, msg)
-            }
-            CmdError::WaitTimeout => Ok(()),
-        }
-    }
-}
-
-impl From<IOError> for CmdError {
-    fn from(e: IOError) -> Self {
-        CmdError::Lost(e)
-    }
-}
-
-impl From<ParseError> for CmdError {
-    fn from(e: ParseError) -> Self {
-        CmdError::BadUrl(e)
-    }
-}
-
-impl From<HError> for CmdError {
-    fn from(e: HError) -> Self {
-        CmdError::Failed(e)
-    }
-}
-
-impl From<serde_json::Error> for CmdError {
-    fn from(e: serde_json::Error) -> Self {
-        CmdError::Json(e)
-    }
-}
-
 /// Error of attempting to create an invalid [`WindowHandle`] from a
 /// [`"current"` string][1].
 ///
 /// [`WindowHandle`]: crate::wd::WindowHandle
 /// [1]: https://www.w3.org/TR/webdriver/#dfn-window-handles
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, thiserror::Error)]
+#[error("Window handle cannot be \"current\"")]
 pub struct InvalidWindowHandle;
-
-impl fmt::Display for InvalidWindowHandle {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, r#"Window handle cannot be "current""#)
-    }
-}
-
-impl Error for InvalidWindowHandle {}
 
 impl From<InvalidWindowHandle> for CmdError {
     fn from(_: InvalidWindowHandle) -> Self {
@@ -412,39 +310,38 @@ pub enum ErrorStatus {
 impl ErrorStatus {
     /// Returns the correct HTTP status code associated with the error type.
     pub fn http_status(&self) -> StatusCode {
-        use self::ErrorStatus::*;
         match *self {
-            DetachedShadowRoot => StatusCode::NOT_FOUND,
-            ElementClickIntercepted => StatusCode::BAD_REQUEST,
-            ElementNotInteractable => StatusCode::BAD_REQUEST,
-            ElementNotSelectable => StatusCode::BAD_REQUEST,
-            InsecureCertificate => StatusCode::BAD_REQUEST,
-            InvalidArgument => StatusCode::BAD_REQUEST,
-            InvalidCookieDomain => StatusCode::BAD_REQUEST,
-            InvalidCoordinates => StatusCode::BAD_REQUEST,
-            InvalidElementState => StatusCode::BAD_REQUEST,
-            InvalidSelector => StatusCode::BAD_REQUEST,
-            InvalidSessionId => StatusCode::NOT_FOUND,
-            JavascriptError => StatusCode::INTERNAL_SERVER_ERROR,
-            MoveTargetOutOfBounds => StatusCode::INTERNAL_SERVER_ERROR,
-            NoSuchAlert => StatusCode::NOT_FOUND,
-            NoSuchCookie => StatusCode::NOT_FOUND,
-            NoSuchElement => StatusCode::NOT_FOUND,
-            NoSuchFrame => StatusCode::NOT_FOUND,
-            NoSuchShadowRoot => StatusCode::NOT_FOUND,
-            NoSuchWindow => StatusCode::NOT_FOUND,
-            ScriptTimeout => StatusCode::INTERNAL_SERVER_ERROR,
-            SessionNotCreated => StatusCode::INTERNAL_SERVER_ERROR,
-            StaleElementReference => StatusCode::NOT_FOUND,
-            Timeout => StatusCode::INTERNAL_SERVER_ERROR,
-            UnableToCaptureScreen => StatusCode::BAD_REQUEST,
-            UnableToSetCookie => StatusCode::INTERNAL_SERVER_ERROR,
-            UnexpectedAlertOpen => StatusCode::INTERNAL_SERVER_ERROR,
-            UnknownCommand => StatusCode::NOT_FOUND,
-            UnknownError => StatusCode::INTERNAL_SERVER_ERROR,
-            UnknownMethod => StatusCode::METHOD_NOT_ALLOWED,
-            UnknownPath => StatusCode::NOT_FOUND,
-            UnsupportedOperation => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::ElementClickIntercepted
+            | Self::ElementNotInteractable
+            | Self::ElementNotSelectable
+            | Self::InsecureCertificate
+            | Self::InvalidArgument
+            | Self::InvalidCookieDomain
+            | Self::InvalidCoordinates
+            | Self::InvalidElementState
+            | Self::UnableToCaptureScreen
+            | Self::InvalidSelector => StatusCode::BAD_REQUEST,
+            Self::DetachedShadowRoot
+            | Self::InvalidSessionId
+            | Self::NoSuchAlert
+            | Self::NoSuchCookie
+            | Self::NoSuchElement
+            | Self::NoSuchFrame
+            | Self::NoSuchShadowRoot
+            | Self::NoSuchWindow
+            | Self::UnknownPath
+            | Self::UnknownCommand
+            | Self::StaleElementReference => StatusCode::NOT_FOUND,
+            Self::JavascriptError
+            | Self::MoveTargetOutOfBounds
+            | Self::ScriptTimeout
+            | Self::SessionNotCreated
+            | Self::Timeout
+            | Self::UnableToSetCookie
+            | Self::UnexpectedAlertOpen
+            | Self::UnknownError
+            | Self::UnsupportedOperation => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::UnknownMethod => StatusCode::METHOD_NOT_ALLOWED,
         }
     }
 }
@@ -557,7 +454,8 @@ impl TryFrom<CmdError> for ErrorStatus {
 }
 
 /// Error returned by WebDriver.
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, thiserror::Error)]
+#[error("{message}")]
 pub struct WebDriver {
     /// Code of this error provided by WebDriver.
     pub error: ErrorStatus,
@@ -573,14 +471,6 @@ pub struct WebDriver {
     /// [error data]: https://www.w3.org/TR/webdriver1/#dfn-error-data
     pub data: Option<serde_json::Value>,
 }
-
-impl fmt::Display for WebDriver {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.message)
-    }
-}
-
-impl Error for WebDriver {}
 
 impl WebDriver {
     /// Create a new WebDriver error struct.
