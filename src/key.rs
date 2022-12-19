@@ -258,6 +258,6 @@ mod tests {
         let a = "a".to_string();
         let b = "b".to_string();
         let this_should_work = a + &b;
-        assert_eq!(this_should_work,"ab");
+        assert_eq!(this_should_work, "ab");
     }
 }
