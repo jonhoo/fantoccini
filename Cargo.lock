@@ -97,6 +97,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-tls",
  "mime",
+ "openssl",
  "serde",
  "serde_json",
  "serial_test",

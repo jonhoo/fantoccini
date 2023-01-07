@@ -44,6 +44,10 @@ tokio = { version = "1", features = ["full"] }
 hyper = { version = "0.14", features = ["server", "tcp"] }
 serial_test = "0.9"
 
+# for minimal-versions
+[target.'cfg(any())'.dependencies]
+openssl = "0.10.35" # through native-tls, <.35 no longer builds
+
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
