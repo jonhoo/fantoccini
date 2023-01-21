@@ -160,21 +160,24 @@ async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
 
 async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
     // go to the Wikipedia frontpage this time
-    c.goto("https://en.wikipedia.org/").await?;
+    c.goto("https://en.wikipedia.org/wiki/Main_Page").await?;
+    // Expand the menu, since invisible elements can't be accessed
+    c.find(Locator::Css("#mw-sidebar-button"))
+        .await?
+        .click()
+        .await?;
     let es = c.find_all(Locator::Css("#p-interaction li")).await?;
-    let texts = futures_util::future::try_join_all(
-        es.into_iter()
-            .take(4)
-            .map(|e| async move { e.text().await }),
-    )
-    .await?;
+    let texts =
+        futures_util::future::try_join_all(es.into_iter().map(|e| async move { e.text().await }))
+            .await?;
     assert_eq!(
         texts,
         [
             "Help",
             "Learn to edit",
             "Community portal",
-            "Recent changes"
+            "Recent changes",
+            "Upload file"
         ]
     );
 
@@ -184,10 +187,15 @@ async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
 async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
     // Go to the Wikipedia front page
     c.goto("https://en.wikipedia.org/").await?;
+    // Expand the menu, since invisible elements can't be accessed
+    c.find(Locator::Css("#mw-sidebar-button"))
+        .await?
+        .click()
+        .await?;
     // Get the main sidebar panel
-    let panel = c.find(Locator::Css("div#mw-panel")).await?;
+    let panel = c.find(Locator::Css("nav#mw-panel")).await?;
     // Get all the ul elements in the sidebar
-    let mut portals = panel.find_all(Locator::Css("nav.portal")).await?;
+    let mut portals = panel.find_all(Locator::Css(".mw-portlet")).await?;
 
     let portal_titles = &[
         // Because GetElementText (used by Element::text()) returns the text
@@ -197,7 +205,6 @@ async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
         "Tools",
         "Print/export",
         "In other projects",
-        "Languages",
     ];
     // Unless something fundamentally changes, this should work
     assert_eq!(portals.len(), portal_titles.len());
