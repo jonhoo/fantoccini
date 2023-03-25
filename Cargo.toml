@@ -46,7 +46,7 @@ serial_test = "1.0"
 
 # for minimal-versions
 [target.'cfg(any())'.dependencies]
-openssl = "0.10.35" # through native-tls, <.35 no longer builds
+openssl = "0.10.48" # through native-tls, <.35 no longer builds
 
 [package.metadata.docs.rs]
 all-features = true
