@@ -159,25 +159,25 @@ async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
 }
 
 async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
-    // go to the Wikipedia frontpage this time
+    // go to the Wikipedia frontpage
     c.goto("https://en.wikipedia.org/wiki/Main_Page").await?;
-    // Expand the menu, since invisible elements can't be accessed
-    c.find(Locator::Css("#mw-sidebar-button"))
-        .await?
-        .click()
-        .await?;
-    let es = c.find_all(Locator::Css("#p-interaction li")).await?;
-    let texts =
+    // Find all the footer links
+    let es = c.find_all(Locator::Css("#footer-places li")).await?;
+    let mut texts =
         futures_util::future::try_join_all(es.into_iter().map(|e| async move { e.text().await }))
             .await?;
+    texts.retain(|t| !t.is_empty());
     assert_eq!(
         texts,
         [
-            "Help",
-            "Learn to edit",
-            "Community portal",
-            "Recent changes",
-            "Upload file"
+            "Privacy policy",
+            "About Wikipedia",
+            "Disclaimers",
+            "Contact Wikipedia",
+            "Mobile view",
+            "Developers",
+            "Statistics",
+            "Cookie statement"
         ]
     );
 
@@ -186,39 +186,39 @@ async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
 
 async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
     // Go to the Wikipedia front page
-    c.goto("https://en.wikipedia.org/").await?;
-    // Expand the menu, since invisible elements can't be accessed
-    c.find(Locator::Css("#mw-sidebar-button"))
-        .await?
-        .click()
-        .await?;
-    // Get the main sidebar panel
-    let panel = c.find(Locator::Css("nav#mw-panel")).await?;
-    // Get all the ul elements in the sidebar
-    let mut portals = panel.find_all(Locator::Css(".mw-portlet")).await?;
+    c.goto("https://en.wikipedia.org/wiki/Main_Page").await?;
+    // Get the main footer
+    let footer = c.find(Locator::Css("#footer-places")).await?;
+    // Get all the li place elements in the footer
+    let mut places = footer.find_all(Locator::Css("li")).await?;
 
-    let portal_titles = &[
-        // Because GetElementText (used by Element::text()) returns the text
-        // *as rendered*, hidden elements return an empty String.
-        "",
-        "Contribute",
-        "Tools",
-        "Print/export",
-        "In other projects",
+    let place_titles = &[
+        "Privacy policy",
+        "About Wikipedia",
+        "Disclaimers",
+        "Contact Wikipedia",
+        "Mobile view",
+        "Developers",
+        "Statistics",
+        "Cookie statement",
     ];
-    // Unless something fundamentally changes, this should work
-    assert_eq!(portals.len(), portal_titles.len());
+    // There's sometimes a hidden "edit preview settings" link in the footer.
+    assert!(
+        places.len() >= place_titles.len(),
+        "{} >= {}",
+        places.len(),
+        place_titles.len()
+    );
 
-    for (i, portal) in portals.iter_mut().enumerate() {
-        // Each "portal" has a title element.
-        let portal_title = portal
-            .find(Locator::Css(".vector-menu-heading-label"))
-            .await?;
-        let portal_title = portal_title.text().await?;
-        assert_eq!(portal_title, portal_titles[i]);
-        // And also an <ul>.
-        let list_entries = portal.find_all(Locator::Css("li")).await?;
-        assert!(!list_entries.is_empty());
+    for (i, place) in places.iter_mut().enumerate() {
+        // Each "place" has a link element.
+        let place_title = place.find(Locator::Css("a")).await?;
+        let place_title = place_title.text().await?;
+        if place_title.is_empty() {
+            assert!(i >= place_titles.len(), "{} >= {}", i, place_titles.len());
+        } else {
+            assert_eq!(place_title, place_titles[i]);
+        }
     }
 
     c.close().await
