@@ -24,20 +24,21 @@ rustls-tls = ["hyper-rustls"]
 
 [dependencies]
 webdriver = { version = "0.46", default-features = false }
-url = "2.2.2"
-serde = { version = "1.0.103", features = ["derive"] }
-serde_json = "1.0.25"
+url = "2.2"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 futures-core = "0.3"
 futures-util = "0.3"
 tokio = { version = "1", features = ["sync", "rt", "time"] }
 hyper = { version = "0.14", features = ["stream", "client", "http1"] }
-cookie = { version = "0.16.0", features = ["percent-encode"] }
+cookie = { version = "0.16", features = ["percent-encode"] }
 base64 = "0.13"
-hyper-rustls = { version = "0.23.0", optional = true }
-hyper-tls = { version = "0.5.0", optional = true }
-mime = "0.3.9"
+hyper-rustls = { version = "0.23", optional = true }
+hyper-tls = { version = "0.5", optional = true }
+mime = "0.3"
 http = "0.2"
 time = "0.3"
+thiserror = "1.0.37"
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
