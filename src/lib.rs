@@ -255,6 +255,8 @@ pub mod client;
 #[doc(inline)]
 pub use client::Client;
 
+pub mod common;
+
 pub mod actions;
 pub mod cookies;
 pub mod elements;
@@ -265,3 +267,5 @@ pub mod wait;
 pub mod wd;
 #[doc(inline)]
 pub use wd::Locator;
+
+pub use fantoccini_proc_macro::test;

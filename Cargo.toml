@@ -38,6 +38,7 @@ hyper-tls = { version = "0.5.0", optional = true }
 mime = "0.3.9"
 http = "0.2"
 time = "0.3"
+fantoccini_proc_macro = { path = "fantoccini_proc_macro"}
 
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
