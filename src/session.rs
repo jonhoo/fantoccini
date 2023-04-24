@@ -630,13 +630,6 @@ where
             cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
         }
 
-        // make chrome comply with w3c
-        cap.entry("goog:chromeOptions".to_string())
-            .or_insert_with(|| Json::Object(serde_json::Map::new()))
-            .as_object_mut()
-            .expect("goog:chromeOptions wasn't a JSON object")
-            .insert("w3c".to_string(), Json::from(true));
-
         let session_config = webdriver::capabilities::SpecNewSessionParameters {
             alwaysMatch: cap.clone(),
             firstMatch: vec![webdriver::capabilities::Capabilities::new()],
