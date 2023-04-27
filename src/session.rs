@@ -631,7 +631,7 @@ where
         }
 
         // make chrome comply with w3c
-        if cap.get("browserName") == Some(&Json::from("chrome")) {
+        if cap.get("browserName") != Some(&Json::from("internet explorer")) {
             cap.entry("goog:chromeOptions".to_string())
                 .or_insert_with(|| Json::Object(serde_json::Map::new()))
                 .as_object_mut()
