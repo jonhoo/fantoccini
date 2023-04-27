@@ -190,8 +190,8 @@ impl PointerAction {
                 WDActions::PointerAction::Move(WDActions::PointerMoveAction {
                     duration: duration.map(|x| x.as_millis() as u64),
                     origin: WDActions::PointerOrigin::Pointer,
-                    x: Some(x),
-                    y: Some(y),
+                    x,
+                    y,
                     ..Default::default()
                 }),
             ),
@@ -199,8 +199,8 @@ impl PointerAction {
                 WDActions::PointerAction::Move(WDActions::PointerMoveAction {
                     duration: duration.map(|x| x.as_millis() as u64),
                     origin: WDActions::PointerOrigin::Viewport,
-                    x: Some(x),
-                    y: Some(y),
+                    x,
+                    y,
                     ..Default::default()
                 }),
             ),
@@ -213,8 +213,8 @@ impl PointerAction {
                 WDActions::PointerMoveAction {
                     duration: duration.map(|x| x.as_millis() as u64),
                     origin: WDActions::PointerOrigin::Element(element.element),
-                    x: Some(x),
-                    y: Some(y),
+                    x,
+                    y,
                     ..Default::default()
                 },
             )),
@@ -404,6 +404,100 @@ impl From<TouchActions> for ActionSequence {
     }
 }
 
+/// A sequence containing [`Wheel` actions](WheelAction) for a wheel device.
+#[derive(Debug, Clone)]
+pub struct WheelActions {
+    /// A unique identifier to distinguish this input source from others.
+    ///
+    /// Choose a meaningful string as it may be useful for debugging.
+    id: String,
+    /// The list of actions for this sequence.
+    actions: Vec<WheelAction>,
+}
+
+impl WheelActions {
+    /// Create a new `WheelActions` sequence.
+    ///
+    /// The id can be any string but must uniquely identify this input source.
+    pub fn new(id: String) -> Self {
+        Self {
+            id,
+            actions: Vec::new(),
+        }
+    }
+
+    /// Pushes a new action.
+    pub fn push(&mut self, action: WheelAction) {
+        self.actions.push(action);
+    }
+}
+
+impl From<WheelActions> for ActionSequence {
+    fn from(wa: WheelActions) -> Self {
+        ActionSequence(WDActions::ActionSequence {
+            id: wa.id,
+            actions: WDActions::ActionsType::Wheel {
+                actions: wa.actions.into_iter().map(|x| x.into_item()).collect(),
+            },
+        })
+    }
+}
+
+/// An action performed with a wheel device.
+///
+/// See [15.4.4 Wheel Actions](https://www.w3.org/TR/webdriver/#wheel-actions) of the
+/// WebDriver standard.
+#[derive(Debug, Clone)]
+pub enum WheelAction {
+    /// Pause action.
+    /// Useful for adding pauses between other key actions.
+    Pause {
+        /// The pause duration, given in milliseconds.
+        duration: Duration,
+    },
+    /// Wheel scroll event.
+    Scroll {
+        /// The scroll duration.
+        duration: Option<Duration>,
+        /// `x` offset of the scroll origin, in pixels.
+        x: i64,
+        /// `y` offset of the scroll origin, in pixels.
+        y: i64,
+        /// The change of the number of pixels to be scrolled on the `x`-axis.
+        delta_x: i64,
+        /// The change of the number of pixels to be scrolled on the `y`-axis.
+        delta_y: i64,
+    },
+}
+
+impl WheelAction {
+    fn into_item(self) -> WDActions::WheelActionItem {
+        match self {
+            WheelAction::Pause { duration } => WDActions::WheelActionItem::General(
+                WDActions::GeneralAction::Pause(WDActions::PauseAction {
+                    duration: Some(duration.as_millis() as u64),
+                }),
+            ),
+            WheelAction::Scroll {
+                x,
+                y,
+                delta_x,
+                delta_y,
+                duration,
+            } => WDActions::WheelActionItem::Wheel(WDActions::WheelAction::Scroll(
+                WDActions::WheelScrollAction {
+                    duration: duration.map(|d| d.as_millis() as u64),
+                    origin: WDActions::PointerOrigin::Viewport,
+                    x: Some(x),
+                    y: Some(y),
+                    deltaX: Some(delta_x),
+                    deltaY: Some(delta_y),
+                },
+            )),
+        }
+    }
+}
+
 /// A sequence of actions to be performed.
 ///
 /// See the documentation for [`Actions`] for more details.
@@ -487,6 +581,19 @@ impl InputSource for TouchActions {
 
     fn pause(self, duration: Duration) -> Self {
         self.then(PointerAction::Pause { duration })
+    }
+
+    fn then(mut self, action: Self::Action) -> Self {
+        self.actions.push(action);
+        self
+    }
+}
+
+impl InputSource for WheelActions {
+    type Action = WheelAction;
+
+    fn pause(self, duration: Duration) -> Self {
+        self.then(WheelAction::Pause { duration })
     }
 
     fn then(mut self, action: Self::Action) -> Self {
