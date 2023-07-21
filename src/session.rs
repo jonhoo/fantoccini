@@ -1,6 +1,6 @@
 use crate::cookies::AddCookieParametersWrapper;
 use crate::error::ErrorStatus;
-use crate::wd::WebDriverCompatibleCommand;
+use crate::wd::{self, WebDriverCompatibleCommand};
 use crate::{error, Client};
 use futures_core::ready;
 use futures_util::future::{self, Either};
@@ -15,6 +15,7 @@ use std::task::Context;
 use std::task::Poll;
 use tokio::sync::{mpsc, oneshot};
 use webdriver::command::WebDriverCommand;
+use webdriver::response::NewSessionResponse;
 
 type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
 
@@ -547,18 +548,22 @@ where
 
     fn map_handshake_response(
         response: Result<Json, error::CmdError>,
-    ) -> Result<(), error::NewSessionError> {
+    ) -> Result<NewSessionResponse, error::NewSessionError> {
         match response {
-            Ok(Json::Object(mut v)) => {
+            Ok(Json::Object(v)) => {
+                // https://w3c.github.io/webdriver/#dfn-new-sessions
                 // TODO: not all impls are w3c compatible
                 // See https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L189
                 // and https://github.com/SeleniumHQ/selenium/blob/242d64ca4cd3523489ac1e58703fd7acd4f10c5a/py/selenium/webdriver/remote/webdriver.py#L200
-                // NOTE: remove so we can re-insert and return if something's wrong
-                if let Some(session_id) = v.remove("sessionId") {
-                    if session_id.is_string() {
-                        return Ok(());
+                if let (Some(Json::String(session_id)), Some(capabilities)) =
+                    (v.get("sessionId"), v.get("capabilities"))
+                {
+                    if capabilities.is_object() {
+                        return Ok(NewSessionResponse {
+                            session_id: session_id.to_owned(),
+                            capabilities: capabilities.to_owned(),
+                        });
                     }
-                    v.insert("sessionId".to_string(), session_id);
                 }
                 Err(error::NewSessionError::NotW3C(Json::Object(v)))
             }
@@ -620,6 +625,7 @@ where
         let client = Client {
             tx: tx.clone(),
             is_legacy: false,
+            new_session_response: None,
         };
 
         // Create a new session for this client
@@ -650,9 +656,10 @@ where
             .map(Self::map_handshake_response)
             .await
         {
-            Ok(_) => Ok(Client {
+            Ok(new_session_response) => Ok(Client {
                 tx,
                 is_legacy: false,
+                new_session_response: Some(wd::NewSessionResponse::from_wd(new_session_response)),
             }),
             Err(error::NewSessionError::NotW3C(json)) => {
                 // maybe try legacy mode?
@@ -699,6 +706,7 @@ where
                 Ok(Client {
                     tx,
                     is_legacy: true,
+                    new_session_response: None,
                 })
             }
             Err(e) => Err(e),

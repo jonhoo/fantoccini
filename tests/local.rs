@@ -427,6 +427,28 @@ async fn dynamic_commands(c: Client, port: u16) -> Result<(), error::CmdError> {
     Ok(())
 }
 
+async fn session_creation_response(c: Client, _: u16) -> Result<(), error::CmdError> {
+    let session_creation_response = c.session_creation_response();
+    assert!(matches!(
+        session_creation_response
+            .unwrap()
+            .capabilities()
+            .unwrap()
+            .get("browserName"),
+        Some(serde_json::Value::String(_))
+    ));
+    Ok(())
+}
+
+async fn capabilities(c: Client, _: u16) -> Result<(), error::CmdError> {
+    let remote_caps = c.capabilities();
+    assert!(matches!(
+        remote_caps.unwrap().get("browserName"),
+        Some(serde_json::Value::String(_))
+    ));
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -554,6 +576,18 @@ mod firefox {
     fn dynamic_commands_test() {
         local_tester!(dynamic_commands, "firefox");
     }
+
+    #[test]
+    #[serial]
+    fn session_creation_response_test() {
+        local_tester!(session_creation_response, "firefox");
+    }
+
+    #[test]
+    #[serial]
+    fn capabilities_test() {
+        local_tester!(capabilities, "firefox");
+    }
 }
 
 mod chrome {
@@ -656,5 +690,17 @@ mod chrome {
     #[test]
     fn dynamic_commands_test() {
         local_tester!(dynamic_commands, "chrome");
+    }
+
+    #[test]
+    #[serial]
+    fn session_creation_response_test() {
+        local_tester!(session_creation_response, "chrome");
+    }
+
+    #[test]
+    #[serial]
+    fn capabilities_test() {
+        local_tester!(capabilities, "chrome");
     }
 }
