@@ -19,7 +19,7 @@ license = "MIT/Apache-2.0"
 
 [features]
 default = ["native-tls"]
-native-tls = ["hyper-tls"]
+native-tls = ["hyper-tls", "openssl"]
 rustls-tls = ["hyper-rustls"]
 
 [dependencies]
@@ -33,7 +33,7 @@ tokio = { version = "1", features = ["sync", "rt", "time"] }
 hyper = { version = "0.14", features = ["stream", "client", "http1"] }
 cookie = { version = "0.16.0", features = ["percent-encode"] }
 base64 = "0.13"
-hyper-rustls = { version = "0.23.0", optional = true }
+hyper-rustls = { version = "0.24.0", optional = true }
 hyper-tls = { version = "0.5.0", optional = true }
 mime = "0.3.9"
 http = "0.2"
@@ -46,7 +46,7 @@ serial_test = "2.0"
 
 # for minimal-versions
 [target.'cfg(any())'.dependencies]
-openssl = "0.10.35" # through native-tls, <.35 no longer builds
+openssl = { version = "0.10.35", optional = true } # through native-tls, <.35 no longer builds
 
 [package.metadata.docs.rs]
 all-features = true
