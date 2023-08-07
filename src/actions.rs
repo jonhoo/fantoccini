@@ -448,8 +448,10 @@ impl From<WheelActions> for ActionSequence {
 /// See [15.4.4 Wheel Actions](https://www.w3.org/TR/webdriver/#wheel-actions) of the
 /// WebDriver standard.
 #[derive(Debug, Clone)]
+#[non_exhaustive]
 pub enum WheelAction {
     /// Pause action.
+    ///
     /// Useful for adding pauses between other key actions.
     Pause {
         /// The pause duration, given in milliseconds.
