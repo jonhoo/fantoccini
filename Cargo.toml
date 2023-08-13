@@ -15,7 +15,7 @@ repository = "https://github.com/jonhoo/fantoccini.git"
 keywords = ["webdriver", "chromedriver", "geckodriver", "phantomjs", "automation"]
 categories = ["api-bindings", "development-tools::testing", "web-programming::http-client"]
 
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 
 [features]
 default = ["native-tls"]
