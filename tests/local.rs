@@ -427,6 +427,33 @@ async fn dynamic_commands(c: Client, port: u16) -> Result<(), error::CmdError> {
     Ok(())
 }
 
+async fn finds_all_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let sample_url = common::wikipedia_main_page_url(port);
+    c.goto(&sample_url).await?;
+    // Find all the footer links
+    let es = c.find_all(Locator::Css("#footer-places li")).await?;
+    let mut texts =
+        futures_util::future::try_join_all(es.into_iter().map(|e| async move { e.text().await }))
+            .await?;
+    texts.retain(|t| !t.is_empty());
+    assert_eq!(
+        texts,
+        [
+            "Privacy policy",
+            "About Wikipedia",
+            "Disclaimers",
+            "Contact Wikipedia",
+            "Code of Conduct",
+            "Mobile view",
+            "Developers",
+            "Statistics",
+            "Cookie statement"
+        ]
+    );
+
+    c.close().await
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -554,6 +581,14 @@ mod firefox {
     fn dynamic_commands_test() {
         local_tester!(dynamic_commands, "firefox");
     }
+
+    #[test]
+    #[serial]
+    fn finds_all_inner_test() {
+        local_tester!(finds_all_inner, "firefox");
+    }
+
+    
 }
 
 mod chrome {
@@ -657,4 +692,10 @@ mod chrome {
     fn dynamic_commands_test() {
         local_tester!(dynamic_commands, "chrome");
     }
+
+    #[test]
+    fn finds_all_inner_test() {
+        local_tester!(finds_all_inner, "chrome");
+    }
+    
 }

@@ -239,3 +239,7 @@ pub fn sample_page_url(port: u16) -> String {
 pub fn other_page_url(port: u16) -> String {
     format!("http://localhost:{}/other_page.html", port)
 }
+
+pub fn wikipedia_main_page_url(port: u16) -> String {
+    format!("http://localhost:{}/wikipedia_main_page.html", port)
+}

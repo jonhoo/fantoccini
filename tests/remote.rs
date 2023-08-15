@@ -158,33 +158,6 @@ async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
-    // go to the Wikipedia frontpage
-    c.goto("https://en.wikipedia.org/wiki/Main_Page").await?;
-    // Find all the footer links
-    let es = c.find_all(Locator::Css("#footer-places li")).await?;
-    let mut texts =
-        futures_util::future::try_join_all(es.into_iter().map(|e| async move { e.text().await }))
-            .await?;
-    texts.retain(|t| !t.is_empty());
-    assert_eq!(
-        texts,
-        [
-            "Privacy policy",
-            "About Wikipedia",
-            "Disclaimers",
-            "Contact Wikipedia",
-            "Code of Conduct",
-            "Mobile view",
-            "Developers",
-            "Statistics",
-            "Cookie statement"
-        ]
-    );
-
-    c.close().await
-}
-
 async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
     // Go to the Wikipedia front page
     c.goto("https://en.wikipedia.org/wiki/Main_Page").await?;
@@ -357,11 +330,6 @@ mod chrome {
     }
 
     #[test]
-    fn it_finds_all() {
-        tester!(finds_all_inner, "chrome");
-    }
-
-    #[test]
     fn it_finds_sub_elements() {
         tester!(finds_sub_elements, "chrome");
     }
@@ -440,12 +408,6 @@ mod firefox {
     #[ignore]
     fn it_can_get_and_set_window_rect() {
         tester!(window_rect_inner, "firefox");
-    }
-
-    #[serial]
-    #[test]
-    fn it_finds_all() {
-        tester!(finds_all_inner, "firefox");
     }
 
     #[serial]
