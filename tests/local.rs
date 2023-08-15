@@ -496,6 +496,54 @@ async fn finds_sub_elements(c: Client, port: u16) -> Result<(), error::CmdError>
     c.close().await
 }
 
+
+async fn window_size_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let sample_url = common::wikipedia_home_page_url(port);
+    c.goto(&sample_url).await?;
+    c.set_window_size(500, 400).await?;
+    let (width, height) = c.get_window_size().await?;
+    assert_eq!(width, 500);
+    assert_eq!(height, 400);
+
+    c.close().await
+}
+
+async fn window_position_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let sample_url = common::wikipedia_home_page_url(port);
+    c.goto(&sample_url).await?;
+    c.set_window_size(200, 100).await?;
+    c.set_window_position(0, 0).await?;
+    c.set_window_position(1, 2).await?;
+    let (x, y) = c.get_window_position().await?;
+    assert_eq!(x, 1);
+    assert_eq!(y, 2);
+
+    c.close().await
+}
+
+async fn window_rect_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let sample_url = common::wikipedia_home_page_url(port);
+    c.goto(&sample_url).await?;
+    c.set_window_rect(0, 0, 500, 400).await?;
+    let (x, y) = c.get_window_position().await?;
+    assert_eq!(x, 0);
+    assert_eq!(y, 0);
+    let (width, height) = c.get_window_size().await?;
+    assert_eq!(width, 500);
+    assert_eq!(height, 400);
+    c.set_window_rect(1, 2, 600, 300).await?;
+    let (x, y) = c.get_window_position().await?;
+    assert_eq!(x, 1);
+    assert_eq!(y, 2);
+    let (width, height) = c.get_window_size().await?;
+    assert_eq!(width, 600);
+    assert_eq!(height, 300);
+
+    c.close().await
+}
+
+
+
 mod firefox {
     use super::*;
     #[test]
@@ -635,7 +683,24 @@ mod firefox {
     fn finds_sub_elements_test() {
         local_tester!(finds_sub_elements, "firefox");
     }
-    
+
+    #[test]
+    #[serial]
+    fn window_size_inner_test() {
+        local_tester!(window_size_inner, "firefox");
+    }
+
+    #[test]
+    #[serial]
+    fn window_position_inner_test() {
+        local_tester!(window_position_inner, "firefox");
+    }
+
+    #[test]
+    #[serial]
+    fn window_rect_inner_test() {
+        local_tester!(window_rect_inner, "firefox");
+    }
 }
 
 mod chrome {
@@ -748,5 +813,17 @@ mod chrome {
     #[test]
     fn finds_sub_elements_test() {
         local_tester!(finds_sub_elements, "chrome");
+    }
+    #[test]
+    fn window_size_inner_test() {
+        local_tester!(window_size_inner, "chrome");
+    }
+    #[test]
+    fn window_position_inner_test() {
+        local_tester!(window_position_inner, "chrome");
+    }
+    #[test]
+    fn window_rect_inner_test() {
+        local_tester!(window_rect_inner, "chrome");
     }
 }
