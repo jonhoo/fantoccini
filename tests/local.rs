@@ -454,6 +454,48 @@ async fn finds_all_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.close().await
 }
 
+
+async fn finds_sub_elements(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let sample_url = common::wikipedia_main_page_url(port);
+    c.goto(&sample_url).await?;
+    // Get the main footer
+    let footer = c.find(Locator::Css("#footer-places")).await?;
+    // Get all the li place elements in the footer
+    let mut places = footer.find_all(Locator::Css("li")).await?;
+
+    let place_titles = &[
+        "Privacy policy",
+        "About Wikipedia",
+        "Disclaimers",
+        "Contact Wikipedia",
+        "Code of Conduct",
+        "Mobile view",
+        "Developers",
+        "Statistics",
+        "Cookie statement",
+    ];
+    // There's sometimes a hidden "edit preview settings" link in the footer.
+    assert!(
+        places.len() >= place_titles.len(),
+        "{} >= {}",
+        places.len(),
+        place_titles.len()
+    );
+
+    for (i, place) in places.iter_mut().enumerate() {
+        // Each "place" has a link element.
+        let place_title = place.find(Locator::Css("a")).await?;
+        let place_title = place_title.text().await?;
+        if place_title.is_empty() {
+            assert!(i >= place_titles.len(), "{} >= {}", i, place_titles.len());
+        } else {
+            assert_eq!(place_title, place_titles[i]);
+        }
+    }
+
+    c.close().await
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -588,6 +630,11 @@ mod firefox {
         local_tester!(finds_all_inner, "firefox");
     }
 
+    #[test]
+    #[serial]
+    fn finds_sub_elements_test() {
+        local_tester!(finds_sub_elements, "firefox");
+    }
     
 }
 
@@ -697,5 +744,9 @@ mod chrome {
     fn finds_all_inner_test() {
         local_tester!(finds_all_inner, "chrome");
     }
-    
+
+    #[test]
+    fn finds_sub_elements_test() {
+        local_tester!(finds_sub_elements, "chrome");
+    }
 }

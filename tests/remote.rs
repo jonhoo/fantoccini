@@ -158,47 +158,6 @@ async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
-    // Go to the Wikipedia front page
-    c.goto("https://en.wikipedia.org/wiki/Main_Page").await?;
-    // Get the main footer
-    let footer = c.find(Locator::Css("#footer-places")).await?;
-    // Get all the li place elements in the footer
-    let mut places = footer.find_all(Locator::Css("li")).await?;
-
-    let place_titles = &[
-        "Privacy policy",
-        "About Wikipedia",
-        "Disclaimers",
-        "Contact Wikipedia",
-        "Code of Conduct",
-        "Mobile view",
-        "Developers",
-        "Statistics",
-        "Cookie statement",
-    ];
-    // There's sometimes a hidden "edit preview settings" link in the footer.
-    assert!(
-        places.len() >= place_titles.len(),
-        "{} >= {}",
-        places.len(),
-        place_titles.len()
-    );
-
-    for (i, place) in places.iter_mut().enumerate() {
-        // Each "place" has a link element.
-        let place_title = place.find(Locator::Css("a")).await?;
-        let place_title = place_title.text().await?;
-        if place_title.is_empty() {
-            assert!(i >= place_titles.len(), "{} >= {}", i, place_titles.len());
-        } else {
-            assert_eq!(place_title, place_titles[i]);
-        }
-    }
-
-    c.close().await
-}
-
 async fn persist_inner(c: Client) -> Result<(), error::CmdError> {
     c.goto("https://en.wikipedia.org/").await?;
     c.persist().await?;
@@ -330,11 +289,6 @@ mod chrome {
     }
 
     #[test]
-    fn it_finds_sub_elements() {
-        tester!(finds_sub_elements, "chrome");
-    }
-
-    #[test]
     #[ignore]
     fn it_persists() {
         tester!(persist_inner, "chrome");
@@ -408,12 +362,6 @@ mod firefox {
     #[ignore]
     fn it_can_get_and_set_window_rect() {
         tester!(window_rect_inner, "firefox");
-    }
-
-    #[serial]
-    #[test]
-    fn it_finds_sub_elements() {
-        tester!(finds_sub_elements, "firefox");
     }
 
     #[test]
