@@ -8,32 +8,43 @@ use serial_test::serial;
 use std::time::Duration;
 use url::Url;
 
+// To Be removed when tests are moved to local.rs
+use crate::common::sample_page_url;
+
 mod common;
 
-async fn works_inner(c: Client) -> Result<(), error::CmdError> {
-    // go to the Wikipedia page for Foobar
-    c.goto("https://en.wikipedia.org/wiki/Foobar").await?;
-    let e = c.find(Locator::Id("History_and_etymology")).await?;
+async fn works_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
+    let e = c.find(Locator::Id("span_id")).await?;
     let text = e.text().await?;
-    assert_eq!(text, "History and etymology");
-    let url = c.current_url().await?;
-    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+    assert_eq!(text, "Span");
 
-    // click "Foo (disambiguation)"
-    c.find(Locator::Css(".mw-disambig")).await?.click().await?;
+    let current_url = c.current_url().await?;
+    assert_eq!(current_url.as_ref(), &url);
 
-    // click "Foo Lake"
-    c.find(Locator::LinkText("Foo Lake")).await?.click().await?;
+    // click "Other Page"
+    c.find(Locator::Css(".other_page")).await?.click().await?;
 
-    let url = c.current_url().await?;
-    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foo_Lake");
+    // click "iframe inner"
+    c.find(Locator::LinkText("iframe inner"))
+        .await?
+        .click()
+        .await?;
+
+    let current_url = c.current_url().await?;
+    assert_eq!(
+        current_url.as_ref(),
+        format!("http://localhost:{}/iframe_inner.html", port)
+    );
 
     c.close().await
 }
 
-async fn clicks_inner_by_locator(c: Client) -> Result<(), error::CmdError> {
-    // go to the Wikipedia frontpage this time
-    c.goto("https://www.wikipedia.org/").await?;
+async fn clicks_inner_by_locator(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
 
     // find, fill out, and submit the search form
     let f = c.form(Locator::Css("#search-form")).await?;
@@ -43,15 +54,15 @@ async fn clicks_inner_by_locator(c: Client) -> Result<(), error::CmdError> {
     f.submit().await?;
 
     // we should now have ended up in the rigth place
-    let url = c.current_url().await?;
-    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+    let current_url = c.current_url().await?;
+    assert_eq!(current_url.as_ref(), format!("{}?search=foobar", url));
 
     c.close().await
 }
 
-async fn clicks_inner(c: Client) -> Result<(), error::CmdError> {
-    // go to the Wikipedia frontpage this time
-    c.goto("https://www.wikipedia.org/").await?;
+async fn clicks_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
 
     // find, fill out, and submit the search form
     let f = c.form(Locator::Css("#search-form")).await?;
@@ -59,18 +70,20 @@ async fn clicks_inner(c: Client) -> Result<(), error::CmdError> {
     f.submit().await?;
 
     // we should now have ended up in the rigth place
-    let url = c.current_url().await?;
-    assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
+    let current_url = c.current_url().await?;
+    // This is not a 1to1 match with previous test ('foobar' vs ?search=foobar),
+    // but I believe it has the same result
+    assert_eq!(current_url.as_ref(), format!("{}?search=foobar", url));
 
     c.close().await
 }
 
-async fn send_keys_and_clear_input_inner(c: Client) -> Result<(), error::CmdError> {
-    // go to the Wikipedia frontpage this time
-    c.goto("https://www.wikipedia.org/").await?;
+async fn send_keys_and_clear_input_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
 
     // find search input element
-    let e = c.wait().for_element(Locator::Id("searchInput")).await?;
+    let e = c.wait().for_element(Locator::Id("text-input")).await?;
     e.send_keys("foobar").await?;
     assert_eq!(
         e.prop("value")
@@ -93,12 +106,12 @@ async fn send_keys_and_clear_input_inner(c: Client) -> Result<(), error::CmdErro
     c.close().await
 }
 
-async fn raw_inner(c: Client) -> Result<(), error::CmdError> {
-    // go back to the frontpage
-    c.goto("https://www.wikipedia.org/").await?;
+async fn raw_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
 
-    // find the source for the Wikipedia globe
-    let img = c.find(Locator::Css("img.central-featured-logo")).await?;
+    // find the source for the globe
+    let img = c.find(Locator::Css("img.globe")).await?;
     let src = img.attr("src").await?.expect("image should have a src");
 
     // now build a raw HTTP client request (which also has all current cookies)
@@ -109,15 +122,16 @@ async fn raw_inner(c: Client) -> Result<(), error::CmdError> {
         .map_err(error::CmdError::from)
         .await?;
 
-    // and voilla, we now have the bytes for the Wikipedia logo!
+    // and voilla, we now have the bytes for the globe!
     assert!(!pixels.is_empty());
-    println!("Wikipedia logo is {}b", pixels.len());
+    println!("The logo is {}b", pixels.len());
 
     c.close().await
 }
 
-async fn window_size_inner(c: Client) -> Result<(), error::CmdError> {
-    c.goto("https://www.wikipedia.org/").await?;
+async fn window_size_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
     c.set_window_size(500, 400).await?;
     let (width, height) = c.get_window_size().await?;
     assert_eq!(width, 500);
@@ -126,8 +140,9 @@ async fn window_size_inner(c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_position_inner(c: Client) -> Result<(), error::CmdError> {
-    c.goto("https://www.wikipedia.org/").await?;
+async fn window_position_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
     c.set_window_size(200, 100).await?;
     c.set_window_position(0, 0).await?;
     c.set_window_position(1, 2).await?;
@@ -138,8 +153,9 @@ async fn window_position_inner(c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
-    c.goto("https://www.wikipedia.org/").await?;
+async fn window_rect_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
     c.set_window_rect(0, 0, 500, 400).await?;
     let (x, y) = c.get_window_position().await?;
     assert_eq!(x, 0);
@@ -158,59 +174,31 @@ async fn window_rect_inner(c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn finds_all_inner(c: Client) -> Result<(), error::CmdError> {
-    // go to the Wikipedia frontpage
-    c.goto("https://en.wikipedia.org/wiki/Main_Page").await?;
+async fn finds_all_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
     // Find all the footer links
-    let es = c.find_all(Locator::Css("#footer-places li")).await?;
+    let es = c.find_all(Locator::Css("#footer li")).await?;
     let mut texts =
         futures_util::future::try_join_all(es.into_iter().map(|e| async move { e.text().await }))
             .await?;
     texts.retain(|t| !t.is_empty());
-    assert_eq!(
-        texts,
-        [
-            "Privacy policy",
-            "About Wikipedia",
-            "Disclaimers",
-            "Contact Wikipedia",
-            "Code of Conduct",
-            "Mobile view",
-            "Developers",
-            "Statistics",
-            "Cookie statement"
-        ]
-    );
+    assert_eq!(texts, ["Footer Element", "Another Footer Element",]);
 
     c.close().await
 }
 
-async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
-    // Go to the Wikipedia front page
-    c.goto("https://en.wikipedia.org/wiki/Main_Page").await?;
+async fn finds_sub_elements(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
+
     // Get the main footer
-    let footer = c.find(Locator::Css("#footer-places")).await?;
+    let footer = c.find(Locator::Css("#footer")).await?;
     // Get all the li place elements in the footer
     let mut places = footer.find_all(Locator::Css("li")).await?;
 
-    let place_titles = &[
-        "Privacy policy",
-        "About Wikipedia",
-        "Disclaimers",
-        "Contact Wikipedia",
-        "Code of Conduct",
-        "Mobile view",
-        "Developers",
-        "Statistics",
-        "Cookie statement",
-    ];
-    // There's sometimes a hidden "edit preview settings" link in the footer.
-    assert!(
-        places.len() >= place_titles.len(),
-        "{} >= {}",
-        places.len(),
-        place_titles.len()
-    );
+    let place_titles = &["Footer Element", "Another Footer Element"];
 
     for (i, place) in places.iter_mut().enumerate() {
         // Each "place" has a link element.
@@ -226,14 +214,15 @@ async fn finds_sub_elements(c: Client) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-async fn persist_inner(c: Client) -> Result<(), error::CmdError> {
-    c.goto("https://en.wikipedia.org/").await?;
+async fn persist_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
+    let url = sample_page_url(port);
+    c.goto(&url).await?;
     c.persist().await?;
 
     c.close().await
 }
 
-async fn simple_wait_test(c: Client) -> Result<(), error::CmdError> {
+async fn simple_wait_test(c: Client, _port: u16) -> Result<(), error::CmdError> {
     #[allow(deprecated)]
     c.wait_for(move |_| {
         std::thread::sleep(Duration::from_secs(4));
@@ -315,67 +304,67 @@ mod chrome {
 
     #[test]
     fn it_works() {
-        tester!(works_inner, "chrome");
+        local_tester!(works_inner, "chrome");
     }
 
     #[test]
     fn it_clicks() {
-        tester!(clicks_inner, "chrome");
+        local_tester!(clicks_inner, "chrome");
     }
 
     #[test]
     fn it_clicks_by_locator() {
-        tester!(clicks_inner_by_locator, "chrome");
+        local_tester!(clicks_inner_by_locator, "chrome");
     }
 
     #[test]
     fn it_sends_keys_and_clear_input() {
-        tester!(send_keys_and_clear_input_inner, "chrome");
+        local_tester!(send_keys_and_clear_input_inner, "chrome");
     }
 
     #[test]
     fn it_can_be_raw() {
-        tester!(raw_inner, "chrome");
+        local_tester!(raw_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_size() {
-        tester!(window_size_inner, "chrome");
+        local_tester!(window_size_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_position() {
-        tester!(window_position_inner, "chrome");
+        local_tester!(window_position_inner, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
-        tester!(window_rect_inner, "chrome");
+        local_tester!(window_rect_inner, "chrome");
     }
 
     #[test]
     fn it_finds_all() {
-        tester!(finds_all_inner, "chrome");
+        local_tester!(finds_all_inner, "chrome");
     }
 
     #[test]
     fn it_finds_sub_elements() {
-        tester!(finds_sub_elements, "chrome");
+        local_tester!(finds_sub_elements, "chrome");
     }
 
     #[test]
     #[ignore]
     fn it_persists() {
-        tester!(persist_inner, "chrome");
+        local_tester!(persist_inner, "chrome");
     }
 
     #[serial]
     #[test]
     fn it_simple_waits() {
-        tester!(simple_wait_test, "chrome");
+        local_tester!(simple_wait_test, "chrome");
     }
 
     #[serial]
@@ -397,73 +386,73 @@ mod firefox {
     #[serial]
     #[test]
     fn it_works() {
-        tester!(works_inner, "firefox");
+        local_tester!(works_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_clicks() {
-        tester!(clicks_inner, "firefox");
+        local_tester!(clicks_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_clicks_by_locator() {
-        tester!(clicks_inner_by_locator, "firefox");
+        local_tester!(clicks_inner_by_locator, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_sends_keys_and_clear_input() {
-        tester!(send_keys_and_clear_input_inner, "firefox");
+        local_tester!(send_keys_and_clear_input_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_can_be_raw() {
-        tester!(raw_inner, "firefox");
+        local_tester!(raw_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_size() {
-        tester!(window_size_inner, "firefox");
+        local_tester!(window_size_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_position() {
-        tester!(window_position_inner, "firefox");
+        local_tester!(window_position_inner, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
-        tester!(window_rect_inner, "firefox");
+        local_tester!(window_rect_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_finds_all() {
-        tester!(finds_all_inner, "firefox");
+        local_tester!(finds_all_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_finds_sub_elements() {
-        tester!(finds_sub_elements, "firefox");
+        local_tester!(finds_sub_elements, "firefox");
     }
 
     #[test]
     #[ignore]
     fn it_persists() {
-        tester!(persist_inner, "firefox");
+        local_tester!(persist_inner, "firefox");
     }
 
     #[serial]
     #[test]
     fn it_simple_waits() {
-        tester!(simple_wait_test, "firefox");
+        local_tester!(simple_wait_test, "firefox");
     }
 
     #[serial]
