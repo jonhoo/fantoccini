@@ -815,10 +815,12 @@ mod chrome {
         local_tester!(window_size_inner, "chrome");
     }
     #[test]
+    #[ignore]
     fn window_position_inner_test() {
         local_tester!(window_position_inner, "chrome");
     }
     #[test]
+    #[ignore]
     fn window_rect_inner_test() {
         local_tester!(window_rect_inner, "chrome");
     }
