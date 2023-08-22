@@ -454,7 +454,6 @@ async fn finds_all_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.close().await
 }
 
-
 async fn finds_sub_elements(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = common::wikipedia_main_page_url(port);
     c.goto(&sample_url).await?;
@@ -495,7 +494,6 @@ async fn finds_sub_elements(c: Client, port: u16) -> Result<(), error::CmdError>
 
     c.close().await
 }
-
 
 async fn window_size_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = common::wikipedia_home_page_url(port);
@@ -541,8 +539,6 @@ async fn window_rect_inner(c: Client, port: u16) -> Result<(), error::CmdError> 
 
     c.close().await
 }
-
-
 
 mod firefox {
     use super::*;
