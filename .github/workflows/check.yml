@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+# Spend CI time only on latest ref: https://github.com/jonhoo/rust-ci-conf/pull/5
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 name: check
 jobs:
   fmt:
@@ -75,7 +79,7 @@ jobs:
     # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
     strategy:
       matrix:
-        msrv: [1.59.0] # time
+        msrv: ["1.59.0"] # time
     name: ubuntu / ${{ matrix.msrv }}
     steps:
       - uses: actions/checkout@v3

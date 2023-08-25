@@ -1,6 +1,6 @@
 [package]
 name = "fantoccini"
-version = "0.20.0-rc.4"
+version = "0.20.0-rc.5"
 edition = "2021"
 
 description = "High-level API for programmatically interacting with web pages through WebDriver."
@@ -15,7 +15,7 @@ repository = "https://github.com/jonhoo/fantoccini.git"
 keywords = ["webdriver", "chromedriver", "geckodriver", "phantomjs", "automation"]
 categories = ["api-bindings", "development-tools::testing", "web-programming::http-client"]
 
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 
 [features]
 default = ["native-tls"]
