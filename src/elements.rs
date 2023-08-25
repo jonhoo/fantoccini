@@ -2,6 +2,7 @@
 
 use crate::wd::Locator;
 use crate::{error, Client};
+use base64::Engine;
 use serde::Serialize;
 use serde_json::Value as Json;
 use std::fmt::{Display, Formatter};
@@ -412,7 +413,9 @@ impl Element {
             ))
             .await?;
         if let Some(src) = src.as_str() {
-            base64::decode(src).map_err(error::CmdError::ImageDecodeError)
+            base64::engine::general_purpose::STANDARD
+                .decode(src)
+                .map_err(error::CmdError::ImageDecodeError)
         } else {
             Err(error::CmdError::NotW3C(src))
         }

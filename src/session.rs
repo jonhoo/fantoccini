@@ -2,6 +2,7 @@ use crate::cookies::AddCookieParametersWrapper;
 use crate::error::ErrorStatus;
 use crate::wd::WebDriverCompatibleCommand;
 use crate::{error, Client};
+use base64::Engine;
 use futures_core::ready;
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt};
@@ -737,7 +738,7 @@ where
                 hyper::header::AUTHORIZATION,
                 format!(
                     "Basic {}",
-                    base64::encode(&format!(
+                    base64::engine::general_purpose::STANDARD.encode(&format!(
                         "{}:{}",
                         url.username(),
                         url.password().unwrap_or("")
