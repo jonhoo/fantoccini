@@ -1,6 +1,6 @@
 [package]
 name = "fantoccini"
-version = "0.20.0-rc.5"
+version = "0.20.0-rc.6"
 edition = "2021"
 
 description = "High-level API for programmatically interacting with web pages through WebDriver."
