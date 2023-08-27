@@ -3,35 +3,8 @@
 use cookie::SameSite;
 use fantoccini::{error, Client};
 use serial_test::serial;
-use url::Url;
 
 mod common;
-
-async fn wait_for_navigation_test(c: Client) -> Result<(), error::CmdError> {
-    let mut path = std::env::current_dir().unwrap();
-    path.push("tests/redirect_test.html");
-
-    let path_string = format!("file://{}", path.to_str().unwrap());
-    let file_url_str = path_string.as_str();
-    let mut url = Url::parse(file_url_str)?;
-
-    c.goto(url.as_str()).await?;
-
-    #[allow(deprecated)]
-    loop {
-        let wait_for = c.wait_for_navigation(Some(url)).await;
-        assert!(wait_for.is_ok());
-        url = c.current_url().await?;
-        if url.as_str() == "about:blank" {
-            // try again
-            continue;
-        }
-        assert_eq!(url.as_str(), "https://www.wikipedia.org/");
-        break;
-    }
-
-    c.close().await
-}
 
 // Verifies that basic cookie handling works
 async fn handle_cookies_test(c: Client) -> Result<(), error::CmdError> {
@@ -78,12 +51,6 @@ mod chrome {
 
     #[serial]
     #[test]
-    fn it_waits_for_navigation() {
-        tester!(wait_for_navigation_test, "chrome");
-    }
-
-    #[serial]
-    #[test]
     fn it_handles_cookies() {
         tester!(handle_cookies_test, "chrome");
     }
@@ -91,12 +58,6 @@ mod chrome {
 
 mod firefox {
     use super::*;
-
-    #[serial]
-    #[test]
-    fn it_waits_for_navigation() {
-        tester!(wait_for_navigation_test, "firefox");
-    }
 
     #[serial]
     #[test]

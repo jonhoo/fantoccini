@@ -6,6 +6,7 @@ use futures_util::TryFutureExt;
 use hyper::Method;
 use serial_test::serial;
 use std::time::Duration;
+use url::Url;
 use webdriver::command::WebDriverCommand;
 
 mod common;
@@ -649,6 +650,32 @@ async fn simple_wait_test(c: Client, _port: u16) -> Result<(), error::CmdError> 
     c.close().await
 }
 
+async fn wait_for_navigation_test(c: Client, _port: u16) -> Result<(), error::CmdError> {
+    let mut path = std::env::current_dir().unwrap();
+    path.push("tests/test_html/redirect_test.html");
+
+    let path_string = format!("file://{}", path.to_str().unwrap());
+    let file_url_str = path_string.as_str();
+    let mut url = Url::parse(file_url_str)?;
+
+    c.goto(url.as_str()).await?;
+
+    #[allow(deprecated)]
+    loop {
+        let wait_for = c.wait_for_navigation(Some(url)).await;
+        assert!(wait_for.is_ok());
+        url = c.current_url().await?;
+        if url.as_str() == "about:blank" {
+            // try again
+            continue;
+        }
+        assert!(url.to_string().ends_with("sample_page.html"));
+        break;
+    }
+
+    c.close().await
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -848,6 +875,12 @@ mod firefox {
     fn it_simple_waits() {
         local_tester!(simple_wait_test, "firefox");
     }
+
+    #[serial]
+    #[test]
+    fn it_waits_for_navigation() {
+        local_tester!(wait_for_navigation_test, "firefox");
+    }
 }
 
 mod chrome {
@@ -1015,5 +1048,11 @@ mod chrome {
     #[test]
     fn it_simple_waits() {
         local_tester!(simple_wait_test, "chrome");
+    }
+
+    #[serial]
+    #[test]
+    fn it_waits_for_navigation() {
+        local_tester!(wait_for_navigation_test, "chrome");
     }
 }
