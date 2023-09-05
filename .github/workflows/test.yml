@@ -24,7 +24,7 @@ jobs:
             browser: chrome
             toolchain: beta
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install ${{ matrix.browser }}
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     name: ubuntu / stable / minimal-versions
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install browsers
@@ -68,7 +68,7 @@ jobs:
     runs-on: ubuntu-latest
     name: ubuntu / stable / coverage
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: true
       - name: Install browsers
