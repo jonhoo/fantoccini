@@ -9,6 +9,7 @@ use crate::wd::{
     Capabilities, Locator, NewSessionResponse, NewWindowType, TimeoutConfiguration,
     WebDriverStatus, WindowHandle,
 };
+use base64::Engine;
 use hyper::{client::connect, Method};
 use serde_json::Value as Json;
 use std::convert::{TryFrom, TryInto as _};
@@ -812,7 +813,9 @@ impl Client {
     pub async fn screenshot(&self) -> Result<Vec<u8>, error::CmdError> {
         let src = self.issue(WebDriverCommand::TakeScreenshot).await?;
         if let Some(src) = src.as_str() {
-            base64::decode(src).map_err(error::CmdError::ImageDecodeError)
+            base64::engine::general_purpose::STANDARD
+                .decode(src)
+                .map_err(error::CmdError::ImageDecodeError)
         } else {
             Err(error::CmdError::NotW3C(src))
         }
