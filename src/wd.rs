@@ -345,3 +345,31 @@ impl TimeoutConfiguration {
         }
     }
 }
+
+/// The response obtained when opening the WebDriver session.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
+pub struct NewSessionResponse {
+    #[serde(rename = "sessionId")]
+    session_id: String,
+    capabilities: Option<Capabilities>,
+}
+
+impl NewSessionResponse {
+    /// Get the session id.
+    pub fn session_id(&self) -> &str {
+        &self.session_id
+    }
+
+    /// Get the remote end capabilities.
+    pub fn capabilities(&self) -> Option<&Capabilities> {
+        self.capabilities.as_ref()
+    }
+
+    pub(crate) fn from_wd(nsr: webdriver::response::NewSessionResponse) -> Self {
+        NewSessionResponse {
+            session_id: nsr.session_id,
+            capabilities: nsr.capabilities.as_object().cloned(),
+        }
+    }
+}

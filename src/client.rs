@@ -6,7 +6,8 @@ use crate::error;
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
 use crate::wd::{
-    Capabilities, Locator, NewWindowType, TimeoutConfiguration, WebDriverStatus, WindowHandle,
+    Capabilities, Locator, NewSessionResponse, NewWindowType, TimeoutConfiguration,
+    WebDriverStatus, WindowHandle,
 };
 use base64::Engine;
 use hyper::{client::connect, Method};
@@ -36,6 +37,7 @@ use crate::ClientBuilder;
 pub struct Client {
     pub(crate) tx: mpsc::UnboundedSender<Task>,
     pub(crate) is_legacy: bool,
+    pub(crate) new_session_response: Option<NewSessionResponse>,
 }
 
 impl Client {
@@ -113,6 +115,20 @@ impl Client {
             Json::Null => Ok(None),
             v => unreachable!("response to GetSessionId was not a string: {:?}", v),
         }
+    }
+
+    /// Get the response obtained when opening the session.
+    ///
+    /// Returns `None` if no session has yet been opened.
+    pub fn session_creation_response(&self) -> Option<&NewSessionResponse> {
+        self.new_session_response.as_ref()
+    }
+
+    /// Get the capabilities returned by the remote end when opening the session.
+    ///
+    /// Returns `None` if no session has yet been opened.
+    pub fn capabilities(&self) -> Option<&Capabilities> {
+        self.new_session_response.as_ref()?.capabilities()
     }
 
     /// Terminate the WebDriver session.
