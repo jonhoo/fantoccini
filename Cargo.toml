@@ -36,7 +36,7 @@ base64 = "0.21"
 hyper-rustls = { version = "0.24.0", optional = true }
 hyper-tls = { version = "0.5.0", optional = true }
 mime = "0.3.9"
-http = "0.2"
+http = "1.0"
 time = "0.3"
 
 [dev-dependencies]
