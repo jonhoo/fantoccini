@@ -42,7 +42,7 @@ time = "0.3"
 [dev-dependencies]
 tokio = { version = "1", features = ["full"] }
 hyper = { version = "0.14", features = ["server", "tcp"] }
-serial_test = "2.0"
+serial_test = "3.0"
 
 # for minimal-versions
 [target.'cfg(any())'.dependencies]
