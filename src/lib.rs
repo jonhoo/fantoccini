@@ -26,11 +26,6 @@
 //! A quick way to get one is to run [`geckodriver`] at the command line. The code also has
 //! partial support for the legacy WebDriver protocol used by `chromedriver` and `ghostdriver`.
 //!
-//! The examples will be using `panic!` or `unwrap` generously when errors occur (see `map_err`)
-//! --- you should probably not do that in your code, and instead deal with errors when they occur.
-//! This is particularly true for methods that you *expect* might fail, such as lookups by CSS
-//! selector.
-//!
 //! Let's start out clicking around on Wikipedia:
 //!
 //! ```no_run
