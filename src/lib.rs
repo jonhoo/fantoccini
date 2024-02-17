@@ -39,7 +39,7 @@
 //!     let c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!     // Connecting using Rustls (with feature `rustls-tls`)
 //!     # #[cfg(feature = "rustls-tls")]
-//!     let c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//!     let c = ClientBuilder::rustls().expect("rustls initialization").connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //!     # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
 //!     # let c: fantoccini::Client = unreachable!("no tls provider available");
 //!
@@ -71,7 +71,7 @@
 //! # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
 //! # let c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(feature = "rustls-tls")]
-//! # let c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let c = ClientBuilder::rustls().expect("rustls initialization").connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
 //! # let c: fantoccini::Client = unreachable!("no tls provider available");
 //! // -- snip wrapper code --
@@ -100,7 +100,7 @@
 //! # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
 //! # let c = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(feature = "rustls-tls")]
-//! # let c = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let c = ClientBuilder::rustls().expect("rustls initialization").connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
 //! # let c: fantoccini::Client = unreachable!("no tls provider available");
 //! // -- snip wrapper code --
@@ -114,7 +114,13 @@
 //!
 //! // we then read out the image bytes
 //! use futures_util::TryStreamExt;
-//! let pixels = hyper::body::to_bytes(raw.into_body()).await.map_err(fantoccini::error::CmdError::from)?;
+//! use http_body_util::BodyExt;
+//! let pixels = raw
+//!   .into_body()
+//!   .collect()
+//!   .await
+//!   .map_err(fantoccini::error::CmdError::from)?
+//!   .to_bytes();
 //! // and voilla, we now have the bytes for the Wikipedia logo!
 //! assert!(pixels.len() > 0);
 //! println!("Wikipedia logo is {}b", pixels.len());
