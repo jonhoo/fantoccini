@@ -47,6 +47,7 @@ pub async fn make_client(
         #[cfg(feature = "rustls-tls")]
         "rustls" => {
             ClientBuilder::rustls()
+                .unwrap()
                 .capabilities(caps)
                 .connect(url)
                 .await

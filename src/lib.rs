@@ -174,14 +174,14 @@ where
 #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
 impl ClientBuilder<hyper_rustls::HttpsConnector<connect::HttpConnector>> {
     /// Build a [`Client`] that will connect using [Rustls](https://crates.io/crates/rustls).
-    pub fn rustls() -> Self {
-        Self::new(
+    pub fn rustls() -> std::io::Result<Self> {
+        Ok(Self::new(
             hyper_rustls::HttpsConnectorBuilder::new()
-                .with_native_roots()
+                .with_native_roots()?
                 .https_or_http()
                 .enable_http1()
                 .build(),
-        )
+        ))
     }
 }
 
