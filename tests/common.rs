@@ -169,7 +169,8 @@ pub fn setup_server() -> u16 {
     let (tx, rx) = std::sync::mpsc::channel();
 
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_current_thread()
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .worker_threads(1)
             .enable_all()
             .build()
             .unwrap();
@@ -201,6 +202,7 @@ fn start_server() -> (
                 hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
                     .serve_connection(TokioIo::new(conn), service_fn(handle_file_request))
                     .await
+                    .unwrap()
             });
         }
     };
