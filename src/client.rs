@@ -826,13 +826,20 @@ impl Client {
 impl Client {
     /// Wait for the given function to return `true` before proceeding.
     ///
-    /// This can be useful to wait for something to appear on the page before interacting with it.
-    /// While this currently just spins and yields, it may be more efficient than this in the
-    /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
-    /// the page.
+    /// Prefer methods available through [`Client::wait`] where possible.
+    ///
+    /// This function provides no "smarts", and can easily end up blocking forever. It is exactly
+    /// equivalent to
+    ///
+    /// ```rust,ignore
+    /// while !is_ready(self).await? {}
+    /// ```
+    ///
+    /// and is deprecated since it is better for the above loop to be clearly visible in your code
+    /// than hidden through `wait_for`.
     #[deprecated(
         since = "0.17.5",
-        note = "This method might block forever. Please use client.wait().on(...) instead. You can still wait forever using: client.wait().forever().on(...)"
+        note = "Prefer client.wait() or while !is_ready(self).await? {}."
     )]
     pub async fn wait_for<F, FF>(&self, mut is_ready: F) -> Result<(), error::CmdError>
     where
@@ -849,10 +856,7 @@ impl Client {
     /// While this currently just spins and yields, it may be more efficient than this in the
     /// future. In particular, in time, it may only run `is_ready` again when an event occurs on
     /// the page.
-    #[deprecated(
-        since = "0.17.5",
-        note = "This method might block forever. Please use client.wait().on(locator) instead. You can still wait forever using: client.wait().forever().on(locator)"
-    )]
+    #[deprecated(since = "0.17.5", note = "Use client.wait().for_element(locator).")]
     pub async fn wait_for_find(&self, search: Locator<'_>) -> Result<Element, error::CmdError> {
         self.wait().forever().for_element(search).await
     }
@@ -864,7 +868,7 @@ impl Client {
     /// `current_url()`, which would lead to an eternal wait.
     #[deprecated(
         since = "0.17.5",
-        note = "This method might block forever and has a chance of randomly blocking. Please use client.wait().on(url) instead, to check if you navigated successfully to the new URL."
+        note = "Use client.wait().for_url(current) if current.is_some() or a while loop otherwise."
     )]
     pub async fn wait_for_navigation(
         &self,
