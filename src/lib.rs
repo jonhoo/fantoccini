@@ -138,7 +138,7 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 use crate::wd::Capabilities;
-use hyper::client::connect;
+use hyper_util::client::legacy::connect;
 
 macro_rules! via_json {
     ($x:expr) => {{
@@ -172,7 +172,7 @@ where
 
 #[cfg(feature = "rustls-tls")]
 #[cfg_attr(docsrs, doc(cfg(feature = "rustls-tls")))]
-impl ClientBuilder<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
+impl ClientBuilder<hyper_rustls::HttpsConnector<connect::HttpConnector>> {
     /// Build a [`Client`] that will connect using [Rustls](https://crates.io/crates/rustls).
     pub fn rustls() -> Self {
         Self::new(
@@ -187,7 +187,7 @@ impl ClientBuilder<hyper_rustls::HttpsConnector<hyper::client::HttpConnector>> {
 
 #[cfg(feature = "native-tls")]
 #[cfg_attr(docsrs, doc(cfg(feature = "native-tls")))]
-impl ClientBuilder<hyper_tls::HttpsConnector<hyper::client::HttpConnector>> {
+impl ClientBuilder<hyper_tls::HttpsConnector<connect::HttpConnector>> {
     /// Build a [`Client`] that will connect using [`native-tls`](https://crates.io/crates/native-tls).
     pub fn native() -> Self {
         Self::new(hyper_tls::HttpsConnector::new())

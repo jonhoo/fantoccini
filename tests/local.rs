@@ -2,7 +2,7 @@
 use crate::common::{other_page_url, sample_page_url};
 use fantoccini::wd::TimeoutConfiguration;
 use fantoccini::{error, Client, Locator};
-use futures_util::TryFutureExt;
+use http_body_util::BodyExt;
 use hyper::Method;
 use serial_test::serial;
 use std::time::Duration;
@@ -557,9 +557,12 @@ async fn raw_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
     let raw = img.client().raw_client_for(Method::GET, &src).await?;
 
     // we then read out the image bytes
-    let pixels = hyper::body::to_bytes(raw.into_body())
-        .map_err(error::CmdError::from)
-        .await?;
+    let pixels = raw
+        .into_body()
+        .collect()
+        .await
+        .map_err(error::CmdError::from)?
+        .to_bytes();
 
     // and voilla, we now have the bytes for the globe!
     assert!(!pixels.is_empty());

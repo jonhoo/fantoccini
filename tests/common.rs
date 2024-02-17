@@ -5,12 +5,14 @@ extern crate futures_util;
 
 use fantoccini::{error, Client, ClientBuilder};
 
-use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server, StatusCode};
+use hyper::body::Bytes;
+use hyper::service::service_fn;
+use hyper::{Request, Response, StatusCode};
+use hyper_util::rt::{TokioExecutor, TokioIo};
 use serde_json::map;
 use std::convert::Infallible;
 use std::future::Future;
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::path::Path;
 use tokio::fs::read_to_string;
 
@@ -187,17 +189,28 @@ fn start_server() -> (
     impl Future<Output = hyper::Result<()>> + 'static,
 ) {
     let socket_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0);
+    let bind = TcpListener::bind(&socket_addr).unwrap();
+    let addr = bind.local_addr().unwrap();
 
-    let server = Server::bind(&socket_addr).serve(make_service_fn(move |_| async {
-        Ok::<_, Infallible>(service_fn(handle_file_request))
-    }));
+    let server = async move {
+        let bind = tokio::net::TcpListener::from_std(bind).unwrap();
+        loop {
+            let (conn, _) = bind.accept().await.unwrap();
+            tokio::spawn(async move {
+                hyper_util::server::conn::auto::Builder::new(TokioExecutor::new())
+                    .serve_connection(TokioIo::new(conn), service_fn(handle_file_request))
+                    .await
+            });
+        }
+    };
 
-    let addr = server.local_addr();
     (addr, server)
 }
 
 /// Tries to return the requested html file
-async fn handle_file_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn handle_file_request(
+    req: Request<hyper::body::Incoming>,
+) -> Result<Response<http_body_util::Full<hyper::body::Bytes>>, Infallible> {
     let uri_path = req.uri().path().trim_matches(&['/', '\\'][..]);
 
     // tests only contain html files
@@ -225,10 +238,10 @@ async fn handle_file_request(req: Request<Body>) -> Result<Response<Body>, Infal
 }
 
 /// Response returned when a file is not found or could not be read
-fn file_not_found() -> Response<Body> {
+fn file_not_found() -> Response<http_body_util::Full<hyper::body::Bytes>> {
     Response::builder()
         .status(StatusCode::NOT_FOUND)
-        .body(Body::empty())
+        .body(http_body_util::Full::new(Bytes::new()))
         .unwrap()
 }
 
