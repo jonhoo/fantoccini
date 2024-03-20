@@ -10,9 +10,10 @@ use crate::wd::{
     WebDriverStatus, WindowHandle,
 };
 use base64::Engine;
-use hyper::{client::connect, Method};
+use http::Method;
+use hyper_util::client::legacy::connect;
 use serde_json::Value as Json;
-use std::convert::{TryFrom, TryInto as _};
+use std::convert::{Infallible, TryFrom, TryInto as _};
 use std::future::Future;
 use tokio::sync::{mpsc, oneshot};
 use webdriver::command::{SendKeysParameters, WebDriverCommand};
@@ -21,6 +22,7 @@ use webdriver::common::{FrameId, ELEMENT_KEY};
 // Used only under `native-tls`
 #[cfg_attr(not(feature = "native-tls"), allow(unused_imports))]
 use crate::ClientBuilder;
+use http_body_util::combinators::BoxBody;
 
 /// A WebDriver client tied to a single browser
 /// [session](https://www.w3.org/TR/webdriver1/#sessions).
@@ -900,9 +902,12 @@ impl Client {
         &self,
         method: Method,
         url: &str,
-    ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
-        self.with_raw_client_for(method, url, |req| req.body(hyper::Body::empty()).unwrap())
-            .await
+    ) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError> {
+        self.with_raw_client_for(method, url, |req| {
+            req.body(BoxBody::new(http_body_util::Empty::new()))
+                .unwrap()
+        })
+        .await
     }
 
     /// Build and issue an HTTP request to the given `url` with all the same cookies as the current
@@ -915,9 +920,11 @@ impl Client {
         method: Method,
         url: &str,
         before: F,
-    ) -> Result<hyper::Response<hyper::Body>, error::CmdError>
+    ) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError>
     where
-        F: FnOnce(http::request::Builder) -> hyper::Request<hyper::Body>,
+        F: FnOnce(
+            http::request::Builder,
+        ) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
     {
         let url = url.to_owned();
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
@@ -1017,7 +1024,7 @@ impl Client {
     /// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
     /// # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(feature = "rustls-tls")]
-    /// # let client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # let client = ClientBuilder::rustls().expect("rustls initialization").connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
     /// # let client: fantoccini::Client = unreachable!("no tls provider available");
     /// // -- snip wrapper code --

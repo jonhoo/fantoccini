@@ -1,5 +1,6 @@
 use http::StatusCode;
 use hyper::Error as HError;
+use hyper_util::client::legacy::Error as HCError;
 use serde::{Serialize, Serializer};
 use std::borrow::Cow;
 use std::error::Error;
@@ -77,6 +78,9 @@ pub enum CmdError {
 
     /// A request to the WebDriver server failed.
     Failed(HError),
+
+    /// A request to the WebDriver server failed (error in hyper_util's legacy client).
+    FailedC(HCError),
 
     /// The connection to the WebDriver server was lost.
     Lost(IOError),
@@ -169,6 +173,7 @@ impl Error for CmdError {
             CmdError::Standard(..) => "webdriver returned error",
             CmdError::BadUrl(..) => "bad url provided",
             CmdError::Failed(..) => "webdriver could not be reached",
+            CmdError::FailedC(..) => "webdriver could not be reached (hyper_util)",
             CmdError::Lost(..) => "webdriver connection lost",
             CmdError::NotJson(..) => "webdriver returned invalid response",
             CmdError::Json(..) => "webdriver returned incoherent response",
@@ -184,6 +189,7 @@ impl Error for CmdError {
             CmdError::Standard(ref e) => Some(e),
             CmdError::BadUrl(ref e) => Some(e),
             CmdError::Failed(ref e) => Some(e),
+            CmdError::FailedC(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
             CmdError::ImageDecodeError(ref e) => Some(e),
@@ -203,6 +209,7 @@ impl fmt::Display for CmdError {
             CmdError::Standard(ref e) => write!(f, "{}", e),
             CmdError::BadUrl(ref e) => write!(f, "{}", e),
             CmdError::Failed(ref e) => write!(f, "{}", e),
+            CmdError::FailedC(ref e) => write!(f, "{}", e),
             CmdError::Lost(ref e) => write!(f, "{}", e),
             CmdError::NotJson(ref e) => write!(f, "{}", e),
             CmdError::Json(ref e) => write!(f, "{}", e),
@@ -231,6 +238,12 @@ impl From<ParseError> for CmdError {
 impl From<HError> for CmdError {
     fn from(e: HError) -> Self {
         CmdError::Failed(e)
+    }
+}
+
+impl From<HCError> for CmdError {
+    fn from(e: HCError) -> Self {
+        CmdError::FailedC(e)
     }
 }
 

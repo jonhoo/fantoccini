@@ -6,8 +6,12 @@ use base64::Engine;
 use futures_core::ready;
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt};
-use hyper::client::connect;
+use http_body_util::combinators::BoxBody;
+use http_body_util::BodyExt;
+use hyper_util::client::legacy::connect;
+use hyper_util::rt::TokioExecutor;
 use serde_json::Value as Json;
+use std::convert::Infallible;
 use std::future::Future;
 use std::io;
 use std::mem;
@@ -31,8 +35,10 @@ pub(crate) enum Cmd {
     Persist,
     GetUa,
     Raw {
-        req: hyper::Request<hyper::Body>,
-        rsp: oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
+        req: hyper::Request<http_body_util::combinators::BoxBody<hyper::body::Bytes, Infallible>>,
+        rsp: oneshot::Sender<
+            Result<hyper::Response<hyper::body::Incoming>, hyper_util::client::legacy::Error>,
+        >,
     },
     WebDriver(Box<dyn WebDriverCompatibleCommand + Send>),
 }
@@ -343,7 +349,7 @@ enum Ongoing {
     Break,
     Shutdown {
         ack: Option<Ack>,
-        fut: hyper::client::ResponseFuture,
+        fut: hyper_util::client::legacy::ResponseFuture,
     },
     WebDriver {
         ack: Ack,
@@ -351,8 +357,10 @@ enum Ongoing {
     },
     Raw {
         ack: Ack,
-        ret: oneshot::Sender<Result<hyper::Response<hyper::Body>, hyper::Error>>,
-        fut: hyper::client::ResponseFuture,
+        ret: oneshot::Sender<
+            Result<hyper::Response<hyper::body::Incoming>, hyper_util::client::legacy::Error>,
+        >,
+        fut: hyper_util::client::legacy::ResponseFuture,
     },
 }
 
@@ -431,7 +439,10 @@ where
 {
     ongoing: Ongoing,
     rx: mpsc::UnboundedReceiver<Task>,
-    client: hyper::Client<C>,
+    client: hyper_util::client::legacy::Client<
+        C,
+        http_body_util::combinators::BoxBody<hyper::body::Bytes, Infallible>,
+    >,
     wdb: url::Url,
     session: Option<String>,
     is_legacy: bool,
@@ -541,7 +552,7 @@ where
             ack,
             fut: self.client.request(
                 hyper::Request::delete(url.as_str())
-                    .body(hyper::Body::empty())
+                    .body(BoxBody::new(http_body_util::Empty::new()))
                     .unwrap(),
             ),
         };
@@ -604,7 +615,8 @@ where
         let wdb = webdriver.parse::<url::Url>();
         let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
         // We want a tls-enabled client
-        let client = hyper::Client::builder().build::<_, hyper::Body>(connector);
+        let client = hyper_util::client::legacy::Client::builder(TokioExecutor::new())
+            .build::<_, BoxBody<hyper::body::Bytes, Infallible>>(connector);
 
         let mut cap = cap.to_owned();
         // We're going to need a channel for sending requests to the WebDriver host
@@ -762,9 +774,12 @@ where
         let req = if let Some(body) = body.take() {
             req = req.header(hyper::header::CONTENT_TYPE, json_mime.as_ref());
             req = req.header(hyper::header::CONTENT_LENGTH, body.len());
-            self.client.request(req.body(body.into()).unwrap())
+            self.client.request(req.body(BoxBody::new(body)).unwrap())
         } else {
-            self.client.request(req.body(hyper::Body::empty()).unwrap())
+            self.client.request(
+                req.body(BoxBody::new(http_body_util::Empty::new()))
+                    .unwrap(),
+            )
         };
 
         let legacy = self.is_legacy;
@@ -781,7 +796,9 @@ where
                     .and_then(|ctype| ctype.to_str().ok()?.parse::<mime::Mime>().ok());
 
                 // What did the server send us?
-                hyper::body::to_bytes(res.into_body())
+                res.into_body()
+                    .collect()
+                    .map_ok(|body| body.to_bytes())
                     .map_ok(move |body| (body, ctype, status))
                     .map_err(|e| -> error::CmdError { e.into() })
             })

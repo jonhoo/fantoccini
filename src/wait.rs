@@ -27,7 +27,7 @@
 //! # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
 //! # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(feature = "rustls-tls")]
-//! # let client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+//! # let client = ClientBuilder::rustls().expect("rustls initialization").connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
 //! # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
 //! # let client: fantoccini::Client = unreachable!("no tls provider available");
 //! // -- snip wrapper code --
@@ -92,7 +92,7 @@ impl<'c> Wait<'c> {
     /// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
     /// # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(feature = "rustls-tls")]
-    /// # let client = ClientBuilder::rustls().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+    /// # let client = ClientBuilder::rustls().expect("rustls initialization").connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
     /// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
     /// # let client: fantoccini::Client = unreachable!("no tls provider available");
     /// // -- snip wrapper code --
