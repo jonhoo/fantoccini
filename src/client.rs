@@ -469,7 +469,7 @@ impl Client {
         }
     }
 
-    /// Sets the x, y, width, and height properties of the current window.
+    /// Sets the width and height properties of the current window.
     ///
     /// See [10.7.2 Set Window Rect](https://www.w3.org/TR/webdriver1/#dfn-set-window-rect) of the
     /// WebDriver standard.
