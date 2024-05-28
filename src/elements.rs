@@ -139,7 +139,7 @@ impl Element {
 
     /// Find all descendant elements that match the given [`Locator`].
     ///
-    /// See [12.5 Find Elemente From
+    /// See [12.5 Find Elements From
     /// Element](https://www.w3.org/TR/webdriver1/#find-elements-from-element) of the WebDriver
     /// standard.
     #[cfg_attr(docsrs, doc(alias = "Find Elements From Element"))]
