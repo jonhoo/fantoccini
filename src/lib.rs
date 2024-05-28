@@ -82,7 +82,7 @@
 //! f.set_by_name("search", "foobar").await?
 //!  .submit().await?;
 //!
-//! // we should now have ended up in the rigth place
+//! // we should now have ended up in the right place
 //! let url = c.current_url().await?;
 //! assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 //!

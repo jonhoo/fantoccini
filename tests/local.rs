@@ -492,7 +492,7 @@ async fn clicks_inner_by_locator(c: Client, port: u16) -> Result<(), error::CmdE
         .await?;
     f.submit().await?;
 
-    // we should now have ended up in the rigth place
+    // we should now have ended up in the right place
     let current_url = c.current_url().await?;
     assert_eq!(current_url.as_ref(), format!("{}?search=foobar", url));
 
@@ -508,7 +508,7 @@ async fn clicks_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
     let f = f.set_by_name("search", "foobar").await?;
     f.submit().await?;
 
-    // we should now have ended up in the rigth place
+    // we should now have ended up in the right place
     let current_url = c.current_url().await?;
     // This is not a 1to1 match with previous test ('foobar' vs ?search=foobar),
     // but I believe it has the same result
