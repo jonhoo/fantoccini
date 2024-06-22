@@ -7,8 +7,7 @@ use fantoccini::actions::{
 use fantoccini::key::Key;
 use fantoccini::{error, Client, Locator};
 use serial_test::serial;
-use std::time::Duration;
-use time::Instant;
+use std::time::{Duration, Instant};
 
 mod common;
 
@@ -18,7 +17,7 @@ async fn actions_null(c: Client, port: u16) -> Result<(), error::CmdError> {
     let null_actions = NullActions::new("null".to_string()).pause(Duration::from_secs(1));
     let now = Instant::now();
     c.perform_actions(null_actions).await?;
-    assert!(now.elapsed().as_seconds_f64() >= 1.0);
+    assert!(now.elapsed().as_secs_f64() >= 1.0);
     Ok(())
 }
 
@@ -30,7 +29,7 @@ async fn actions_key(c: Client, port: u16) -> Result<(), error::CmdError> {
     let key_pause = KeyActions::new("key".to_string()).pause(Duration::from_secs(1));
     let now = Instant::now();
     c.perform_actions(key_pause).await?;
-    assert!(now.elapsed().as_seconds_f64() >= 1.0);
+    assert!(now.elapsed().as_secs_f64() >= 1.0);
 
     // Test key down/up.
     let elem = c.find(Locator::Id("text-input")).await?;
@@ -59,7 +58,7 @@ async fn actions_mouse(c: Client, port: u16) -> Result<(), error::CmdError> {
     let mouse_pause = MouseActions::new("mouse".to_string()).pause(Duration::from_secs(1));
     let now = Instant::now();
     c.perform_actions(mouse_pause).await?;
-    assert!(now.elapsed().as_seconds_f64() >= 1.0);
+    assert!(now.elapsed().as_secs_f64() >= 1.0);
 
     let elem = c.find(Locator::Id("button-alert")).await?;
 
