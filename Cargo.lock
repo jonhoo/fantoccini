@@ -138,6 +138,7 @@ dependencies = [
  "hyper-tls",
  "mime",
  "openssl",
+ "openssl-macros",
  "serde",
  "serde_json",
  "serial_test",
