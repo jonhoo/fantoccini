@@ -164,6 +164,127 @@ impl Client {
         self.issue(Cmd::Persist).await?;
         Ok(())
     }
+
+    /// Create a new raw request builder.
+    pub fn raw_request(&self) -> RawRequestBuilder<'_> {
+        RawRequestBuilder::new(self)
+    }
+}
+
+/// A builder for constructing raw HTTP requests with optional cookies.
+pub struct RawRequestBuilder<'a> {
+    client: &'a Client,
+    method: Method,
+    url: String,
+    cookie_url: Option<String>,
+    request_modifier: Option<Box<dyn FnOnce(http::request::Builder) -> hyper::Request<hyper::Body> + Send>>,
+}
+
+impl std::fmt::Debug for RawRequestBuilder<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RawRequestBuilder")
+            .field("client", &self.client)
+            .field("method", &self.method)
+            .field("url", &self.url)
+            .field("cookie_url", &self.cookie_url)
+            .field("request_modifier", &"<closure>")
+            .finish()
+    }
+}
+
+impl<'a> RawRequestBuilder<'a> {
+    /// Create a new raw request builder.
+    pub fn new(client: &'a Client) -> Self {
+        RawRequestBuilder {
+            client,
+            method: Method::GET,
+            url: String::new(),
+            cookie_url: None,
+            request_modifier: None,
+        }
+    }
+
+    /// Set the HTTP method for the request.
+    pub fn method(&mut self, method: Method) -> &mut Self {
+        self.method = method;
+        self
+    }
+
+    /// Set the URL for the request.
+    pub fn url(&mut self, url: &str) -> &mut Self {
+        self.url = url.to_string();
+        self
+    }
+
+    /// Set the URL for retrieving cookies.
+    pub fn cookie_url(&mut self, url: &str) -> &mut Self {
+        self.cookie_url = Some(url.to_string());
+        self
+    }
+
+    /// Set a function to modify the request.
+    pub fn map_request<F>(&mut self, f: F) -> &mut Self
+    where
+        F: FnOnce(http::request::Builder) -> hyper::Request<hyper::Body> + Send + 'static,
+    {
+        self.request_modifier = Some(Box::new(f));
+        self
+    }
+
+    /// Send the constructed request.
+    pub async fn send(self) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
+        let url = self.url.clone();
+        let method = self.method.clone();
+        let cookie_url = self.cookie_url.clone();
+        let request_modifier = self.request_modifier.unwrap_or(Box::new(|req| req.body(hyper::Body::empty()).unwrap()));
+    
+        let (cookies, ua) = if let Some(cookie_url) = cookie_url {
+            self.client.goto(&cookie_url).await?;
+            let cookies = self.client.issue(WebDriverCommand::GetCookies).await?;
+            self.client.back().await?;
+            if !cookies.is_array() {
+                return Err(error::CmdError::NotW3C(cookies));
+            }
+            let ua = self.client.get_ua().await?;
+            let jar = cookies.as_array().unwrap()
+                .iter()
+                .filter_map(|cookie| {
+                    if let Json::Object(cookie) = cookie {
+                        if let (Some(Json::String(name)), Some(Json::String(value))) = (cookie.get("name"), cookie.get("value")) {
+                            return Some(cookie::Cookie::new(name.clone(), value.clone()).encoded().to_string());
+                        }
+                    }
+                    None
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            (Some(jar), ua)
+        } else {
+            (None, None)
+        };
+    
+        let mut req = hyper::Request::builder()
+            .method(method)
+            .uri(http::Uri::try_from(url.as_str()).unwrap());
+    
+        if let Some(cookies) = cookies {
+            req = req.header(hyper::header::COOKIE, cookies);
+        }
+    
+        if let Some(ua) = ua {
+            req = req.header(hyper::header::USER_AGENT, ua);
+        }
+    
+        let req = request_modifier(req);
+        let (tx, rx) = oneshot::channel();
+        self.client.issue(Cmd::Raw { req, rsp: tx }).await?;
+        match rx.await {
+            Ok(Ok(r)) => Ok(r),
+            Ok(Err(e)) => Err(e.into()),
+            Err(e) => unreachable!("Session ended prematurely: {:?}", e),
+        }
+    }
+    
 }
 
 // NOTE: new impl block to keep related methods together.
