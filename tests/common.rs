@@ -195,6 +195,7 @@ fn start_server() -> (
     let addr = bind.local_addr().unwrap();
 
     let server = async move {
+        bind.set_nonblocking(true).unwrap();
         let bind = tokio::net::TcpListener::from_std(bind).unwrap();
         loop {
             let (conn, _) = bind.accept().await.unwrap();
