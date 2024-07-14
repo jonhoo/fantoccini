@@ -2,7 +2,7 @@
 use crate::common::{other_page_url, sample_page_url};
 use fantoccini::wd::TimeoutConfiguration;
 use fantoccini::{error, Client, Locator};
-use futures_util::TryFutureExt;
+use http_body_util::BodyExt;
 use hyper::Method;
 use serial_test::serial;
 use std::time::Duration;
@@ -557,9 +557,12 @@ async fn raw_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
     let raw = img.client().raw_client_for(Method::GET, &src).await?;
 
     // we then read out the image bytes
-    let pixels = hyper::body::to_bytes(raw.into_body())
-        .map_err(error::CmdError::from)
-        .await?;
+    let pixels = raw
+        .into_body()
+        .collect()
+        .await
+        .map_err(error::CmdError::from)?
+        .to_bytes();
 
     // and voilla, we now have the bytes for the globe!
     assert!(!pixels.is_empty());
@@ -838,80 +841,84 @@ mod firefox {
         local_tester!(capabilities, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_works() {
         local_tester!(works_inner, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_clicks() {
         local_tester!(clicks_inner, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_clicks_by_locator() {
         local_tester!(clicks_inner_by_locator, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_sends_keys_and_clear_input() {
         local_tester!(send_keys_and_clear_input_inner, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_can_be_raw() {
         local_tester!(raw_inner, "firefox");
     }
 
     #[test]
+    #[serial]
     #[ignore]
     fn it_can_get_and_set_window_size() {
         local_tester!(window_size_inner, "firefox");
     }
 
     #[test]
+    #[serial]
     #[ignore]
     fn it_can_get_and_set_window_position() {
         local_tester!(window_position_inner, "firefox");
     }
 
     #[test]
+    #[serial]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
         local_tester!(window_rect_inner, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_finds_all() {
         local_tester!(finds_all_inner, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_finds_sub_elements() {
         local_tester!(finds_sub_elements, "firefox");
     }
 
     #[test]
+    #[serial]
     #[ignore]
     fn it_persists() {
         local_tester!(persist_inner, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_simple_waits() {
         local_tester!(simple_wait_test, "firefox");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_waits_for_navigation() {
         local_tester!(wait_for_navigation_test, "firefox");
     }
@@ -919,102 +926,123 @@ mod firefox {
 
 mod chrome {
     use super::*;
+
     #[test]
+    #[serial]
     fn navigate_to_other_page() {
         local_tester!(goto, "chrome");
     }
 
     #[test]
+    #[serial]
     fn find_and_click_link_test() {
         local_tester!(find_and_click_link, "chrome");
     }
 
     #[test]
+    #[serial]
     fn get_active_element_test() {
         local_tester!(get_active_element, "chrome");
     }
 
     #[test]
+    #[serial]
     fn serialize_element_test() {
         local_tester!(serialize_element, "chrome");
     }
 
     #[test]
+    #[serial]
     fn iframe_test() {
         local_tester!(iframe_switch, "chrome");
     }
 
     #[test]
+    #[serial]
     fn new_window_test() {
         tester!(new_window, "chrome");
     }
 
     #[test]
+    #[serial]
     fn new_window_switch_test() {
         tester!(new_window_switch, "chrome");
     }
 
     #[test]
+    #[serial]
     fn new_tab_test() {
         tester!(new_tab_switch, "chrome");
     }
 
     #[test]
+    #[serial]
     fn close_window_test() {
         tester!(close_window, "chrome");
     }
 
     #[test]
+    #[serial]
     fn double_close_window_test() {
         tester!(close_window_twice_errors, "chrome");
     }
 
     #[test]
+    #[serial]
     fn set_by_name_textarea_test() {
         local_tester!(set_by_name_textarea, "chrome");
     }
 
     #[test]
+    #[serial]
     fn stale_element_test() {
         local_tester!(stale_element, "chrome");
     }
 
     #[test]
+    #[serial]
     fn select_by_label_test() {
         local_tester!(select_by_label, "chrome");
     }
 
     #[test]
+    #[serial]
     fn select_by_index_label() {
         local_tester!(select_by_index, "chrome");
     }
 
     #[test]
+    #[serial]
     fn select_by_test() {
         local_tester!(select_by, "chrome")
     }
 
     #[test]
+    #[serial]
     fn back_and_forward_test() {
         local_tester!(back_and_forward, "chrome");
     }
 
     #[test]
+    #[serial]
     fn status_test() {
         local_tester!(status_chrome, "chrome");
     }
 
     #[test]
+    #[serial]
     fn title_test() {
         local_tester!(page_title, "chrome");
     }
 
     #[test]
+    #[serial]
     fn timeouts_test() {
         local_tester!(timeouts, "chrome");
     }
 
     #[test]
+    #[serial]
     fn dynamic_commands_test() {
         local_tester!(dynamic_commands, "chrome");
     }
@@ -1032,72 +1060,83 @@ mod chrome {
     }
 
     #[test]
+    #[serial]
     fn it_works() {
         local_tester!(works_inner, "chrome");
     }
 
     #[test]
+    #[serial]
     fn it_clicks() {
         local_tester!(clicks_inner, "chrome");
     }
 
     #[test]
+    #[serial]
     fn it_clicks_by_locator() {
         local_tester!(clicks_inner_by_locator, "chrome");
     }
 
     #[test]
+    #[serial]
     fn it_sends_keys_and_clear_input() {
         local_tester!(send_keys_and_clear_input_inner, "chrome");
     }
 
     #[test]
+    #[serial]
     fn it_can_be_raw() {
         local_tester!(raw_inner, "chrome");
     }
 
     #[test]
+    #[serial]
     #[ignore]
     fn it_can_get_and_set_window_size() {
         local_tester!(window_size_inner, "chrome");
     }
 
     #[test]
+    #[serial]
     #[ignore]
     fn it_can_get_and_set_window_position() {
         local_tester!(window_position_inner, "chrome");
     }
 
     #[test]
+    #[serial]
     #[ignore]
     fn it_can_get_and_set_window_rect() {
         local_tester!(window_rect_inner, "chrome");
     }
 
     #[test]
+    #[serial]
     fn it_finds_all() {
         local_tester!(finds_all_inner, "chrome");
     }
 
     #[test]
+    #[serial]
     fn it_finds_sub_elements() {
         local_tester!(finds_sub_elements, "chrome");
     }
 
     #[test]
+    #[serial]
     #[ignore]
     fn it_persists() {
         local_tester!(persist_inner, "chrome");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_simple_waits() {
         local_tester!(simple_wait_test, "chrome");
     }
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_waits_for_navigation() {
         local_tester!(wait_for_navigation_test, "chrome");
     }

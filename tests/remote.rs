@@ -49,8 +49,8 @@ async fn handle_cookies_test(c: Client) -> Result<(), error::CmdError> {
 mod chrome {
     use super::*;
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_handles_cookies() {
         tester!(handle_cookies_test, "chrome");
     }
@@ -59,8 +59,8 @@ mod chrome {
 mod firefox {
     use super::*;
 
-    #[serial]
     #[test]
+    #[serial]
     fn it_handles_cookies() {
         tester!(handle_cookies_test, "firefox");
     }
