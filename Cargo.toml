@@ -32,7 +32,7 @@ futures-util = "0.3"
 tokio = { version = "1", features = ["sync", "rt", "time"] }
 hyper = { version = "0.14", features = ["stream", "client", "http1"] }
 cookie = { version = "0.17.0", features = ["percent-encode"] }
-base64 = "0.21"
+base64 = "0.22"
 hyper-rustls = { version = "0.24.0", optional = true }
 hyper-tls = { version = "0.5.0", optional = true }
 mime = "0.3.9"
