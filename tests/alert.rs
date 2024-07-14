@@ -102,16 +102,19 @@ mod chrome {
     use super::*;
 
     #[test]
+    #[serial]
     fn alert_accept_test() {
         local_tester!(alert_accept, "chrome");
     }
 
     #[test]
+    #[serial]
     fn alert_dismiss_test() {
         local_tester!(alert_dismiss, "chrome");
     }
 
     #[test]
+    #[serial]
     fn alert_text_test() {
         local_tester!(alert_text, "chrome");
     }

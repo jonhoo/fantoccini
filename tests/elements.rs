@@ -162,36 +162,43 @@ mod chrome {
     use super::*;
 
     #[test]
+    #[serial]
     fn element_is_test() {
         local_tester!(element_is, "chrome");
     }
 
     #[test]
+    #[serial]
     fn element_attr_test() {
         local_tester!(element_attr, "chrome");
     }
 
     #[test]
+    #[serial]
     fn element_prop_test() {
         local_tester!(element_prop, "chrome");
     }
 
     #[test]
+    #[serial]
     fn element_css_value_test() {
         local_tester!(element_css_value, "chrome");
     }
 
     #[test]
+    #[serial]
     fn element_tag_name_test() {
         local_tester!(element_tag_name, "chrome");
     }
 
     #[test]
+    #[serial]
     fn element_rect_test() {
         local_tester!(element_rect, "chrome");
     }
 
     #[test]
+    #[serial]
     fn element_send_keys_test() {
         local_tester!(element_send_keys, "chrome");
     }

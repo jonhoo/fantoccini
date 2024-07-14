@@ -204,26 +204,31 @@ mod chrome {
     use super::*;
 
     #[test]
+    #[serial]
     fn actions_null_test() {
         local_tester!(actions_null, "chrome");
     }
 
     #[test]
+    #[serial]
     fn actions_key_test() {
         local_tester!(actions_key, "chrome");
     }
 
     #[test]
+    #[serial]
     fn actions_mouse_test() {
         local_tester!(actions_mouse, "chrome");
     }
 
     #[test]
+    #[serial]
     fn actions_mouse_move_test() {
         local_tester!(actions_mouse_move, "chrome");
     }
 
     #[test]
+    #[serial]
     fn actions_release_test() {
         local_tester!(actions_release, "chrome");
     }
