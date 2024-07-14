@@ -29,7 +29,14 @@ pub fn make_capabilities(s: &str) -> map::Map<String, serde_json::Value> {
         "chrome" => {
             let mut caps = serde_json::map::Map::new();
             let opts = serde_json::json!({
-                "args": ["--headless", "--disable-gpu", "--no-sandbox", "--disable-dev-shm-usage"],
+                "args": [
+                    "--headless",
+                    "--disable-gpu",
+                    "--no-sandbox",
+                    "--disable-dev-shm-usage",
+                    // https://issues.chromium.org/issues/42323434
+                    "--remote-debugging-pipe"
+                ],
             });
             caps.insert("goog:chromeOptions".to_string(), opts);
             caps
