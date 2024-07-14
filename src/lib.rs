@@ -82,7 +82,7 @@
 //! f.set_by_name("search", "foobar").await?
 //!  .submit().await?;
 //!
-//! // we should now have ended up in the rigth place
+//! // we should now have ended up in the right place
 //! let url = c.current_url().await?;
 //! assert_eq!(url.as_ref(), "https://en.wikipedia.org/wiki/Foobar");
 //!
@@ -219,7 +219,7 @@ where
     /// in an object under a prefixed key like
     /// [`moz:firefoxOptions`](https://developer.mozilla.org/en-US/docs/Web/WebDriver/Capabilities/firefoxOptions)
     /// or
-    /// [`goog:chromeOptions`](https://sites.google.com/a/chromium.org/chromedriver/capabilities).
+    /// [`goog:chromeOptions`](https://developer.chrome.com/docs/chromedriver/capabilities).
     ///
     /// The standard options are given below. See the
     /// [specification](https://www.w3.org/TR/webdriver1/#capabilities) for more details.

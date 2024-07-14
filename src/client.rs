@@ -32,7 +32,7 @@ use http_body_util::combinators::BoxBody;
 /// Note that most callers should explicitly call `Client::close`, and wait for the returned
 /// future before exiting. Not doing so may result in the WebDriver session not being cleanly
 /// closed, which is particularly important for some drivers, such as geckodriver, where
-/// multiple simulatenous sessions are not supported. If `close` is not explicitly called, a
+/// multiple simultaneous sessions are not supported. If `close` is not explicitly called, a
 /// session close request will be spawned on the given `handle` when the last instance of this
 /// `Client` is dropped.
 #[derive(Clone, Debug)]
@@ -471,7 +471,7 @@ impl Client {
         }
     }
 
-    /// Sets the x, y, width, and height properties of the current window.
+    /// Sets the width and height properties of the current window.
     ///
     /// See [10.7.2 Set Window Rect](https://www.w3.org/TR/webdriver1/#dfn-set-window-rect) of the
     /// WebDriver standard.
@@ -931,7 +931,7 @@ impl Client {
         // *current* domain, whereas we want the cookies for `url`'s domain. So, we navigate to the
         // URL in question, fetch its cookies, and then navigate back. *Except* that we can't do
         // that either (what if `url` is some huge file?). So we *actually* navigate to some weird
-        // url that's unlikely to exist on the target doamin, and which won't resolve into the
+        // url that's unlikely to exist on the target domain, and which won't resolve into the
         // actual content, but will still give the same cookies.
         //
         // The fact that cookies can have /path and security constraints makes this even more of a
