@@ -814,7 +814,7 @@ where
                 let mut legacy_status = 0;
 
                 // https://www.w3.org/TR/webdriver/#dfn-send-a-response
-                // NOTE: the standard specifies that even errors use the "Send a Reponse" steps
+                // NOTE: the standard specifies that even errors use the "Send a Response" steps
                 let body = match serde_json::from_str(&*body)? {
                     Json::Object(mut v) => {
                         if legacy {
