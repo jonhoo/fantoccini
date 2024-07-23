@@ -185,7 +185,7 @@ pub struct RawRequestBuilder<'a> {
     method: Method,
     url: String,
     cookie_url: Option<String>,
-    request_modifier: Option<Box<dyn FnOnce(http::request::Builder) -> hyper::Request<hyper::Body> + Send>>,
+    request_modifier: Option<Box<dyn FnOnce(http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>> + Send>>,
 }
 
 impl std::fmt::Debug for RawRequestBuilder<'_> {
@@ -249,14 +249,14 @@ impl<'a> RawRequestBuilder<'a> {
     /// Set a function to modify the request.
     pub fn map_request<F>(&mut self, f: F) -> &mut Self
     where
-        F: FnOnce(http::request::Builder) -> hyper::Request<hyper::Body> + Send + 'static,
+        F: FnOnce(http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>> + Send + 'static,
     {
         self.request_modifier = Some(Box::new(f));
         self
     }
 
     /// Send the constructed request.
-    pub async fn send(self) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
+    pub async fn send(self) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError> {
         let url = self.url;
         let method = self.method;
         let cookie_url = self.cookie_url;
@@ -266,7 +266,7 @@ impl<'a> RawRequestBuilder<'a> {
         // *current* domain, whereas we want the cookies for `url`'s domain. So, we navigate to the
         // URL in question, fetch its cookies, and then navigate back. *Except* that we can't do
         // that either (what if `url` is some huge file?). So we *actually* navigate to some weird
-        // url that's unlikely to exist on the target doamin, and which won't resolve into the
+        // url that's unlikely to exist on the target domain, and which won't resolve into the
         // actual content, but will still give the same cookies.
         //
         // The fact that cookies can have /path and security constraints makes this even more of a
@@ -345,7 +345,7 @@ impl<'a> RawRequestBuilder<'a> {
         let req = if let Some(modifier) = request_modifier {
             modifier(req)
         } else {
-            req.body(hyper::Body::empty()).unwrap()
+            req.body(BoxBody::new(http_body_util::Empty::new())).unwrap()
         };
         
         let (tx, rx) = oneshot::channel();
@@ -1095,10 +1095,14 @@ impl Client {
         &self,
         method: Method,
         url: &str,
-    ) -> Result<hyper::Response<hyper::Body>, error::CmdError> {
+    ) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError> {
         let mut builder = self.raw_request();
-        builder.method(method).url(url);
-        builder.send().await
+        builder
+            .method(method)
+            .url(url);
+        builder
+            .send()
+            .await
     }
 
     /// Build and issue an HTTP request to the given `url` with all the same cookies as the current
@@ -1113,91 +1117,18 @@ impl Client {
         before: F,
     ) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError>
     where
-        F: FnOnce(http::request::Builder) -> hyper::Request<hyper::Body>,
+        F: FnOnce(
+            http::request::Builder,
+        ) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>> + Send + 'static,
     {
-        let url = url.to_owned();
-        // We need to do some trickiness here. GetCookies will only give us the cookies for the
-        // *current* domain, whereas we want the cookies for `url`'s domain. So, we navigate to the
-        // URL in question, fetch its cookies, and then navigate back. *Except* that we can't do
-        // that either (what if `url` is some huge file?). So we *actually* navigate to some weird
-        // url that's unlikely to exist on the target doamin, and which won't resolve into the
-        // actual content, but will still give the same cookies.
-        //
-        // The fact that cookies can have /path and security constraints makes this even more of a
-        // pain. /path in particular is tricky, because you could have a URL like:
-        //
-        //    example.com/download/some_identifier/ignored_filename_just_for_show
-        //
-        // Imagine if a cookie is set with path=/download/some_identifier. How do we get that
-        // cookie without triggering a request for the (large) file? I don't know. Hence: TODO.
-        let old_url = self.current_url_().await?;
-        let url = old_url.clone().join(&url)?;
-        let cookie_url = url.clone().join("/please_give_me_your_cookies")?;
-        self.goto(cookie_url.as_str()).await?;
-
-        // TODO: go back before we return if this call errors:
-        let cookies = self.issue(WebDriverCommand::GetCookies).await?;
-        if !cookies.is_array() {
-            return Err(error::CmdError::NotW3C(cookies));
-        }
-        self.back().await?;
-        let ua = self.get_ua().await?;
-
-        // now add all the cookies
-        let mut all_ok = true;
-        let mut jar = Vec::new();
-        for cookie in cookies.as_array().unwrap() {
-            if !cookie.is_object() {
-                all_ok = false;
-                break;
-            }
-
-            // https://w3c.github.io/webdriver/webdriver-spec.html#cookies
-            let cookie = cookie.as_object().unwrap();
-            if !cookie.contains_key("name") || !cookie.contains_key("value") {
-                all_ok = false;
-                break;
-            }
-
-            if !cookie["name"].is_string() || !cookie["value"].is_string() {
-                all_ok = false;
-                break;
-            }
-
-            // Note that since we're sending these cookies, all that matters is the mapping
-            // from name to value. The other fields only matter when deciding whether to
-            // include a cookie or not, and the driver has already decided that for us
-            // (GetCookies is for a particular URL).
-            jar.push(
-                cookie::Cookie::new(
-                    cookie["name"].as_str().unwrap().to_owned(),
-                    cookie["value"].as_str().unwrap().to_owned(),
-                )
-                .encoded()
-                .to_string(),
-            );
-        }
-
-        if !all_ok {
-            return Err(error::CmdError::NotW3C(cookies));
-        }
-
-        let mut req = hyper::Request::builder();
-        req = req
+        let mut builder = self.raw_request();
+        builder
             .method(method)
-            .uri(http::Uri::try_from(url.as_str()).unwrap());
-        req = req.header(hyper::header::COOKIE, jar.join("; "));
-        if let Some(s) = ua {
-            req = req.header(hyper::header::USER_AGENT, s);
-        }
-        let req = before(req);
-        let (tx, rx) = oneshot::channel();
-        self.issue(Cmd::Raw { req, rsp: tx }).await?;
-        match rx.await {
-            Ok(Ok(r)) => Ok(r),
-            Ok(Err(e)) => Err(e.into()),
-            Err(e) => unreachable!("Session ended prematurely: {:?}", e),
-        }
+            .url(url)
+            .map_request(before);
+        builder
+            .send()
+            .await
     }
 }
 
