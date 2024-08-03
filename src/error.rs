@@ -16,6 +16,8 @@ pub enum NewSessionError {
     BadWebdriverUrl(ParseError),
     /// The WebDriver server could not be reached.
     Failed(HError),
+    /// The WebDriver server could not be reached (error in hyper_util's legacy client).
+    FailedC(HCError),
     /// The connection to the WebDriver server was lost.
     Lost(IOError),
     /// The server did not give a WebDriver-conforming response.
@@ -29,6 +31,7 @@ impl Error for NewSessionError {
         match *self {
             NewSessionError::BadWebdriverUrl(..) => "webdriver url is invalid",
             NewSessionError::Failed(..) => "webdriver server did not respond",
+            NewSessionError::FailedC(..) => "webdriver server did not respond (legacy client)",
             NewSessionError::Lost(..) => "webdriver server disconnected",
             NewSessionError::NotW3C(..) => "webdriver server gave non-conformant response",
             NewSessionError::SessionNotCreated(..) => "webdriver did not create session",
@@ -39,6 +42,7 @@ impl Error for NewSessionError {
         match *self {
             NewSessionError::BadWebdriverUrl(ref e) => Some(e),
             NewSessionError::Failed(ref e) => Some(e),
+            NewSessionError::FailedC(ref e) => Some(e),
             NewSessionError::Lost(ref e) => Some(e),
             NewSessionError::NotW3C(..) => None,
             NewSessionError::SessionNotCreated(ref e) => Some(e),
@@ -53,6 +57,7 @@ impl fmt::Display for NewSessionError {
         match *self {
             NewSessionError::BadWebdriverUrl(ref e) => write!(f, "{}", e),
             NewSessionError::Failed(ref e) => write!(f, "{}", e),
+            NewSessionError::FailedC(ref e) => write!(f, "{}", e),
             NewSessionError::Lost(ref e) => write!(f, "{}", e),
             NewSessionError::NotW3C(ref e) => write!(f, "{:?}", e),
             NewSessionError::SessionNotCreated(ref e) => write!(f, "{}", e),

@@ -581,6 +581,7 @@ where
             }
             Ok(v) | Err(error::CmdError::NotW3C(v)) => Err(error::NewSessionError::NotW3C(v)),
             Err(error::CmdError::Failed(e)) => Err(error::NewSessionError::Failed(e)),
+            Err(error::CmdError::FailedC(e)) => Err(error::NewSessionError::FailedC(e)),
             Err(error::CmdError::Lost(e)) => Err(error::NewSessionError::Lost(e)),
             Err(error::CmdError::NotJson(v)) => {
                 Err(error::NewSessionError::NotW3C(Json::String(v)))
