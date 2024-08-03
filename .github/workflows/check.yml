@@ -99,7 +99,7 @@ jobs:
     # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
     strategy:
       matrix:
-        msrv: ["1.67.0"] # time
+        msrv: ["1.70.0"] # tokio
     name: ubuntu / ${{ matrix.msrv }}
     steps:
       - uses: actions/checkout@v4
