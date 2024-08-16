@@ -186,6 +186,7 @@ pub struct RawRequestBuilder<'a> {
     url: String,
     cookie_url: Option<String>,
     request_modifier: Option<Box<dyn FnOnce(http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>> + Send>>,
+    skip_cookie_navigation: bool,
 }
 
 impl std::fmt::Debug for RawRequestBuilder<'_> {
@@ -196,6 +197,7 @@ impl std::fmt::Debug for RawRequestBuilder<'_> {
             .field("url", &self.url)
             .field("cookie_url", &self.cookie_url)
             .field("request_modifier", &"<closure>")
+            .field("skip_cookie_navigation", &self.skip_cookie_navigation)
             .finish()
     }
 }
@@ -207,8 +209,9 @@ impl<'a> RawRequestBuilder<'a> {
             client,
             method: Method::GET,
             url: String::new(),
-            cookie_url: None,
+            cookie_url: Some("/please_give_me_your_cookies".to_string()),
             request_modifier: None,
+            skip_cookie_navigation: false,
         }
     }
 
@@ -246,6 +249,14 @@ impl<'a> RawRequestBuilder<'a> {
         self
     }
 
+    /// Opt out of the cookie navigation process.
+    ///
+    /// This allows to skip the navigation to a cookie URL if they don't want to retrieve cookies.
+    pub fn skip_cookie_navigation(&mut self) -> &mut Self {
+        self.skip_cookie_navigation = true;
+        self
+    }
+
     /// Set a function to modify the request.
     pub fn map_request<F>(&mut self, f: F) -> &mut Self
     where
@@ -261,6 +272,7 @@ impl<'a> RawRequestBuilder<'a> {
         let method = self.method;
         let cookie_url = self.cookie_url;
         let request_modifier = self.request_modifier;
+        let skip_cookie_navigation = self.skip_cookie_navigation;   
 
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
         // *current* domain, whereas we want the cookies for `url`'s domain. So, we navigate to the
@@ -277,77 +289,87 @@ impl<'a> RawRequestBuilder<'a> {
         // Imagine if a cookie is set with path=/download/some_identifier. How do we get that
         // cookie without triggering a request for the (large) file? I don't know. Hence: TODO.
         //
-        // Retrieve cookies and User-Agent from the WebDriver session if a cookie URL is provided.
-        let (cookies, ua) = if let Some(cookie_url) = cookie_url {
-            // Navigate to the cookie URL to retrieve cookies.
-            self.client.goto(&cookie_url).await?;
-            let cookies = self.client.issue(WebDriverCommand::GetCookies).await?;
-            self.client.back().await?;
-            if !cookies.is_array() {
-                return Err(error::CmdError::NotW3C(cookies));
-            }
-            let ua = self.client.get_ua().await?;
-
-            // now add all the cookies
-            let mut all_ok = true;
-            let mut jar = Vec::new();
-            for cookie in cookies.as_array().unwrap() {
-                if !cookie.is_object() {
-                    all_ok = false;
-                    break;
+        // If cookie navigation is not skipped, handle the cookie retrieval.
+        let cookies = if !skip_cookie_navigation {
+            if let Some(cookie_url) = cookie_url {
+                let current_url = self.client.current_url_().await?;
+                let cookie_url = current_url.join(&cookie_url)?;
+                self.client.goto(cookie_url.as_str()).await?;
+    
+                let cookies = self.client.issue(WebDriverCommand::GetCookies).await?;
+                self.client.back().await?;
+    
+                if !cookies.is_array() {
+                    return Err(error::CmdError::NotW3C(cookies));
                 }
+    
+                // now add all the cookies
+                let mut all_ok = true;
+                let mut jar = Vec::new();
+                for cookie in cookies.as_array().unwrap() {
+                    if !cookie.is_object() {
+                        all_ok = false;
+                        break;
+                    }
 
-                // https://w3c.github.io/webdriver/webdriver-spec.html#cookies
-                let cookie = cookie.as_object().unwrap();
-                if !cookie.contains_key("name") || !cookie.contains_key("value") {
-                    all_ok = false;
-                    break;
+                    // https://w3c.github.io/webdriver/webdriver-spec.html#cookies
+                    let cookie = cookie.as_object().unwrap();
+                    if !cookie.contains_key("name") || !cookie.contains_key("value") {
+                        all_ok = false;
+                        break;
+                    }
+    
+                    if !cookie["name"].is_string() || !cookie["value"].is_string() {
+                        all_ok = false;
+                        break;
+                    }
+
+                    // Note that since we're sending these cookies, all that matters is the mapping
+                    // from name to value. The other fields only matter when deciding whether to
+                    // include a cookie or not, and the driver has already decided that for us
+                    // (GetCookies is for a particular URL).  
+                    jar.push(
+                        cookie::Cookie::new(
+                            cookie["name"].as_str().unwrap().to_owned(),
+                            cookie["value"].as_str().unwrap().to_owned(),
+                        )
+                        .encoded()
+                        .to_string(),
+                    );
                 }
-
-                if !cookie["name"].is_string() || !cookie["value"].is_string() {
-                    all_ok = false;
-                    break;
+    
+                if !all_ok {
+                    return Err(error::CmdError::NotW3C(cookies));
                 }
-
-                // Note that since we're sending these cookies, all that matters is the mapping
-                // from name to value. The other fields only matter when deciding whether to
-                // include a cookie or not, and the driver has already decided that for us
-                // (GetCookies is for a particular URL).
-                jar.push(
-                    cookie::Cookie::new(
-                        cookie["name"].as_str().unwrap().to_owned(),
-                        cookie["value"].as_str().unwrap().to_owned(),
-                    )
-                    .encoded()
-                    .to_string(),
-                );
+    
+                Some(jar.join("; "))
+            } else {
+                None
             }
-
-            if !all_ok {
-                return Err(error::CmdError::NotW3C(cookies));
-            }
-
-            (Some(jar.join("; ")), ua)
         } else {
-            (None, None)
+            None
         };
 
         let mut req = hyper::Request::builder();
         req = req
             .method(method)
             .uri(http::Uri::try_from(url.as_str()).unwrap());
+    
         if let Some(cookies) = cookies {
             req = req.header(hyper::header::COOKIE, cookies);
         }
+
+        let ua = self.client.get_ua().await?;
         if let Some(ua) = ua {
             req = req.header(hyper::header::USER_AGENT, ua);
         }
+    
         let req = if let Some(modifier) = request_modifier {
             modifier(req)
         } else {
             req.body(BoxBody::new(http_body_util::Empty::new())).unwrap()
         };
-        
+    
         let (tx, rx) = oneshot::channel();
         self.client.issue(Cmd::Raw { req, rsp: tx }).await?;
         match rx.await {
@@ -356,7 +378,6 @@ impl<'a> RawRequestBuilder<'a> {
             Err(e) => unreachable!("Session ended prematurely: {:?}", e),
         }
     }
-    
 }
 
 // NOTE: new impl block to keep related methods together.
