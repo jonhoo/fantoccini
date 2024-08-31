@@ -343,10 +343,12 @@ where
         // cookie without triggering a request for the (large) file? I don't know. Hence: TODO.
         //
         let cookies = if let Some(cookie_url) = self.cookie_url {
-            let current_url = self.client.current_url_().await?;
-            let cookie_url = current_url.join(&cookie_url)?;
+            let old_url = self.client.current_url_().await?;
+            let url = old_url.clone().join(&self.url)?;
+            let cookie_url = url.clone().join(&cookie_url)?;
             self.client.goto(cookie_url.as_str()).await?;
 
+            // TODO: go back before we return if this call errors:
             let cookies = self.client.issue(WebDriverCommand::GetCookies).await?;
             self.client.back().await?;
 
