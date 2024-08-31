@@ -170,18 +170,63 @@ impl Client {
     /// This method allows to build a direct HTTP request to a remote site without routing
     /// through the WebDriver host. It preserves the cookies and user agent from the current
     /// WebDriver session, enabling you to maintain the session context while making external
-    /// requests. 
-    /// 
+    /// requests.
+    ///
     /// This can be useful for operations where direct access is needed or when
     /// interacting with third-party services that require the same session cookies.
-    pub fn raw_request(&self) -> RawRequestBuilder<'_> {
+    pub fn raw_request(
+        &self,
+    ) -> RawRequestBuilder<
+        '_,
+        fn(http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
+    > {
         RawRequestBuilder::new(self)
     }
 }
 
 /// A builder for constructing raw HTTP requests with optional cookies.
+///
+/// ```no_run
+/// # use fantoccini::{ClientBuilder, Locator};
+/// # #[tokio::main]
+/// # async fn main() -> Result<(), fantoccini::error::CmdError> {
+/// # #[cfg(all(feature = "native-tls", not(feature = "rustls-tls")))]
+/// # let client = ClientBuilder::native().connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+/// # #[cfg(feature = "rustls-tls")]
+/// # let client = ClientBuilder::rustls().expect("rustls initialization").connect("http://localhost:4444").await.expect("failed to connect to WebDriver");
+/// # #[cfg(all(not(feature = "native-tls"), not(feature = "rustls-tls")))]
+/// # let client: fantoccini::Client = unreachable!("no tls provider available");
+/// // go back to the frontpage
+/// client.goto("https://www.wikipedia.org/").await?;
+/// // find the source for the Wikipedia globe
+/// let img = client.find(Locator::Css("img.central-featured-logo")).await?;
+/// let src = img.attr("src").await?.expect("image should have a src");
+/// // now build a raw HTTP client request
+/// // we could just use client.raw_client_for() here,
+/// // but let's use the builder to show how it works:
+/// let mut builder = client.raw_request();
+/// builder.method(hyper::Method::GET).url(&src);
+/// // we don't need cookies for this request
+/// builder.skip_cookie_navigation();
+/// let raw = builder.send().await?;
+///
+/// // we then read out the image bytes
+/// use futures_util::TryStreamExt;
+/// use http_body_util::BodyExt;
+/// let pixels = raw
+///   .into_body()
+///   .collect()
+///   .await
+///   .map_err(fantoccini::error::CmdError::from)?
+///   .to_bytes();
+/// // and voilla, we now have the bytes for the Wikipedia logo!
+/// assert!(pixels.len() > 0);
+/// println!("Wikipedia logo is {}b", pixels.len());
+/// # client.close().await
+/// # }
+/// ```
 #[derive(Clone, Debug)]
-pub struct RawRequestBuilder<'a, F = fn(http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>> {
+pub struct RawRequestBuilder<'a, F> {
     client: &'a Client,
     method: Method,
     url: String,
@@ -189,12 +234,19 @@ pub struct RawRequestBuilder<'a, F = fn(http::request::Builder) -> hyper::Reques
     request_modifier: F,
 }
 
-fn empty_body(req: http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>> {
+fn empty_body(
+    req: http::request::Builder,
+) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>> {
     req.body(BoxBody::new(http_body_util::Empty::new()))
         .unwrap()
 }
 
-impl<'a> RawRequestBuilder<'a> {
+impl<'a>
+    RawRequestBuilder<
+        'a,
+        fn(http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
+    >
+{
     /// Create a new raw request builder.
     pub fn new(client: &'a Client) -> Self {
         RawRequestBuilder {
@@ -205,7 +257,9 @@ impl<'a> RawRequestBuilder<'a> {
             request_modifier: empty_body,
         }
     }
+}
 
+impl<'a, F> RawRequestBuilder<'a, F> {
     /// Set the HTTP method for the request.
     pub fn method(&mut self, method: Method) -> &mut Self {
         self.method = method;
@@ -220,18 +274,18 @@ impl<'a> RawRequestBuilder<'a> {
 
     /// Set the URL for retrieving cookies.
     ///
-    /// The WebDriver specification requires that cookies can only be retrieved or set for the 
-    /// current domain of the active WebDriver session. This method sets a `cookie_url` which 
-    /// the WebDriver client will navigate to in order to retrieve the cookies needed for 
+    /// The WebDriver specification requires that cookies can only be retrieved or set for the
+    /// current domain of the active WebDriver session. This method sets a `cookie_url` which
+    /// the WebDriver client will navigate to in order to retrieve the cookies needed for
     /// the raw HTTP request.
     ///
-    /// This approach is necessary due to the WebDriver limitation discussed in 
-    /// [w3c/webdriver#1238](https://github.com/w3c/webdriver/issues/1238), 
+    /// This approach is necessary due to the WebDriver limitation discussed in
+    /// [w3c/webdriver#1238](https://github.com/w3c/webdriver/issues/1238),
     /// which prevents setting cookies for a domain that the WebDriver is not currently on.
-    /// 
-    /// By setting this URL, you can ensure that the appropriate cookies are included in the 
-    /// raw HTTP request. This can be particularly useful for scenarios where you need to 
-    /// reuse cookies from a previous session to avoid redundant login operations or share 
+    ///
+    /// By setting this URL, you can ensure that the appropriate cookies are included in the
+    /// raw HTTP request. This can be particularly useful for scenarios where you need to
+    /// reuse cookies from a previous session to avoid redundant login operations or share
     /// WebDriver sessions across different threads with distinct cookies.
     ///
     /// - [Issue #148](https://github.com/jonhoo/fantoccini/issues/148)
@@ -247,11 +301,15 @@ impl<'a> RawRequestBuilder<'a> {
         self.cookie_url = None;
         self
     }
+}
 
+impl<'a, F> RawRequestBuilder<'a, F> {
     /// Set a function to modify the request.
-    pub fn map_request<F>(self, f: F) -> RawRequestBuilder<'a, F>
+    pub fn map_request<F2>(self, f: F2) -> RawRequestBuilder<'a, F2>
     where
-        F: FnOnce(http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
+        F2: FnOnce(
+            http::request::Builder,
+        ) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
     {
         RawRequestBuilder {
             client: self.client,
@@ -261,9 +319,14 @@ impl<'a> RawRequestBuilder<'a> {
             request_modifier: f,
         }
     }
+}
 
+impl<'a, F> RawRequestBuilder<'a, F>
+where
+    F: FnOnce(http::request::Builder) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
+{
     /// Send the constructed request.
-    pub async fn send(self) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError> { 
+    pub async fn send(self) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError> {
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
         // *current* domain, whereas we want the cookies for `url`'s domain. So, we navigate to the
         // URL in question, fetch its cookies, and then navigate back. *Except* that we can't do
@@ -315,7 +378,7 @@ impl<'a> RawRequestBuilder<'a> {
                 // Note that since we're sending these cookies, all that matters is the mapping
                 // from name to value. The other fields only matter when deciding whether to
                 // include a cookie or not, and the driver has already decided that for us
-                // (GetCookies is for a particular URL).  
+                // (GetCookies is for a particular URL).
                 jar.push(
                     cookie::Cookie::new(
                         cookie["name"].as_str().unwrap().to_owned(),
@@ -1099,12 +1162,8 @@ impl Client {
         url: &str,
     ) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError> {
         let mut builder = self.raw_request();
-        builder
-            .method(method)
-            .url(url);
-        builder
-            .send()
-            .await
+        builder.method(method).url(url);
+        builder.send().await
     }
 
     /// Build and issue an HTTP request to the given `url` with all the same cookies as the current
@@ -1124,13 +1183,8 @@ impl Client {
         ) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
     {
         let mut builder = self.raw_request();
-        builder
-            .method(method)
-            .url(url).clone()
-            .map_request(before);
-        builder
-            .send()
-            .await
+        builder.method(method).url(url).clone().map_request(before);
+        builder.send().await
     }
 }
 
