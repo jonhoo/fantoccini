@@ -327,6 +327,10 @@ where
 {
     /// Send the constructed request.
     pub async fn send(self) -> Result<hyper::Response<hyper::body::Incoming>, error::CmdError> {
+        // Allow navigation by relative URL:
+        let old_url = self.client.current_url_().await?;
+        let url = old_url.join(&self.url)?;
+
         // We need to do some trickiness here. GetCookies will only give us the cookies for the
         // *current* domain, whereas we want the cookies for `url`'s domain. So, we navigate to the
         // URL in question, fetch its cookies, and then navigate back. *Except* that we can't do
@@ -343,9 +347,7 @@ where
         // cookie without triggering a request for the (large) file? I don't know. Hence: TODO.
         //
         let cookies = if let Some(cookie_url) = self.cookie_url {
-            let old_url = self.client.current_url_().await?;
-            let url = old_url.clone().join(&self.url)?;
-            let cookie_url = url.clone().join(&cookie_url)?;
+            let cookie_url = url.join(&cookie_url)?;
             self.client.goto(cookie_url.as_str()).await?;
 
             // TODO: go back before we return if this call errors:
@@ -403,7 +405,7 @@ where
         let mut req = hyper::Request::builder();
         req = req
             .method(self.method)
-            .uri(http::Uri::try_from(self.url.as_str()).unwrap());
+            .uri(http::Uri::try_from(url.as_str()).unwrap());
 
         if let Some(cookies) = cookies {
             req = req.header(hyper::header::COOKIE, cookies);
