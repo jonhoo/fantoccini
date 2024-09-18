@@ -601,9 +601,7 @@ where
                 serde_json::to_value(e)
                     .expect("error::WebDriver should always be serializeable to JSON"),
             )),
-            Err(e) => {
-                panic!("unexpected webdriver error; {}", e);
-            }
+            Err(e) => Err(error::NewSessionError::UnexpectedError(e)),
         }
     }
 
