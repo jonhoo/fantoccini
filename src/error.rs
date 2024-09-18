@@ -24,6 +24,8 @@ pub enum NewSessionError {
     NotW3C(serde_json::Value),
     /// The WebDriver server refused to create a new session.
     SessionNotCreated(WebDriver),
+    /// An unexpected error occurred.
+    UnexpectedError(CmdError),
 }
 
 impl Error for NewSessionError {
@@ -35,6 +37,7 @@ impl Error for NewSessionError {
             NewSessionError::Lost(..) => "webdriver server disconnected",
             NewSessionError::NotW3C(..) => "webdriver server gave non-conformant response",
             NewSessionError::SessionNotCreated(..) => "webdriver did not create session",
+            NewSessionError::UnexpectedError(..) => "unexpected webdriver error",
         }
     }
 
@@ -46,6 +49,7 @@ impl Error for NewSessionError {
             NewSessionError::Lost(ref e) => Some(e),
             NewSessionError::NotW3C(..) => None,
             NewSessionError::SessionNotCreated(ref e) => Some(e),
+            NewSessionError::UnexpectedError(ref e) => Some(e),
         }
     }
 }
@@ -61,6 +65,7 @@ impl fmt::Display for NewSessionError {
             NewSessionError::Lost(ref e) => write!(f, "{}", e),
             NewSessionError::NotW3C(ref e) => write!(f, "{:?}", e),
             NewSessionError::SessionNotCreated(ref e) => write!(f, "{}", e),
+            NewSessionError::UnexpectedError(ref e) => write!(f, "{}", e),
         }
     }
 }
