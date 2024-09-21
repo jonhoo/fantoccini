@@ -425,7 +425,7 @@ async fn dynamic_commands(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.goto(&sample_url).await?;
     let title = c.issue_cmd(WebDriverCommand::GetTitle).await?;
     assert_eq!(title.as_str(), Some("Sample Page"));
-    let title = c.issue_cmd(Box::new(WebDriverCommand::GetTitle)).await?;
+    let title = c.issue_cmd(*Box::new(WebDriverCommand::GetTitle)).await?;
     assert_eq!(title.as_str(), Some("Sample Page"));
     Ok(())
 }

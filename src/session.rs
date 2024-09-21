@@ -26,6 +26,10 @@ type Ack = oneshot::Sender<Result<Json, error::CmdError>>;
 
 type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 
+// Wrapper to hide Wcmd from the public API.
+#[derive(Debug)]
+struct WcmdWrapper(Wcmd);
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Cmd {
@@ -43,7 +47,7 @@ pub(crate) enum Cmd {
     WebDriver(Box<dyn WebDriverCompatibleCommand + Send>),
 }
 
-impl WebDriverCompatibleCommand for Wcmd {
+impl WebDriverCompatibleCommand for WcmdWrapper {
     /// Helper for determining what URL endpoint to use for various requests.
     ///
     /// This mapping is essentially that of <https://www.w3.org/TR/webdriver/#list-of-endpoints>.
@@ -52,16 +56,16 @@ impl WebDriverCompatibleCommand for Wcmd {
         base_url: &url::Url,
         session_id: Option<&str>,
     ) -> Result<url::Url, url::ParseError> {
-        if let WebDriverCommand::NewSession(..) = self {
+        if let WebDriverCommand::NewSession(..) = self.0 {
             return base_url.join("session");
         }
 
-        if let WebDriverCommand::Status = self {
+        if let WebDriverCommand::Status = self.0 {
             return base_url.join("status");
         }
 
         let base = { base_url.join(&format!("session/{}/", session_id.as_ref().unwrap()))? };
-        match self {
+        match self.0 {
             WebDriverCommand::NewSession(..) => unreachable!(),
             WebDriverCommand::DeleteSession => unreachable!(),
             WebDriverCommand::Get(..) | WebDriverCommand::GetCurrentUrl => base.join("url"),
@@ -159,7 +163,7 @@ impl WebDriverCompatibleCommand for Wcmd {
         let mut body = None;
 
         // but some have a request body
-        match self {
+        match self.0 {
             WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
                 // TODO: awful hacks
                 let mut also = String::new();
@@ -280,12 +284,12 @@ impl WebDriverCompatibleCommand for Wcmd {
     }
 
     fn is_new_session(&self) -> bool {
-        matches!(self, WebDriverCommand::NewSession(..))
+        matches!(self.0, WebDriverCommand::NewSession(..))
     }
 
     fn is_legacy(&self) -> bool {
         matches!(
-            self,
+            self.0,
             WebDriverCommand::NewSession(webdriver::command::NewSessionParameters::Legacy(..)),
         )
     }
@@ -293,7 +297,7 @@ impl WebDriverCompatibleCommand for Wcmd {
 
 impl From<Wcmd> for Cmd {
     fn from(o: Wcmd) -> Self {
-        Cmd::WebDriver(Box::new(o))
+        Cmd::WebDriver(Box::new(WcmdWrapper(o)))
     }
 }
 
@@ -333,10 +337,10 @@ impl Client {
 
     /// Issue the specified [`WebDriverCompatibleCommand`] to the WebDriver instance.
     pub async fn issue_cmd(
-        &self,
-        cmd: impl WebDriverCompatibleCommand + Send + 'static,
+        &self, 
+        cmd: Wcmd
     ) -> Result<Json, error::CmdError> {
-        self.issue(Cmd::WebDriver(Box::new(cmd))).await
+        self.issue(Cmd::WebDriver(Box::new(WcmdWrapper(cmd)))).await
     }
 
     pub(crate) fn is_legacy(&self) -> bool {
