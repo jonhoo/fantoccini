@@ -336,10 +336,7 @@ impl Client {
     }
 
     /// Issue the specified [`WebDriverCompatibleCommand`] to the WebDriver instance.
-    pub async fn issue_cmd(
-        &self, 
-        cmd: Wcmd
-    ) -> Result<Json, error::CmdError> {
+    pub async fn issue_cmd(&self, cmd: Wcmd) -> Result<Json, error::CmdError> {
         self.issue(Cmd::WebDriver(Box::new(WcmdWrapper(cmd)))).await
     }
 
