@@ -60,7 +60,6 @@ impl Client {
     /// should generally be one that supports HTTPS, as that is commonly required by WebDriver
     /// implementations.
     ///
-    /// Calls `with_capabilities_and_connector` with an empty capabilities list.
     pub(crate) async fn new_with_connector<C>(
         webdriver: &str,
         connector: C,
@@ -68,12 +67,31 @@ impl Client {
     where
         C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
     {
-        Self::with_capabilities_and_connector(
-            webdriver,
-            &webdriver::capabilities::Capabilities::new(),
-            connector,
+        let (client, wdb) = Session::create_client_and_parse_url(webdriver, connector).await?;
+        Session::setup_session(
+            client,
+            wdb,
+            None,
+            Some(webdriver::capabilities::Capabilities::new()),
         )
         .await
+    }
+
+    /// Reconnect to a previously established WebDriver session using its ID.
+    ///
+    /// Ideal for resuming operations without losing session data after a disconnect
+    /// or process restart, ensuring that the session can be reused without creating a new one.
+    ///
+    pub async fn with_existing_session<C>(
+        webdriver: &str,
+        session_id: &str,
+        connector: C,
+    ) -> Result<Self, error::NewSessionError>
+    where
+        C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
+    {
+        let (client, wdb) = Session::create_client_and_parse_url(webdriver, connector).await?;
+        Session::setup_session(client, wdb, Some(session_id), None).await
     }
 
     /// Connect to the WebDriver host running the given address.
