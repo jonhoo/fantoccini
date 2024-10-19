@@ -1,7 +1,7 @@
 //! Tests that don't make use of external websites.
 use crate::common::{other_page_url, sample_page_url};
 use fantoccini::wd::TimeoutConfiguration;
-use fantoccini::{error, Client, Locator};
+use fantoccini::{error, test_wrap_command, Client, Locator};
 use http_body_util::BodyExt;
 use hyper::Method;
 use serial_test::serial;
@@ -423,9 +423,13 @@ async fn timeouts(c: Client, _: u16) -> Result<(), error::CmdError> {
 async fn dynamic_commands(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
-    let title = c.issue_cmd(WebDriverCommand::GetTitle).await?;
+    let title = c
+        .issue_cmd(test_wrap_command(WebDriverCommand::GetTitle))
+        .await?;
     assert_eq!(title.as_str(), Some("Sample Page"));
-    let title = c.issue_cmd(*Box::new(WebDriverCommand::GetTitle)).await?;
+    let title = c
+        .issue_cmd(test_wrap_command(WebDriverCommand::GetTitle))
+        .await?;
     assert_eq!(title.as_str(), Some("Sample Page"));
     Ok(())
 }

@@ -30,6 +30,18 @@ type Wcmd = WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>;
 #[derive(Debug)]
 struct WcmdWrapper(Wcmd);
 
+/// Wraps a WebDriverCommand inside a WcmdWrapper and returns it as a
+/// Box<dyn WebDriverCompatibleCommand>.
+///
+/// This helper function is intended for use in tests where internal
+/// WebDriver commands need to be wrapped in the private `WcmdWrapper`
+#[cfg(any(test, feature = "test_helpers"))]
+pub fn test_wrap_command(
+    cmd: WebDriverCommand<webdriver::command::VoidWebDriverExtensionCommand>,
+) -> Box<dyn WebDriverCompatibleCommand + Send + 'static> {
+    Box::new(WcmdWrapper(cmd))
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub(crate) enum Cmd {
@@ -336,8 +348,11 @@ impl Client {
     }
 
     /// Issue the specified [`WebDriverCompatibleCommand`] to the WebDriver instance.
-    pub async fn issue_cmd(&self, cmd: Wcmd) -> Result<Json, error::CmdError> {
-        self.issue(Cmd::WebDriver(Box::new(WcmdWrapper(cmd)))).await
+    pub async fn issue_cmd(
+        &self,
+        cmd: Box<dyn WebDriverCompatibleCommand + Send + 'static>,
+    ) -> Result<Json, error::CmdError> {
+        self.issue(Cmd::WebDriver(cmd)).await
     }
 
     pub(crate) fn is_legacy(&self) -> bool {

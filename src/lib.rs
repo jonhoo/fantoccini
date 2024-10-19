@@ -266,3 +266,6 @@ pub mod wait;
 pub mod wd;
 #[doc(inline)]
 pub use wd::Locator;
+
+#[cfg(any(test, feature = "test_helpers"))]
+pub use crate::session::test_wrap_command;
