@@ -22,7 +22,6 @@ license = "MIT OR Apache-2.0"
 default = ["native-tls"]
 native-tls = ["hyper-tls", "openssl"]
 rustls-tls = ["hyper-rustls"]
-test_helpers = []
 
 [dependencies]
 webdriver = { version = "0.50", default-features = false }
@@ -48,7 +47,6 @@ tokio = { version = "1", features = ["full"] }
 hyper = { version = "1.1.0", features = ["server"] }
 hyper-util = { version = "0.1.3", features = ["server", "http1"] }
 serial_test = "3.0"
-fantoccini = { path = "../fantoccini", features = ["test_helpers"] }
 
 # for minimal-versions
 [target.'cfg(any())'.dependencies]

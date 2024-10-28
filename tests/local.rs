@@ -1,15 +1,48 @@
 //! Tests that don't make use of external websites.
 use crate::common::{other_page_url, sample_page_url};
-use fantoccini::wd::TimeoutConfiguration;
-use fantoccini::{error, test_wrap_command, Client, Locator};
+use fantoccini::wd::{TimeoutConfiguration, WebDriverCompatibleCommand};
+use fantoccini::{error, Client, Locator};
 use http_body_util::BodyExt;
 use hyper::Method;
 use serial_test::serial;
 use std::time::Duration;
 use url::Url;
-use webdriver::command::WebDriverCommand;
 
 mod common;
+
+#[derive(Debug)]
+struct GetTitle;
+
+// Implement `WebDriverCompatibleCommand` for `GetTitle`
+impl WebDriverCompatibleCommand for GetTitle {
+    fn endpoint(
+        &self,
+        base_url: &url::Url,
+        session_id: Option<&str>,
+    ) -> Result<url::Url, url::ParseError> {
+        let base = base_url.join(&format!("session/{}/", session_id.unwrap()))?;
+        base.join("title")
+    }
+
+    fn method_and_body(&self, _: &url::Url) -> (http::Method, Option<String>) {
+        (http::Method::GET, None)
+    }
+
+    fn is_new_session(&self) -> bool {
+        false
+    }
+
+    fn is_legacy(&self) -> bool {
+        false
+    }
+}
+
+// Implement `Into<Box<dyn WebDriverCompatibleCommand + Send>>` for `GetTitle`
+impl Into<Box<dyn WebDriverCompatibleCommand + Send>> for GetTitle {
+    fn into(self) -> Box<dyn WebDriverCompatibleCommand + Send> {
+        Box::new(self)
+    }
+}
 
 async fn goto(c: Client, port: u16) -> Result<(), error::CmdError> {
     let url = sample_page_url(port);
@@ -423,13 +456,9 @@ async fn timeouts(c: Client, _: u16) -> Result<(), error::CmdError> {
 async fn dynamic_commands(c: Client, port: u16) -> Result<(), error::CmdError> {
     let sample_url = sample_page_url(port);
     c.goto(&sample_url).await?;
-    let title = c
-        .issue_cmd(test_wrap_command(WebDriverCommand::GetTitle))
-        .await?;
+    let title = c.issue_cmd(GetTitle).await?;
     assert_eq!(title.as_str(), Some("Sample Page"));
-    let title = c
-        .issue_cmd(test_wrap_command(WebDriverCommand::GetTitle))
-        .await?;
+    let title = c.issue_cmd(GetTitle).await?;
     assert_eq!(title.as_str(), Some("Sample Page"));
     Ok(())
 }
