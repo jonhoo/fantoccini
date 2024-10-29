@@ -336,10 +336,11 @@ impl Client {
     }
 
     /// Issue the specified [`WebDriverCompatibleCommand`] to the WebDriver instance.
-    pub async fn issue_cmd(
-        &self,
-        cmd: impl Into<Box<dyn WebDriverCompatibleCommand + Send + 'static>>,
-    ) -> Result<Json, error::CmdError> {
+    pub async fn issue_cmd<C, CC>(&self, cmd: C) -> Result<Json, error::CmdError>
+    where
+        C: Into<Box<CC>>,
+        CC: WebDriverCompatibleCommand + Send + 'static,
+    {
         self.issue(Cmd::WebDriver(cmd.into())).await
     }
 

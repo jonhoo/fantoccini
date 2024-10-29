@@ -27,21 +27,6 @@ impl WebDriverCompatibleCommand for GetTitle {
     fn method_and_body(&self, _: &url::Url) -> (http::Method, Option<String>) {
         (http::Method::GET, None)
     }
-
-    fn is_new_session(&self) -> bool {
-        false
-    }
-
-    fn is_legacy(&self) -> bool {
-        false
-    }
-}
-
-// Implement `Into<Box<dyn WebDriverCompatibleCommand + Send>>` for `GetTitle`
-impl Into<Box<dyn WebDriverCompatibleCommand + Send>> for GetTitle {
-    fn into(self) -> Box<dyn WebDriverCompatibleCommand + Send> {
-        Box::new(self)
-    }
 }
 
 async fn goto(c: Client, port: u16) -> Result<(), error::CmdError> {
