@@ -539,14 +539,14 @@ where
         rx: mpsc::UnboundedReceiver<Task>,
         client: hyper_util::client::legacy::Client<C, BoxBody<hyper::body::Bytes, Infallible>>,
         wdb_url: url::Url,
-        session_id: &str,
+        session_id: Option<impl Into<String>>,
     ) -> Self {
         Session {
             ongoing: Ongoing::None,
             rx,
             client,
             wdb: wdb_url,
-            session: Some(session_id.to_string()),
+            session: session_id.map(Into::into),
             is_legacy: false,
             ua: None,
             persist: false,
@@ -651,27 +651,17 @@ where
         client: hyper_util::client::legacy::Client<C, BoxBody<hyper::body::Bytes, Infallible>>,
         wdb: url::Url,
         session_id: Option<&str>,
-        cap: Option<webdriver::capabilities::Capabilities>,
+        _cap: Option<webdriver::capabilities::Capabilities>,
     ) -> Result<Client, error::NewSessionError> {
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
 
-        if let Some(session_id) = session_id {
-            // Reconnect to an existing session
-            tokio::spawn(Session::new(rx, client, wdb, session_id));
-        } else if let Some(_capabilities) = cap {
-            // Spawn a new WebDriver session.
-            tokio::spawn(Session {
-                rx,
-                ongoing: Ongoing::None,
-                client,
-                wdb,
-                session: None,
-                is_legacy: false,
-                ua: None,
-                persist: false,
-            });
-        }
+        tokio::spawn(Session::new(
+            rx,
+            client,
+            wdb,
+            session_id.map(|id| id.to_string()),
+        ));
 
         // now that the session is running, let's do the handshake
         Ok(Client {
@@ -689,6 +679,10 @@ where
         let (client, wdb) = Self::create_client_and_parse_url(webdriver, connector).await?;
         let mut cap = cap.to_owned();
 
+        // Create a new session for this client
+        // https://www.w3.org/TR/webdriver/#dfn-new-session
+        // https://www.w3.org/TR/webdriver/#capabilities
+        //  - we want the browser to wait for the page to load
         if !cap.contains_key("pageLoadStrategy") {
             cap.insert("pageLoadStrategy".to_string(), Json::from("normal"));
         }
@@ -702,11 +696,7 @@ where
                 .insert("w3c".to_string(), Json::from(true));
         }
 
-        // Create a new session for this client
-        // https://www.w3.org/TR/webdriver/#dfn-new-session
-        // https://www.w3.org/TR/webdriver/#capabilities
-        //  - we want the browser to wait for the page to load
-        let client = Self::setup_session(client, wdb, None, Some(cap.clone())).await?;
+        let mut client = Self::setup_session(client, wdb, None, Some(cap.clone())).await?;
 
         let session_config = webdriver::capabilities::SpecNewSessionParameters {
             alwaysMatch: cap.clone(),
@@ -719,11 +709,11 @@ where
             .map(Self::map_handshake_response)
             .await
         {
-            Ok(new_session_response) => Ok(Client {
-                tx: client.tx,
-                is_legacy: false,
-                new_session_response: Some(wd::NewSessionResponse::from_wd(new_session_response)),
-            }),
+            Ok(new_session_response) => {
+                client.new_session_response =
+                    Some(wd::NewSessionResponse::from_wd(new_session_response));
+                Ok(client)
+            }
             Err(error::NewSessionError::NotW3C(json)) => {
                 // maybe try legacy mode?
                 let mut legacy = false;
@@ -766,11 +756,9 @@ where
                     .map(Self::map_handshake_response)
                     .await?;
 
-                Ok(Client {
-                    tx: client.tx,
-                    is_legacy: true,
-                    new_session_response: None,
-                })
+                client.is_legacy = true;
+                client.new_session_response = None;
+                Ok(client)
             }
             Err(e) => Err(e),
         }
