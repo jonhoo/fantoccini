@@ -651,7 +651,6 @@ where
         client: hyper_util::client::legacy::Client<C, BoxBody<hyper::body::Bytes, Infallible>>,
         wdb: url::Url,
         session_id: Option<&str>,
-        _cap: Option<webdriver::capabilities::Capabilities>,
     ) -> Result<Client, error::NewSessionError> {
         // We're going to need a channel for sending requests to the WebDriver host
         let (tx, rx) = mpsc::unbounded_channel();
@@ -665,7 +664,7 @@ where
 
         // now that the session is running, let's do the handshake
         Ok(Client {
-            tx: tx.clone(),
+            tx,
             is_legacy: false,
             new_session_response: None,
         })
@@ -696,7 +695,7 @@ where
                 .insert("w3c".to_string(), Json::from(true));
         }
 
-        let mut client = Self::setup_session(client, wdb, None, Some(cap.clone())).await?;
+        let mut client = Self::setup_session(client, wdb, None).await?;
 
         let session_config = webdriver::capabilities::SpecNewSessionParameters {
             alwaysMatch: cap.clone(),
@@ -757,7 +756,6 @@ where
                     .await?;
 
                 client.is_legacy = true;
-                client.new_session_response = None;
                 Ok(client)
             }
             Err(e) => Err(e),
