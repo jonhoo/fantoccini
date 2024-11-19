@@ -164,6 +164,9 @@ mod session;
 /// [`rustls`](ClientBuilder::rustls) (depending on your preference) to start the builder. If you
 /// want to supply your own connector, use [`new`](ClientBuilder::new).
 ///
+/// Note: [`Geckodriver`](https://github.com/mozilla/geckodriver) currently does not support multiple simultaneous instances,
+/// therefore it would be best to use [`chromedriver`](https://developer.chrome.com/docs/chromedriver/downloads) for this.
+///
 /// To connect to the WebDriver instance, call [`connect`](ClientBuilder::connect).
 ///
 /// [builder]: https://rust-lang.github.io/api-guidelines/type-safety.html#c-builder
