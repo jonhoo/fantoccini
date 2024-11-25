@@ -535,6 +535,24 @@ impl<C> Session<C>
 where
     C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
 {
+    fn new(
+        rx: mpsc::UnboundedReceiver<Task>,
+        client: hyper_util::client::legacy::Client<C, BoxBody<hyper::body::Bytes, Infallible>>,
+        wdb_url: url::Url,
+        session_id: Option<impl Into<String>>,
+    ) -> Self {
+        Session {
+            ongoing: Ongoing::None,
+            rx,
+            client,
+            wdb: wdb_url,
+            session: session_id.map(Into::into),
+            is_legacy: false,
+            ua: None,
+            persist: false,
+        }
+    }
+
     fn shutdown(&mut self, ack: Option<Ack>) {
         // session was not created
         if self.session.is_none() {
@@ -605,40 +623,58 @@ where
         }
     }
 
+    pub(crate) async fn create_client_and_parse_url(
+        webdriver: &str,
+        connector: C,
+    ) -> Result<
+        (
+            hyper_util::client::legacy::Client<C, BoxBody<hyper::body::Bytes, Infallible>>,
+            url::Url,
+        ),
+        error::NewSessionError,
+    > {
+        // Where is the WebDriver server?
+        let wdb = webdriver
+            .parse::<url::Url>()
+            .map_err(error::NewSessionError::BadWebdriverUrl)?;
+
+        // We want a tls-enabled client
+        let client = hyper_util::client::legacy::Client::builder(TokioExecutor::new())
+            .build::<_, BoxBody<hyper::body::Bytes, Infallible>>(connector);
+
+        Ok((client, wdb))
+    }
+
+    pub(crate) async fn setup_session(
+        client: hyper_util::client::legacy::Client<C, BoxBody<hyper::body::Bytes, Infallible>>,
+        wdb: url::Url,
+        session_id: Option<&str>,
+    ) -> Result<Client, error::NewSessionError> {
+        // We're going to need a channel for sending requests to the WebDriver host
+        let (tx, rx) = mpsc::unbounded_channel();
+
+        tokio::spawn(Session::new(
+            rx,
+            client,
+            wdb,
+            session_id.map(|id| id.to_string()),
+        ));
+
+        // now that the session is running, let's do the handshake
+        Ok(Client {
+            tx,
+            is_legacy: false,
+            new_session_response: None,
+        })
+    }
+
     pub(crate) async fn with_capabilities_and_connector(
         webdriver: &str,
         cap: &webdriver::capabilities::Capabilities,
         connector: C,
     ) -> Result<Client, error::NewSessionError> {
-        // Where is the WebDriver server?
-        let wdb = webdriver.parse::<url::Url>();
-        let wdb = wdb.map_err(error::NewSessionError::BadWebdriverUrl)?;
-        // We want a tls-enabled client
-        let client = hyper_util::client::legacy::Client::builder(TokioExecutor::new())
-            .build::<_, BoxBody<hyper::body::Bytes, Infallible>>(connector);
-
+        let (client, wdb) = Self::create_client_and_parse_url(webdriver, connector).await?;
         let mut cap = cap.to_owned();
-        // We're going to need a channel for sending requests to the WebDriver host
-        let (tx, rx) = mpsc::unbounded_channel();
-
-        // Set up our WebDriver session.
-        tokio::spawn(Session {
-            rx,
-            ongoing: Ongoing::None,
-            client,
-            wdb,
-            session: None,
-            is_legacy: false,
-            ua: None,
-            persist: false,
-        });
-
-        // now that the session is running, let's do the handshake
-        let client = Client {
-            tx: tx.clone(),
-            is_legacy: false,
-            new_session_response: None,
-        };
 
         // Create a new session for this client
         // https://www.w3.org/TR/webdriver/#dfn-new-session
@@ -657,6 +693,8 @@ where
                 .insert("w3c".to_string(), Json::from(true));
         }
 
+        let mut client = Self::setup_session(client, wdb, None).await?;
+
         let session_config = webdriver::capabilities::SpecNewSessionParameters {
             alwaysMatch: cap.clone(),
             firstMatch: vec![webdriver::capabilities::Capabilities::new()],
@@ -668,11 +706,11 @@ where
             .map(Self::map_handshake_response)
             .await
         {
-            Ok(new_session_response) => Ok(Client {
-                tx,
-                is_legacy: false,
-                new_session_response: Some(wd::NewSessionResponse::from_wd(new_session_response)),
-            }),
+            Ok(new_session_response) => {
+                client.new_session_response =
+                    Some(wd::NewSessionResponse::from_wd(new_session_response));
+                Ok(client)
+            }
             Err(error::NewSessionError::NotW3C(json)) => {
                 // maybe try legacy mode?
                 let mut legacy = false;
@@ -715,11 +753,8 @@ where
                     .map(Self::map_handshake_response)
                     .await?;
 
-                Ok(Client {
-                    tx,
-                    is_legacy: true,
-                    new_session_response: None,
-                })
+                client.is_legacy = true;
+                Ok(client)
             }
             Err(e) => Err(e),
         }
