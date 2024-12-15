@@ -164,11 +164,14 @@ mod session;
 /// [`rustls`](ClientBuilder::rustls) (depending on your preference) to start the builder. If you
 /// want to supply your own connector, use [`new`](ClientBuilder::new).
 ///
-/// Note: [`geckodriver`](https://github.com/mozilla/geckodriver) does not support multiple simultaneous instances.
-/// When using geckodriver, ensure you:
+/// Note: [`geckodriver`](https://github.com/mozilla/geckodriver) does not support multiple
+/// simultaneous instances. When using geckodriver, ensure you:
+///
 /// - Run only one webdriver instance at a time
 /// - Explicitly close the webdriver session after use, even if an error occurs
-/// To run multiple webdriver instances use [chromedriver](https://developer.chrome.com/docs/chromedriver/downloads) 
+///
+/// To run multiple webdriver instances use
+/// [chromedriver](https://developer.chrome.com/docs/chromedriver/downloads).
 ///
 /// To connect to the WebDriver instance, call [`connect`](ClientBuilder::connect).
 ///
