@@ -2,8 +2,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/fantoccini.svg)](https://crates.io/crates/fantoccini)
 [![Documentation](https://docs.rs/fantoccini/badge.svg)](https://docs.rs/fantoccini/)
-[![codecov](https://codecov.io/gh/jonhoo/fantoccini/branch/master/graph/badge.svg?token=NteBJ0F7Ok)](https://codecov.io/gh/jonhoo/fantoccini)
-[![Gitter chat](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/fantoccini-rs/Lobby)
+[![codecov](https://codecov.io/gh/jonhoo/fantoccini/graph/badge.svg?token=NteBJ0F7Ok)](https://codecov.io/gh/jonhoo/fantoccini)
 
 A high-level API for programmatically interacting with web pages through WebDriver.
 
