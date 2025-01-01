@@ -67,8 +67,7 @@ impl Client {
     where
         C: connect::Connect + Unpin + 'static + Clone + Send + Sync,
     {
-        let (client, wdb) = Session::create_client_and_parse_url(webdriver, connector).await?;
-        Session::setup_session(client, wdb, None).await
+        Session::with_capabilities_and_connector(webdriver, &Default::default(), connector).await
     }
 
     /// Reconnect to a previously established WebDriver session using its ID.
