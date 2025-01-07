@@ -161,26 +161,26 @@ impl WebDriverCompatibleCommand for Wcmd {
         // but some have a request body
         match self {
             WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
-                // TODO: awful hacks
-                let mut also = String::new();
-                if !request_url.username().is_empty() {
-                    also.push_str(&format!(
-                        r#", "user": {}"#,
-                        serde_json::to_string(request_url.username()).unwrap()
-                    ));
-                }
-                if let Some(pwd) = request_url.password() {
-                    also.push_str(&format!(
-                        r#", "password": {}"#,
-                        serde_json::to_string(pwd).unwrap()
-                    ));
-                }
-                body = Some(format!(
-                    r#"{{"capabilities": {}{}}}"#,
-                    serde_json::to_string(conf).unwrap(),
-                    also
-                ));
+                let mut capabilities_json = serde_json::json!({
+                    "capabilities": conf
+                });
 
+                if let Some(capabilities_map) = capabilities_json.as_object_mut() {
+                    if !request_url.username().is_empty() {
+                        capabilities_map.insert(
+                            "user".to_string(),
+                            serde_json::Value::String(request_url.username().to_string()),
+                        );
+                    }
+                    if let Some(pwd) = request_url.password() {
+                        capabilities_map.insert(
+                            "password".to_string(),
+                            serde_json::Value::String(pwd.to_string()),
+                        );
+                    }
+                }
+
+                body = Some(capabilities_json.to_string());
                 method = Method::POST;
             }
             WebDriverCommand::NewSession(command::NewSessionParameters::Legacy(ref conf)) => {
