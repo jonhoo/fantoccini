@@ -161,25 +161,29 @@ impl WebDriverCompatibleCommand for Wcmd {
         // but some have a request body
         match self {
             WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
-                // TODO: awful hacks
-                let mut also = String::new();
+                let mut capabilities = serde_json::value::Map::new();
+                capabilities.insert(
+                    String::from("capabilities"),
+                    serde_json::to_value(conf)
+                        .expect("SpecNewSessionParameters is always valid JSON"),
+                );
                 if !request_url.username().is_empty() {
-                    also.push_str(&format!(
-                        r#", "user": {}"#,
-                        serde_json::to_string(request_url.username()).unwrap()
-                    ));
+                    capabilities.insert(
+                        String::from("user"),
+                        serde_json::to_value(request_url.username())
+                            .expect("all strings are valid JSON"),
+                    );
                 }
                 if let Some(pwd) = request_url.password() {
-                    also.push_str(&format!(
-                        r#", "password": {}"#,
-                        serde_json::to_string(pwd).unwrap()
-                    ));
+                    capabilities.insert(
+                        String::from("user"),
+                        serde_json::to_value(pwd).expect("all strings are valid JSON"),
+                    );
                 }
-                body = Some(format!(
-                    r#"{{"capabilities": {}{}}}"#,
-                    serde_json::to_string(conf).unwrap(),
-                    also
-                ));
+                body = Some(
+                    serde_json::to_string(&serde_json::Value::Object(capabilities))
+                        .expect("a serde_json::Value can always be turned into JSON"),
+                );
 
                 method = Method::POST;
             }
