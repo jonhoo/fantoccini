@@ -687,8 +687,7 @@ async fn wait_for_navigation_test(c: Client, _port: u16) -> Result<(), error::Cm
 
     #[allow(deprecated)]
     loop {
-        let wait_for = c.wait_for_navigation(Some(url)).await;
-        assert!(wait_for.is_ok());
+        c.wait_for_navigation(Some(url)).await?;
         url = c.current_url().await?;
         if url.as_str() == "about:blank" {
             // try again
