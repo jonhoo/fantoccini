@@ -118,6 +118,9 @@ pub enum CmdError {
     /// Could not decode a base64 image
     ImageDecodeError(base64::DecodeError),
 
+    /// Could not decode a base64 PDF.
+    PdfDecodeError(base64::DecodeError),
+
     /// Timeout of a wait condition.
     ///
     /// When waiting for a for a condition using [`Client::wait`](crate::Client::wait), any of the
@@ -190,6 +193,7 @@ impl Error for CmdError {
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
             CmdError::ImageDecodeError(..) => "error decoding image",
+            CmdError::PdfDecodeError(..) => "error decoding PDF",
             CmdError::WaitTimeout => "timeout waiting on condition",
         }
     }
@@ -202,7 +206,7 @@ impl Error for CmdError {
             CmdError::FailedC(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
-            CmdError::ImageDecodeError(ref e) => Some(e),
+            CmdError::ImageDecodeError(ref e) | CmdError::PdfDecodeError(ref e) => Some(e),
             CmdError::NotJson(_)
             | CmdError::NotW3C(_)
             | CmdError::InvalidArgument(..)
@@ -224,7 +228,9 @@ impl fmt::Display for CmdError {
             CmdError::NotJson(ref e) => write!(f, "{}", e),
             CmdError::Json(ref e) => write!(f, "{}", e),
             CmdError::NotW3C(ref e) => write!(f, "{:?}", e),
-            CmdError::ImageDecodeError(ref e) => write!(f, "{:?}", e),
+            CmdError::ImageDecodeError(ref e) | CmdError::PdfDecodeError(ref e) => {
+                write!(f, "{:?}", e)
+            }
             CmdError::InvalidArgument(ref arg, ref msg) => {
                 write!(f, "Invalid argument `{}`: {}", arg, msg)
             }

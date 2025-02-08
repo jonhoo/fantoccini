@@ -1,17 +1,16 @@
 //! WebDriver types and declarations.
-
 use crate::error;
 #[cfg(doc)]
 use crate::Client;
 use http::Method;
 use serde::{Deserialize, Serialize};
-use std::borrow::Cow;
 use std::convert::TryFrom;
 use std::fmt;
 use std::fmt::Debug;
 use std::time::Duration;
+use std::{borrow::Cow, ops::RangeInclusive};
 use url::{ParseError, Url};
-use webdriver::command::TimeoutsParameters;
+use webdriver::command::{PrintParameters, TimeoutsParameters};
 
 /// A command that can be sent to the WebDriver.
 ///
@@ -370,6 +369,321 @@ impl NewSessionResponse {
         NewSessionResponse {
             session_id: nsr.session_id,
             capabilities: nsr.capabilities.as_object().cloned(),
+        }
+    }
+}
+
+/// The builder of [`PrintConfiguration`].
+#[derive(Debug)]
+pub struct PrintConfigurationBuilder {
+    orientation: PrintOrientation,
+    scale: f64,
+    background: PrintBackground,
+    size: PrintSize,
+    margins: PrintMargins,
+    page_ranges: Vec<PrintPageRange>,
+    shrink_to_fit: bool,
+}
+
+impl Default for PrintConfigurationBuilder {
+    fn default() -> Self {
+        Self {
+            orientation: PrintOrientation::default(),
+            scale: 1.0,
+            background: PrintBackground::default(),
+            size: PrintSize::default(),
+            margins: PrintMargins::default(),
+            page_ranges: Vec::default(),
+            shrink_to_fit: true,
+        }
+    }
+}
+
+impl PrintConfigurationBuilder {
+    /// Builds the [`PrintConfiguration`].
+    ///
+    /// Returns None if:
+    ///  - the scale, the margins or the size are infinite, NaN or negative
+    ///  - the margins overflow the size (e.g. margins.left + margins.right >= page.width)
+    pub fn build(self) -> Option<PrintConfiguration> {
+        let must_be_finite_and_positive = [
+            self.scale,
+            self.margins.top,
+            self.margins.left,
+            self.margins.right,
+            self.margins.bottom,
+            self.size.width,
+            self.size.height,
+        ];
+        if !must_be_finite_and_positive
+            .into_iter()
+            .all(|n| n.is_finite() && n.is_sign_positive())
+        {
+            return None;
+        }
+
+        if (self.margins.top + self.margins.bottom) >= self.size.height
+            || (self.margins.left + self.margins.right) >= self.size.width
+        {
+            return None;
+        }
+
+        Some(PrintConfiguration {
+            orientation: self.orientation,
+            scale: self.scale,
+            background: self.background,
+            size: self.size,
+            margins: self.margins,
+            page_ranges: self.page_ranges,
+            shrink_to_fit: self.shrink_to_fit,
+        })
+    }
+
+    /// Sets the orientation of the printed page.
+    ///
+    /// Default: [`PrintOrientation::Portrait`].
+    pub fn orientation(mut self, orientation: PrintOrientation) -> Self {
+        self.orientation = orientation;
+
+        self
+    }
+
+    /// Sets the scale of the printed page.
+    ///
+    /// Default: 1.
+    pub fn scale(mut self, scale: f64) -> Self {
+        self.scale = scale;
+
+        self
+    }
+
+    /// Sets whether or not to print the backgrounds of the page.
+    ///
+    /// Default: [`PrintBackground::Exclude`].
+    pub fn background(mut self, background: PrintBackground) -> Self {
+        self.background = background;
+
+        self
+    }
+
+    /// Sets the size of the printed page.
+    ///
+    /// Default: `21.59x27.79 cm`.
+    pub fn size(mut self, size: PrintSize) -> Self {
+        self.size = size;
+
+        self
+    }
+
+    /// Sets the margins of the printed page.
+    ///
+    /// Default: `1x1x1x1 cm`.
+    pub fn margins(mut self, margins: PrintMargins) -> Self {
+        self.margins = margins;
+
+        self
+    }
+
+    /// Sets ranges of pages to print.
+    ///
+    /// An empty `ranges` prints all pages.
+    /// Default: all.
+    pub fn page_ranges(mut self, ranges: Vec<PrintPageRange>) -> Self {
+        self.page_ranges = ranges;
+
+        self
+    }
+
+    /// Sets whether or not to resize the content to fit the page width,
+    /// overriding any page width specified in the content of pages to print.
+    ///
+    /// Default: true.
+    pub fn shrink_to_fit(mut self, shrink_to_fit: bool) -> Self {
+        self.shrink_to_fit = shrink_to_fit;
+
+        self
+    }
+}
+
+/// The print configuration.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrintConfiguration {
+    orientation: PrintOrientation,
+    scale: f64,
+    background: PrintBackground,
+    size: PrintSize,
+    margins: PrintMargins,
+    page_ranges: Vec<PrintPageRange>,
+    shrink_to_fit: bool,
+}
+
+impl PrintConfiguration {
+    /// Creates a [`PrintConfigurationBuilder`] to configure a [`PrintConfiguration`].
+    pub fn builder() -> PrintConfigurationBuilder {
+        PrintConfigurationBuilder::default()
+    }
+
+    pub(crate) fn into_params(self) -> PrintParameters {
+        PrintParameters {
+            orientation: self.orientation.into_params(),
+            scale: self.scale,
+            background: self.background.into_params(),
+            page: self.size.into_params(),
+            margin: self.margins.into_params(),
+            page_ranges: self
+                .page_ranges
+                .into_iter()
+                .map(|page_range| page_range.into_params())
+                .collect(),
+            shrink_to_fit: self.shrink_to_fit,
+        }
+    }
+}
+
+impl Default for PrintConfiguration {
+    fn default() -> Self {
+        PrintConfiguration {
+            orientation: PrintOrientation::default(),
+            scale: 1.0,
+            background: PrintBackground::default(),
+            size: PrintSize::default(),
+            margins: PrintMargins::default(),
+            page_ranges: Vec::new(),
+            shrink_to_fit: true,
+        }
+    }
+}
+
+/// The orientation of the print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PrintOrientation {
+    /// Landscape orientation.
+    Landscape,
+    #[default]
+    /// Portrait orientation.
+    Portrait,
+}
+
+impl PrintOrientation {
+    pub(crate) fn into_params(self) -> webdriver::command::PrintOrientation {
+        match self {
+            Self::Landscape => webdriver::command::PrintOrientation::Landscape,
+            Self::Portrait => webdriver::command::PrintOrientation::Portrait,
+        }
+    }
+}
+
+/// Whether to print backgrounds or not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum PrintBackground {
+    /// Include the backgrounds in the print.
+    Include,
+    #[default]
+    /// Exclude the backgrounds from the print.
+    Exclude,
+}
+
+impl PrintBackground {
+    pub(crate) fn into_params(self) -> bool {
+        match self {
+            Self::Include => true,
+            Self::Exclude => false,
+        }
+    }
+}
+
+/// The size of the printed page in centimeters.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrintSize {
+    /// The width in centimeters.
+    pub width: f64,
+    /// The height in centimeters.
+    pub height: f64,
+}
+
+impl PrintSize {
+    pub(crate) fn into_params(self) -> webdriver::command::PrintPage {
+        webdriver::command::PrintPage {
+            width: self.width,
+            height: self.height,
+        }
+    }
+}
+
+impl Default for PrintSize {
+    fn default() -> Self {
+        Self {
+            width: 21.59,
+            height: 27.94,
+        }
+    }
+}
+
+/// The range of the pages to print.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PrintPageRange {
+    range: RangeInclusive<u64>,
+}
+
+impl PrintPageRange {
+    /// A single page to print.
+    pub const fn single(page: u64) -> Self {
+        Self { range: page..=page }
+    }
+
+    /// A range of pages to print.
+    ///
+    /// Returns None if the range start is greater than the range end.
+    pub const fn range(range: RangeInclusive<u64>) -> Option<Self> {
+        if *range.start() <= *range.end() {
+            Some(Self { range })
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn into_params(self) -> webdriver::command::PrintPageRange {
+        let (start, end) = self.range.into_inner();
+
+        if start == end {
+            webdriver::command::PrintPageRange::Integer(start)
+        } else {
+            webdriver::command::PrintPageRange::Range(format!("{start}-{end}"))
+        }
+    }
+}
+
+/// The margins of the printed page in centimeters.
+#[derive(Debug, Clone, PartialEq)]
+pub struct PrintMargins {
+    /// The top margin in centimeters.
+    pub top: f64,
+    /// The bottom margin in centimeters.
+    pub bottom: f64,
+    /// The left margin in centimeters.
+    pub left: f64,
+    /// The right margin in centimeters.
+    pub right: f64,
+}
+
+impl PrintMargins {
+    pub(crate) fn into_params(self) -> webdriver::command::PrintMargins {
+        webdriver::command::PrintMargins {
+            top: self.top,
+            bottom: self.bottom,
+            left: self.left,
+            right: self.right,
+        }
+    }
+}
+
+impl Default for PrintMargins {
+    fn default() -> Self {
+        Self {
+            top: 1.0,
+            bottom: 1.0,
+            left: 1.0,
+            right: 1.0,
         }
     }
 }
