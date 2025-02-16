@@ -241,7 +241,6 @@ version = "0.21.4"
 dependencies = [
  "base64 0.22.1",
  "cookie 0.18.1",
- "futures-core",
  "futures-util",
  "http 1.1.0",
  "http-body-util",
