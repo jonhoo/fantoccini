@@ -72,6 +72,7 @@ impl fmt::Display for NewSessionError {
 
 /// An error occurred while executing some browser action.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum CmdError {
     /// A standard WebDriver error occurred.
     ///
