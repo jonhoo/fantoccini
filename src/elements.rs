@@ -235,6 +235,7 @@ impl Element {
         match self.client.issue(cmd).await? {
             Json::String(v) => Ok(Some(v)),
             Json::Bool(b) => Ok(Some(b.to_string())),
+            Json::Number(n) => Ok(Some(n.to_string())),
             Json::Null => Ok(None),
             v => Err(error::CmdError::NotW3C(v)),
         }
