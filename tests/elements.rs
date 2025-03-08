@@ -48,6 +48,9 @@ async fn element_prop(c: Client, port: u16) -> Result<(), error::CmdError> {
     assert_eq!(elem.prop("id").await?.unwrap(), "checkbox-option-1");
     assert_eq!(elem.prop("checked").await?.unwrap(), "false");
     assert!(elem.attr("invalid-property").await?.is_none());
+
+    let elem = c.find(Locator::Id("content")).await?;
+    assert_eq!(elem.prop("childElementCount").await?.unwrap(), "5");
     Ok(())
 }
 
