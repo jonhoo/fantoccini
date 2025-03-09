@@ -223,12 +223,48 @@ impl Element {
     ///
     /// `Ok(None)` is returned if the element does not have the given property.
     ///
-    /// Boolean properties such as "checked" will be returned as the String "true" or "false".
-    ///
     /// See [13.3 Get Element Property](https://www.w3.org/TR/webdriver1/#get-element-property)
     /// of the WebDriver standard.
     ///
     /// [property]: https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.1
+    ///
+    /// Example:
+    ///
+    /// ```
+    /// # use fantoccini::{ClientBuilder, error, Locator};
+    /// # use serde_json::{json, Number};
+    /// # async fn no_search_results() -> Result<(), error::CmdError> {
+    /// // Define capabilities of client...
+    /// #    let capabilities = json!({})
+    /// #        .as_object()
+    /// #        .unwrap()
+    /// #        .to_owned();
+    /// #
+    /// // Create client...
+    /// # let client = ClientBuilder::native()
+    /// #   .capabilities(capabilities)
+    /// #   .connect("http://127.0.0.1:4444")
+    /// #   .await.unwrap();
+    /// #
+    /// // Perform some kind of search on the website that we don't expect any results from...
+    ///
+    /// let search_matches = client
+    ///     .wait()
+    ///     .for_element(Locator::Css("#search-matches"))
+    ///     .await?;
+    ///
+    /// let num_search_matches = search_matches
+    ///     .prop("childElementCount")
+    ///     .await?
+    ///     .expect("expected there to be some value for childElementCount property")
+    ///     .as_u64()
+    ///     .expect("expected childElementCount to be an integer value");
+    ///
+    /// assert_eq!(num_search_matches, 0);
+    /// #
+    /// #   Ok(())
+    /// # };
+    /// ```
     #[cfg_attr(docsrs, doc(alias = "Get Element Property"))]
     pub async fn prop(&self, prop: &str) -> Result<Option<Json>, error::CmdError> {
         let cmd = WebDriverCommand::GetElementProperty(self.element.clone(), prop.to_string());
