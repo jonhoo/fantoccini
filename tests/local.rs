@@ -529,7 +529,7 @@ async fn send_keys_and_clear_input_inner(c: Client, port: u16) -> Result<(), err
             .await?
             .expect("input should have value prop")
             .as_str(),
-        "foobar"
+        Some("foobar")
     );
 
     e.clear().await?;
@@ -538,7 +538,7 @@ async fn send_keys_and_clear_input_inner(c: Client, port: u16) -> Result<(), err
             .await?
             .expect("input should have value prop")
             .as_str(),
-        ""
+        Some("")
     );
 
     let c = e.client();
