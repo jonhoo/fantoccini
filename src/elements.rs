@@ -230,14 +230,11 @@ impl Element {
     ///
     /// [property]: https://www.ecma-international.org/ecma-262/5.1/#sec-8.12.1
     #[cfg_attr(docsrs, doc(alias = "Get Element Property"))]
-    pub async fn prop(&self, prop: &str) -> Result<Option<String>, error::CmdError> {
+    pub async fn prop(&self, prop: &str) -> Result<Option<Json>, error::CmdError> {
         let cmd = WebDriverCommand::GetElementProperty(self.element.clone(), prop.to_string());
         match self.client.issue(cmd).await? {
-            Json::String(v) => Ok(Some(v)),
-            Json::Bool(b) => Ok(Some(b.to_string())),
-            Json::Number(n) => Ok(Some(n.to_string())),
             Json::Null => Ok(None),
-            v => Err(error::CmdError::NotW3C(v)),
+            v => Ok(Some(v)),
         }
     }
 
