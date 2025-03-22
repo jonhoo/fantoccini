@@ -46,8 +46,32 @@ async fn element_prop(c: Client, port: u16) -> Result<(), error::CmdError> {
     c.goto(&sample_url).await?;
     let elem = c.find(Locator::Id("checkbox-option-1")).await?;
     assert_eq!(elem.prop("id").await?.unwrap(), "checkbox-option-1");
-    assert_eq!(elem.prop("checked").await?.unwrap(), "false");
+
+    assert_eq!(
+        elem.prop("checked")
+            .await?
+            .expect(
+                "expected checked property to exist on HTML element with ID 'checkbox-option-1'"
+            )
+            .as_bool()
+            .expect("expected checked property to be a boolean value"),
+        false,
+    );
+
     assert!(elem.attr("invalid-property").await?.is_none());
+
+    let elem = c.find(Locator::Id("content")).await?;
+    assert_eq!(
+        elem.prop("childElementCount")
+            .await?
+            .expect(
+                "expected childElementCount property to exist on HTML element with ID 'content'"
+            )
+            .as_u64()
+            .expect("expected childElementCount property to be an integer value"),
+        5,
+    );
+
     Ok(())
 }
 
