@@ -237,7 +237,7 @@ dependencies = [
 
 [[package]]
 name = "fantoccini"
-version = "0.21.4"
+version = "0.21.5"
 dependencies = [
  "base64 0.22.1",
  "cookie 0.18.1",
