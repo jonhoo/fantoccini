@@ -316,6 +316,7 @@ impl<'a, F> RawRequestBuilder<'a, F> {
 
 impl<'a, F> RawRequestBuilder<'a, F> {
     /// Set a function to modify the request.
+    #[must_use]
     pub fn map_request<F2>(self, f: F2) -> RawRequestBuilder<'a, F2>
     where
         F2: FnOnce(
@@ -1218,8 +1219,8 @@ impl Client {
         ) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
     {
         let mut builder = self.raw_request();
-        builder.method(method).url(url).clone().map_request(before);
-        builder.send().await
+        builder.method(method).url(url);
+        builder.map_request(before).send().await
     }
 }
 

@@ -492,9 +492,10 @@ async fn clicks_inner_by_locator(c: Client, port: u16) -> Result<(), error::CmdE
         .await?;
     f.submit().await?;
 
-    // we should now have ended up in the right place
-    let current_url = c.current_url().await?;
-    assert_eq!(current_url.as_ref(), format!("{}?search=foobar", url));
+    // we should now end up in the right place
+    c.wait()
+        .for_url(format!("{}?search=foobar", url).parse().unwrap())
+        .await?;
 
     c.close().await
 }
@@ -509,10 +510,9 @@ async fn clicks_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
     f.submit().await?;
 
     // we should now have ended up in the right place
-    let current_url = c.current_url().await?;
-    // This is not a 1to1 match with previous test ('foobar' vs ?search=foobar),
-    // but I believe it has the same result
-    assert_eq!(current_url.as_ref(), format!("{}?search=foobar", url));
+    c.wait()
+        .for_url(format!("{}?search=foobar", url).parse().unwrap())
+        .await?;
 
     c.close().await
 }
@@ -687,8 +687,7 @@ async fn wait_for_navigation_test(c: Client, _port: u16) -> Result<(), error::Cm
 
     #[allow(deprecated)]
     loop {
-        let wait_for = c.wait_for_navigation(Some(url)).await;
-        assert!(wait_for.is_ok());
+        c.wait_for_navigation(Some(url)).await?;
         url = c.current_url().await?;
         if url.as_str() == "about:blank" {
             // try again
