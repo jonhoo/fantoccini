@@ -6,8 +6,8 @@ use crate::error;
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
 use crate::wd::{
-    Capabilities, Locator, NewSessionResponse, NewWindowType, TimeoutConfiguration,
-    WebDriverStatus, WindowHandle,
+    Capabilities, Locator, NewSessionResponse, NewWindowType, PrintConfiguration,
+    TimeoutConfiguration, WebDriverStatus, WindowHandle,
 };
 use base64::Engine;
 use http::Method;
@@ -1092,6 +1092,26 @@ impl Client {
             base64::engine::general_purpose::STANDARD
                 .decode(src)
                 .map_err(error::CmdError::ImageDecodeError)
+        } else {
+            Err(error::CmdError::NotW3C(src))
+        }
+    }
+
+    /// Get a PDF of the current page.
+    ///
+    /// See [18.1 Print Page](https://www.w3.org/TR/webdriver2/#print-page) of the
+    /// WebDriver2 standard.
+    pub async fn print(
+        &self,
+        print_configuration: PrintConfiguration,
+    ) -> Result<Vec<u8>, error::CmdError> {
+        let src = self
+            .issue(WebDriverCommand::Print(print_configuration.into_params()))
+            .await?;
+        if let Some(src) = src.as_str() {
+            base64::engine::general_purpose::STANDARD
+                .decode(src)
+                .map_err(error::CmdError::PdfDecodeError)
         } else {
             Err(error::CmdError::NotW3C(src))
         }

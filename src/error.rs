@@ -72,6 +72,7 @@ impl fmt::Display for NewSessionError {
 
 /// An error occurred while executing some browser action.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum CmdError {
     /// A standard WebDriver error occurred.
     ///
@@ -117,6 +118,9 @@ pub enum CmdError {
 
     /// Could not decode a base64 image
     ImageDecodeError(base64::DecodeError),
+
+    /// Could not decode a base64 PDF.
+    PdfDecodeError(base64::DecodeError),
 
     /// Timeout of a wait condition.
     ///
@@ -190,6 +194,7 @@ impl Error for CmdError {
             CmdError::NotW3C(..) => "webdriver returned non-conforming response",
             CmdError::InvalidArgument(..) => "invalid argument provided",
             CmdError::ImageDecodeError(..) => "error decoding image",
+            CmdError::PdfDecodeError(..) => "error decoding PDF",
             CmdError::WaitTimeout => "timeout waiting on condition",
         }
     }
@@ -202,7 +207,7 @@ impl Error for CmdError {
             CmdError::FailedC(ref e) => Some(e),
             CmdError::Lost(ref e) => Some(e),
             CmdError::Json(ref e) => Some(e),
-            CmdError::ImageDecodeError(ref e) => Some(e),
+            CmdError::ImageDecodeError(ref e) | CmdError::PdfDecodeError(ref e) => Some(e),
             CmdError::NotJson(_)
             | CmdError::NotW3C(_)
             | CmdError::InvalidArgument(..)
@@ -224,7 +229,9 @@ impl fmt::Display for CmdError {
             CmdError::NotJson(ref e) => write!(f, "{}", e),
             CmdError::Json(ref e) => write!(f, "{}", e),
             CmdError::NotW3C(ref e) => write!(f, "{:?}", e),
-            CmdError::ImageDecodeError(ref e) => write!(f, "{:?}", e),
+            CmdError::ImageDecodeError(ref e) | CmdError::PdfDecodeError(ref e) => {
+                write!(f, "{:?}", e)
+            }
             CmdError::InvalidArgument(ref arg, ref msg) => {
                 write!(f, "Invalid argument `{}`: {}", arg, msg)
             }
@@ -282,6 +289,35 @@ impl Error for InvalidWindowHandle {}
 impl From<InvalidWindowHandle> for CmdError {
     fn from(_: InvalidWindowHandle) -> Self {
         Self::NotW3C(serde_json::Value::String("current".to_string()))
+    }
+}
+
+/// Error of attempting to build an invalid [`PrintConfiguration`](crate::wd::PrintConfiguration).
+#[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum PrintConfigurationError {
+    /// One or more dimensions of the page margins/size are negative.
+    NegativeDimensions,
+    /// One or more dimensions of the page margins/size are NaN or infinite.
+    NonFiniteDimensions,
+    /// The margins overflow the page size (e.g. margins.left + margins.right >= page.width).
+    DimensionsOverflow,
+    /// Eighter one of print height or width are smaller than the [`PrintSize::MIN`](crate::wd::PrintSize::MIN).
+    PrintSizeTooSmall,
+}
+
+impl fmt::Display for PrintConfigurationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::NegativeDimensions => {
+                "one or more dimensions of the page (margins and/or size) are negative"
+            }
+            Self::NonFiniteDimensions => {
+                "one or more dimensions of the page (margins and/or size) are NaN or infinite"
+            }
+            Self::DimensionsOverflow => "the margins overflow the page size",
+            Self::PrintSizeTooSmall => "the print size is too small",
+        })
     }
 }
 

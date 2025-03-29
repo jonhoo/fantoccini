@@ -1,5 +1,4 @@
 //! WebDriver types and declarations.
-
 use crate::error;
 #[cfg(doc)]
 use crate::Client;
@@ -373,3 +372,8 @@ impl NewSessionResponse {
         }
     }
 }
+
+pub use crate::print::{
+    PrintConfiguration, PrintConfigurationBuilder, PrintMargins, PrintOrientation, PrintPageRange,
+    PrintSize,
+};

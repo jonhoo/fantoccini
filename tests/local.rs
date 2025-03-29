@@ -1,6 +1,6 @@
 //! Tests that don't make use of external websites.
 use crate::common::{other_page_url, sample_page_url};
-use fantoccini::wd::TimeoutConfiguration;
+use fantoccini::wd::{PrintConfiguration, TimeoutConfiguration};
 use fantoccini::{error, Client, Locator};
 use http_body_util::BodyExt;
 use hyper::Method;
@@ -700,6 +700,16 @@ async fn wait_for_navigation_test(c: Client, _port: u16) -> Result<(), error::Cm
     c.close().await
 }
 
+async fn print_page_test(c: Client, _port: u16) -> Result<(), error::CmdError> {
+    let pdf_bytes = c
+        .print(PrintConfiguration::builder().build().unwrap())
+        .await?;
+
+    assert!(pdf_bytes.starts_with(b"%PDF-"));
+
+    Ok(())
+}
+
 mod firefox {
     use super::*;
     #[test]
@@ -921,6 +931,12 @@ mod firefox {
     fn it_waits_for_navigation() {
         local_tester!(wait_for_navigation_test, "firefox");
     }
+
+    #[test]
+    #[serial]
+    fn print_page() {
+        local_tester!(print_page_test, "firefox");
+    }
 }
 
 mod chrome {
@@ -1138,5 +1154,11 @@ mod chrome {
     #[serial]
     fn it_waits_for_navigation() {
         local_tester!(wait_for_navigation_test, "chrome");
+    }
+
+    #[test]
+    #[serial]
+    fn print_page() {
+        local_tester!(print_page_test, "chrome");
     }
 }
