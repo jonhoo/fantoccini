@@ -217,8 +217,8 @@ pub struct PrintSize {
 impl PrintSize {
     /// The standard A4 paper size, which has the dimension of `21.0x29.7cm`.
     pub const A4: Self = Self {
-        width: 29.7,
-        height: 21.0,
+        width: 21.0,
+        height: 29.7,
     };
 
     /// The standard US letter paper size, which has the dimension of `21.59x27.94cm`.
