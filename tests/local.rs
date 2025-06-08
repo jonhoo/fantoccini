@@ -494,7 +494,7 @@ async fn clicks_inner_by_locator(c: Client, port: u16) -> Result<(), error::CmdE
 
     // we should now end up in the right place
     c.wait()
-        .for_url(format!("{}?search=foobar", url).parse().unwrap())
+        .for_url(&format!("{}?search=foobar", url).parse().unwrap())
         .await?;
 
     c.close().await
@@ -511,7 +511,7 @@ async fn clicks_inner(c: Client, port: u16) -> Result<(), error::CmdError> {
 
     // we should now have ended up in the right place
     c.wait()
-        .for_url_ref(&format!("{}?search=foobar", url).parse().unwrap())
+        .for_url(&format!("{}?search=foobar", url).parse().unwrap())
         .await?;
 
     c.close().await

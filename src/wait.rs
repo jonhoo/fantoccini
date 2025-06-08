@@ -144,12 +144,7 @@ impl<'c> Wait<'c> {
     }
 
     /// Wait until a given URL is reached.
-    pub async fn for_url(self, url: url::Url) -> Result<(), CmdError> {
-        self.for_url_ref(&url).await
-    }
-
-    /// Wait until a given URL is reached.
-    pub async fn for_url_ref(self, url: &url::Url) -> Result<(), CmdError> {
+    pub async fn for_url(self, url: &url::Url) -> Result<(), CmdError> {
         wait_on!(self, {
             Ok::<_, CmdError>(if self.client.current_url().await? == *url {
                 Some(())
