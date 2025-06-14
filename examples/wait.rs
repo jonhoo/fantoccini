@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Wait for a URL
     let _: () = client
         .wait()
-        .for_url(url::Url::parse("https://www.rust-lang.org/")?)
+        .for_url(&url::Url::parse("https://www.rust-lang.org/")?)
         .await?;
 
     // Wait for a locator, and get back the element.
