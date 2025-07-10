@@ -105,7 +105,7 @@ impl Element {
     #[cfg_attr(docsrs, doc(alias = "Switch To Frame"))]
     pub async fn enter_frame(&self) -> Result<(), error::CmdError> {
         let params = webdriver::command::SwitchToFrameParameters {
-            id: Some(FrameId::Element(self.element.clone())),
+            id: FrameId::Element(self.element.clone()),
         };
         self.client
             .issue(WebDriverCommand::SwitchToFrame(params))
@@ -537,8 +537,7 @@ impl Form {
 
         let res = self.client.issue(locator).await?;
         let field = self.client.parse_lookup(res)?;
-        let mut args = vec![via_json!(&field), value];
-        self.client.fixup_elements(&mut args);
+        let args = vec![via_json!(&field), value];
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "arguments[0].value = arguments[1]".to_string(),
             args: Some(args),
@@ -617,8 +616,7 @@ impl Form {
     /// Note that since no button is actually clicked, the `name=value` pair for the submit button
     /// will not be submitted. This can be circumvented by using `submit_sneaky` instead.
     pub async fn submit_direct(&self) -> Result<(), error::CmdError> {
-        let mut args = vec![via_json!(&self.form)];
-        self.client.fixup_elements(&mut args);
+        let args = vec![via_json!(&self.form)];
         // some sites are silly, and name their submit button "submit". this ends up overwriting
         // the "submit" function of the form with a reference to the submit button itself, so we
         // can't call .submit(). we get around this by creating a *new* form, and using *its*
@@ -648,8 +646,7 @@ impl Form {
     /// `field=value` mapping. This allows you to emulate the form data as it would have been *if*
     /// the submit button was indeed clicked.
     pub async fn submit_sneaky(&self, field: &str, value: &str) -> Result<(), error::CmdError> {
-        let mut args = vec![via_json!(&self.form), Json::from(field), Json::from(value)];
-        self.client.fixup_elements(&mut args);
+        let args = vec![via_json!(&self.form), Json::from(field), Json::from(value)];
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: "\
                      var h = document.createElement('input');\

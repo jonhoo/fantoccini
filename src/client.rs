@@ -6,8 +6,8 @@ use crate::error;
 use crate::session::{Cmd, Session, Task};
 use crate::wait::Wait;
 use crate::wd::{
-    Capabilities, Locator, NewSessionResponse, NewWindowType, TimeoutConfiguration,
-    WebDriverStatus, WindowHandle,
+    Capabilities, Locator, NewSessionResponse, NewWindowType, PrintConfiguration,
+    TimeoutConfiguration, WebDriverStatus, WindowHandle,
 };
 use base64::Engine;
 use http::Method;
@@ -38,7 +38,6 @@ use http_body_util::combinators::BoxBody;
 #[derive(Clone, Debug)]
 pub struct Client {
     pub(crate) tx: mpsc::UnboundedSender<Task>,
-    pub(crate) is_legacy: bool,
     pub(crate) new_session_response: Option<NewSessionResponse>,
 }
 
@@ -316,6 +315,7 @@ impl<'a, F> RawRequestBuilder<'a, F> {
 
 impl<'a, F> RawRequestBuilder<'a, F> {
     /// Set a function to modify the request.
+    #[must_use]
     pub fn map_request<F2>(self, f: F2) -> RawRequestBuilder<'a, F2>
     where
         F2: FnOnce(
@@ -669,9 +669,9 @@ impl Client {
     /// See [10.5 Switch To Frame](https://www.w3.org/TR/webdriver1/#switch-to-frame) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Switch To Frame"))]
-    pub async fn enter_frame(&self, index: Option<u16>) -> Result<(), error::CmdError> {
+    pub async fn enter_frame(&self, index: u16) -> Result<(), error::CmdError> {
         let params = webdriver::command::SwitchToFrameParameters {
-            id: index.map(FrameId::Short),
+            id: FrameId::Short(index),
         };
         self.issue(WebDriverCommand::SwitchToFrame(params)).await?;
         Ok(())
@@ -918,12 +918,7 @@ impl Client {
     /// See [15.2.1 Execute Script](https://www.w3.org/TR/webdriver1/#dfn-execute-script) of the
     /// WebDriver standard.
     #[cfg_attr(docsrs, doc(alias = "Execute Script"))]
-    pub async fn execute(
-        &self,
-        script: &str,
-        mut args: Vec<Json>,
-    ) -> Result<Json, error::CmdError> {
-        self.fixup_elements(&mut args);
+    pub async fn execute(&self, script: &str, args: Vec<Json>) -> Result<Json, error::CmdError> {
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: script.to_string(),
             args: Some(args),
@@ -967,9 +962,8 @@ impl Client {
     pub async fn execute_async(
         &self,
         script: &str,
-        mut args: Vec<Json>,
+        args: Vec<Json>,
     ) -> Result<Json, error::CmdError> {
-        self.fixup_elements(&mut args);
         let cmd = webdriver::command::JavascriptCommandParameters {
             script: script.to_string(),
             args: Some(args),
@@ -1095,6 +1089,26 @@ impl Client {
             Err(error::CmdError::NotW3C(src))
         }
     }
+
+    /// Get a PDF of the current page.
+    ///
+    /// See [18.1 Print Page](https://www.w3.org/TR/webdriver2/#print-page) of the
+    /// WebDriver2 standard.
+    pub async fn print(
+        &self,
+        print_configuration: PrintConfiguration,
+    ) -> Result<Vec<u8>, error::CmdError> {
+        let src = self
+            .issue(WebDriverCommand::Print(print_configuration.into_params()))
+            .await?;
+        if let Some(src) = src.as_str() {
+            base64::engine::general_purpose::STANDARD
+                .decode(src)
+                .map_err(error::CmdError::PdfDecodeError)
+        } else {
+            Err(error::CmdError::NotW3C(src))
+        }
+    }
 }
 
 /// Operations that wait for a change on the page.
@@ -1198,8 +1212,8 @@ impl Client {
         ) -> hyper::Request<BoxBody<hyper::body::Bytes, Infallible>>,
     {
         let mut builder = self.raw_request();
-        builder.method(method).url(url).clone().map_request(before);
-        builder.send().await
+        builder.method(method).url(url);
+        builder.map_request(before).send().await
     }
 }
 
@@ -1257,23 +1271,16 @@ impl Client {
             res => return Err(error::CmdError::NotW3C(res)),
         };
 
-        // legacy protocol uses "ELEMENT" as identifier
-        let key = if self.is_legacy() {
-            "ELEMENT"
-        } else {
-            ELEMENT_KEY
-        };
-
-        if !res.contains_key(key) {
+        if !res.contains_key(ELEMENT_KEY) {
             return Err(error::CmdError::NotW3C(Json::Object(res)));
         }
 
-        match res.remove(key) {
+        match res.remove(ELEMENT_KEY) {
             Some(Json::String(wei)) => {
                 return Ok(webdriver::common::WebElement(wei));
             }
             Some(v) => {
-                res.insert(key.to_string(), v);
+                res.insert(ELEMENT_KEY.to_string(), v);
             }
             None => {}
         }
@@ -1298,20 +1305,6 @@ impl Client {
         }
 
         Ok(array)
-    }
-
-    pub(crate) fn fixup_elements(&self, args: &mut [Json]) {
-        if self.is_legacy() {
-            for arg in args {
-                // the serialization of WebElement uses the W3C index,
-                // but legacy implementations need us to use the "ELEMENT" index
-                if let Json::Object(ref mut o) = *arg {
-                    if let Some(wei) = o.remove(ELEMENT_KEY) {
-                        o.insert("ELEMENT".to_string(), wei);
-                    }
-                }
-            }
-        }
     }
 }
 

@@ -67,8 +67,8 @@ async fn actions_mouse(c: Client, port: u16) -> Result<(), error::CmdError> {
         .then(PointerAction::MoveToElement {
             element: elem,
             duration: None,
-            x: 0,
-            y: 0,
+            x: 0.,
+            y: 0.,
         })
         .then(PointerAction::Down {
             button: MOUSE_BUTTON_LEFT,
@@ -100,14 +100,14 @@ async fn actions_mouse_move(c: Client, port: u16) -> Result<(), error::CmdError>
         // Move to a position at a known offset from the button.
         .then(PointerAction::MoveTo {
             duration: None,
-            x: 0,
-            y: elem_center_y as i64 - 100,
+            x: 0.,
+            y: elem_center_y - 100.,
         })
         // Now move by relative offset so that the cursor is now over the button.
         .then(PointerAction::MoveBy {
             duration: None,
-            x: elem_center_x as i64,
-            y: 100,
+            x: elem_center_x,
+            y: 100.,
         })
         // Press left mouse button down.
         .then(PointerAction::Down {

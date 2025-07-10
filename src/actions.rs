@@ -135,9 +135,9 @@ pub enum PointerAction {
         /// The move duration.
         duration: Option<Duration>,
         /// `x` offset, in pixels.
-        x: i64,
+        x: f64,
         /// `y` offset, in pixels.
-        y: i64,
+        y: f64,
     },
     /// Move the pointer to a new position.
     ///
@@ -146,9 +146,9 @@ pub enum PointerAction {
         /// The move duration.
         duration: Option<Duration>,
         /// `x` offset, in pixels.
-        x: i64,
+        x: f64,
         /// `y` offset, in pixels.
-        y: i64,
+        y: f64,
     },
     /// Move the pointer to a position relative to the specified element.
     MoveToElement {
@@ -158,9 +158,9 @@ pub enum PointerAction {
         /// The move duration.
         duration: Option<Duration>,
         /// `x` offset, in pixels.
-        x: i64,
+        x: f64,
         /// `y` offset, in pixels.
-        y: i64,
+        y: f64,
     },
     /// Pointer cancel action. Used to cancel the current pointer action.
     Cancel,

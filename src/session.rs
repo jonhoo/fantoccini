@@ -3,7 +3,6 @@ use crate::error::ErrorStatus;
 use crate::wd::{self, WebDriverCompatibleCommand};
 use crate::{error, Client};
 use base64::Engine;
-use futures_core::ready;
 use futures_util::future::{self, Either};
 use futures_util::{FutureExt, TryFutureExt};
 use http_body_util::combinators::BoxBody;
@@ -17,7 +16,7 @@ use std::io;
 use std::mem;
 use std::pin::Pin;
 use std::task::Context;
-use std::task::Poll;
+use std::task::{ready, Poll};
 use tokio::sync::{mpsc, oneshot};
 use webdriver::command::WebDriverCommand;
 use webdriver::response::NewSessionResponse;
@@ -116,7 +115,6 @@ impl WebDriverCompatibleCommand for Wcmd {
                 base.join(&format!("element/{}/rect", we.0))
             }
             WebDriverCommand::IsEnabled(ref we) => base.join(&format!("element/{}/enabled", we.0)),
-            WebDriverCommand::ExecuteScript(..) if self.is_legacy() => base.join("execute"),
             WebDriverCommand::ExecuteScript(..) => base.join("execute/sync"),
             WebDriverCommand::ExecuteAsyncScript(..) => base.join("execute/async"),
             WebDriverCommand::GetCookies
@@ -160,7 +158,9 @@ impl WebDriverCompatibleCommand for Wcmd {
 
         // but some have a request body
         match self {
-            WebDriverCommand::NewSession(command::NewSessionParameters::Spec(ref conf)) => {
+            WebDriverCommand::NewSession(command::NewSessionParameters {
+                capabilities: ref conf,
+            }) => {
                 let mut capabilities = serde_json::value::Map::new();
                 capabilities.insert(
                     String::from("capabilities"),
@@ -185,10 +185,6 @@ impl WebDriverCompatibleCommand for Wcmd {
                         .expect("a serde_json::Value can always be turned into JSON"),
                 );
 
-                method = Method::POST;
-            }
-            WebDriverCommand::NewSession(command::NewSessionParameters::Legacy(ref conf)) => {
-                body = Some(serde_json::to_string(conf).unwrap());
                 method = Method::POST;
             }
             WebDriverCommand::Get(ref params) => {
@@ -286,13 +282,6 @@ impl WebDriverCompatibleCommand for Wcmd {
     fn is_new_session(&self) -> bool {
         matches!(self, WebDriverCommand::NewSession(..))
     }
-
-    fn is_legacy(&self) -> bool {
-        matches!(
-            self,
-            WebDriverCommand::NewSession(webdriver::command::NewSessionParameters::Legacy(..)),
-        )
-    }
 }
 
 impl From<Wcmd> for Cmd {
@@ -341,10 +330,6 @@ impl Client {
         cmd: impl WebDriverCompatibleCommand + Send + 'static,
     ) -> Result<Json, error::CmdError> {
         self.issue(Cmd::WebDriver(Box::new(cmd))).await
-    }
-
-    pub(crate) fn is_legacy(&self) -> bool {
-        self.is_legacy
     }
 }
 
@@ -449,7 +434,6 @@ where
     >,
     wdb: url::Url,
     session: Option<String>,
-    is_legacy: bool,
     ua: Option<String>,
     persist: bool,
 }
@@ -509,12 +493,6 @@ where
                         self.shutdown(Some(ack));
                     }
                     Cmd::WebDriver(request) => {
-                        // looks like the client setup is falling back to legacy params
-                        // keep track of that for later
-                        if request.is_legacy() {
-                            self.is_legacy = true;
-                        }
-
                         self.ongoing = Ongoing::WebDriver {
                             ack,
                             fut: Box::pin(self.issue_wd_cmd(request)),
@@ -551,7 +529,6 @@ where
             client,
             wdb: wdb_url,
             session: session_id.map(Into::into),
-            is_legacy: false,
             ua: None,
             persist: false,
         }
@@ -667,7 +644,6 @@ where
         // now that the session is running, let's do the handshake
         Ok(Client {
             tx,
-            is_legacy: false,
             new_session_response: None,
         })
     }
@@ -703,7 +679,9 @@ where
             alwaysMatch: cap.clone(),
             firstMatch: vec![webdriver::capabilities::Capabilities::new()],
         };
-        let spec = webdriver::command::NewSessionParameters::Spec(session_config);
+        let spec = webdriver::command::NewSessionParameters {
+            capabilities: session_config,
+        };
 
         match client
             .issue(WebDriverCommand::NewSession(spec))
@@ -715,51 +693,8 @@ where
                     Some(wd::NewSessionResponse::from_wd(new_session_response));
                 Ok(client)
             }
-            Err(error::NewSessionError::NotW3C(json)) => {
-                // maybe try legacy mode?
-                let mut legacy = false;
-                match json {
-                    Json::String(ref err) if err.starts_with("Missing Command Parameter") => {
-                        // ghostdriver
-                        legacy = true;
-                    }
-                    Json::Object(ref err) => {
-                        legacy = err
-                            .get("message")
-                            .and_then(|m| m.as_str())
-                            .map(|s| {
-                                // chromedriver < 2.29 || chromedriver == 2.29 || saucelabs
-                                s.contains("cannot find dict 'desiredCapabilities'")
-                                    || s.contains("Missing or invalid capabilities")
-                                    || s.contains("Unexpected server error.")
-                            })
-                            .unwrap_or(false);
-                    }
-                    _ => {}
-                }
-
-                if !legacy {
-                    return Err(error::NewSessionError::NotW3C(json));
-                }
-
-                // we're dealing with an implementation that only supports the legacy
-                // WebDriver protocol:
-                // https://www.selenium.dev/documentation/legacy/json_wire_protocol/
-                let session_config = webdriver::capabilities::LegacyNewSessionParameters {
-                    desired: cap,
-                    required: webdriver::capabilities::Capabilities::new(),
-                };
-                let spec = webdriver::command::NewSessionParameters::Legacy(session_config);
-
-                // try again with a legacy client
-                client
-                    .issue(WebDriverCommand::NewSession(spec))
-                    .map(Self::map_handshake_response)
-                    .await?;
-
-                client.is_legacy = true;
-                Ok(client)
-            }
+            // the webdriver host _could_ still support the legacy webdriver protocol, but since
+            // that's no longer supported by the webdriver crate, we also don't support it.
             Err(e) => Err(e),
         }
     }
@@ -820,7 +755,6 @@ where
             )
         };
 
-        let legacy = self.is_legacy;
         let f = req
             .map_err(error::CmdError::from)
             .and_then(move |res| {
@@ -863,28 +797,14 @@ where
             })
             .map(move |r| {
                 let (body, status) = r?;
-                let is_new_session = cmd.is_new_session();
-
-                let mut is_success = status.is_success();
-                let mut legacy_status = 0;
+                let is_success = status.is_success();
 
                 // https://www.w3.org/TR/webdriver/#dfn-send-a-response
                 // NOTE: the standard specifies that even errors use the "Send a Response" steps
                 let body = match serde_json::from_str(&*body)? {
-                    Json::Object(mut v) => {
-                        if legacy {
-                            legacy_status = v["status"].as_u64().unwrap();
-                            is_success = legacy_status == 0;
-                        }
-
-                        if legacy && is_new_session {
-                            // legacy implementations do not wrap sessionId inside "value"
-                            Ok(Json::Object(v))
-                        } else {
-                            v.remove("value")
-                                .ok_or(error::CmdError::NotW3C(Json::Object(v)))
-                        }
-                    }
+                    Json::Object(mut v) => v
+                        .remove("value")
+                        .ok_or(error::CmdError::NotW3C(Json::Object(v))),
                     v => Err(error::CmdError::NotW3C(v)),
                 }?;
 
@@ -902,49 +822,18 @@ where
                 // phantomjs injects a *huge* field with the entire screen contents -- remove that
                 body.remove("screen");
 
-                let es = if legacy {
-                    // old clients use status codes instead of "error", and we now have to map them
-                    // https://github.com/SeleniumHQ/selenium/wiki/JsonWireProtocol#response-status-codes
-                    if !body.contains_key("message") || !body["message"].is_string() {
-                        return Err(error::CmdError::NotW3C(Json::Object(body)));
-                    }
-                    match legacy_status {
-                        6 | 33 => ErrorStatus::SessionNotCreated,
-                        7 => ErrorStatus::NoSuchElement,
-                        8 => ErrorStatus::NoSuchFrame,
-                        9 => ErrorStatus::UnknownCommand,
-                        10 => ErrorStatus::StaleElementReference,
-                        11 => ErrorStatus::ElementNotInteractable,
-                        12 => ErrorStatus::InvalidElementState,
-                        13 => ErrorStatus::UnknownError,
-                        15 => ErrorStatus::ElementNotSelectable,
-                        17 => ErrorStatus::JavascriptError,
-                        19 | 32 => ErrorStatus::InvalidSelector,
-                        21 => ErrorStatus::Timeout,
-                        23 => ErrorStatus::NoSuchWindow,
-                        24 => ErrorStatus::InvalidCookieDomain,
-                        25 => ErrorStatus::UnableToSetCookie,
-                        26 => ErrorStatus::UnexpectedAlertOpen,
-                        27 => ErrorStatus::NoSuchAlert,
-                        28 => ErrorStatus::ScriptTimeout,
-                        29 => ErrorStatus::InvalidCoordinates,
-                        34 => ErrorStatus::MoveTargetOutOfBounds,
-                        _ => return Err(error::CmdError::NotW3C(Json::Object(body))),
-                    }
-                } else {
-                    if !body.contains_key("error")
-                        || !body.contains_key("message")
-                        || !body["error"].is_string()
-                        || !body["message"].is_string()
-                    {
-                        return Err(error::CmdError::NotW3C(Json::Object(body)));
-                    }
+                if !body.contains_key("error")
+                    || !body.contains_key("message")
+                    || !body["error"].is_string()
+                    || !body["message"].is_string()
+                {
+                    return Err(error::CmdError::NotW3C(Json::Object(body)));
+                }
 
-                    match body["error"].as_str() {
-                        Some(s) => s.parse()?,
-                        None => return Err(error::CmdError::NotW3C(Json::Object(body))),
-                    }
+                let Some(es) = body["error"].as_str() else {
+                    return Err(error::CmdError::NotW3C(Json::Object(body)));
                 };
+                let es = es.parse()?;
 
                 let message = match body.remove("message") {
                     Some(Json::String(x)) => x,
