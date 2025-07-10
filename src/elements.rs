@@ -370,7 +370,13 @@ impl Element {
     #[cfg_attr(docsrs, doc(alias = "outerHTML"))]
     pub async fn html(&self, inner: bool) -> Result<String, error::CmdError> {
         let prop = if inner { "innerHTML" } else { "outerHTML" };
-        Ok(self.prop(prop).await?.unwrap().to_string())
+
+        match self.prop(prop).await? {
+            // Requesting `innerHTML` or `outerHTML` should normally return a string
+            Some(Json::String(contents)) => Ok(contents),
+            Some(res) => Err(error::CmdError::NotW3C(res)),
+            _ => Err(error::CmdError::NotW3C(Json::Null)),
+        }
     }
 }
 
