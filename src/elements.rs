@@ -8,7 +8,7 @@ use serde_json::Value as Json;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use webdriver::command::WebDriverCommand;
-use webdriver::common::FrameId;
+use webdriver::common::{FrameId, SHADOW_KEY};
 
 /// Web element reference.
 ///
@@ -86,6 +86,114 @@ impl Element {
     /// Get the element id as given by the webdriver.
     pub fn element_id(&self) -> ElementRef {
         ElementRef(self.element.0.clone())
+    }
+
+    /// Get the shadow root of the element.
+    ///
+    /// Returns a [`ShadowRoot`] that can be used to find elements within the shadow DOM.
+    ///
+    /// See [12.6 Get Element Shadow Root](https://www.w3.org/TR/webdriver2/#get-element-shadow-root)
+    /// of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Get Element Shadow Root"))]
+    pub async fn shadow_root(&self) -> Result<ShadowRoot, error::CmdError> {
+        let res = self
+            .client
+            .issue(WebDriverCommand::GetShadowRoot(self.element.clone()))
+            .await?;
+        let shadow = parse_shadow_root(res)?;
+        Ok(ShadowRoot {
+            client: self.client.clone(),
+            shadow_root: shadow,
+        })
+    }
+}
+
+/// A shadow root of an element on the current page.
+///
+/// A shadow root encapsulates a shadow DOM tree, which is a separate DOM subtree
+/// attached to an element. This struct provides methods to find elements within
+/// the shadow DOM.
+///
+/// See [Shadow Root](https://www.w3.org/TR/webdriver2/#dfn-shadow-roots) of the WebDriver standard.
+#[derive(Clone, Debug)]
+pub struct ShadowRoot {
+    /// The high-level WebDriver client, for sending commands.
+    pub(crate) client: Client,
+    /// The encapsulated ShadowRoot struct.
+    pub(crate) shadow_root: webdriver::common::ShadowRoot,
+}
+
+/// Extract the `ShadowRoot` from a `GetShadowRoot` command response.
+fn parse_shadow_root(res: Json) -> Result<webdriver::common::ShadowRoot, error::CmdError> {
+    let mut res = match res {
+        Json::Object(o) => o,
+        res => return Err(error::CmdError::NotW3C(res)),
+    };
+
+    if !res.contains_key(SHADOW_KEY) {
+        return Err(error::CmdError::NotW3C(Json::Object(res)));
+    }
+
+    match res.remove(SHADOW_KEY) {
+        Some(Json::String(shadow_id)) => Ok(webdriver::common::ShadowRoot(shadow_id)),
+        Some(v) => {
+            res.insert(SHADOW_KEY.to_string(), v);
+            Err(error::CmdError::NotW3C(Json::Object(res)))
+        }
+        None => Err(error::CmdError::NotW3C(Json::Object(res))),
+    }
+}
+
+impl ShadowRoot {
+    /// Get back the [`Client`] hosting this `ShadowRoot`.
+    pub fn client(self) -> Client {
+        self.client
+    }
+}
+
+/// [Element Retrieval](https://www.w3.org/TR/webdriver2/#element-retrieval) for Shadow Root
+impl ShadowRoot {
+    /// Find the first element within the shadow root that matches the given [`Locator`].
+    ///
+    /// See [12.4.1 Find Element From Shadow Root](https://www.w3.org/TR/webdriver2/#find-element-from-shadow-root)
+    /// of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Find Element From Shadow Root"))]
+    pub async fn find(&self, search: Locator<'_>) -> Result<Element, error::CmdError> {
+        let res = self
+            .client
+            .issue(WebDriverCommand::FindShadowRootElement(
+                self.shadow_root.clone(),
+                search.into_parameters(),
+            ))
+            .await?;
+        let e = self.client.parse_lookup(res)?;
+        Ok(Element {
+            client: self.client.clone(),
+            element: e,
+        })
+    }
+
+    /// Find all elements within the shadow root that match the given [`Locator`].
+    ///
+    /// See [12.4.2 Find Elements From Shadow Root](https://www.w3.org/TR/webdriver2/#find-elements-from-shadow-root)
+    /// of the WebDriver standard.
+    #[cfg_attr(docsrs, doc(alias = "Find Elements From Shadow Root"))]
+    pub async fn find_all(&self, search: Locator<'_>) -> Result<Vec<Element>, error::CmdError> {
+        let res = self
+            .client
+            .issue(WebDriverCommand::FindShadowRootElements(
+                self.shadow_root.clone(),
+                search.into_parameters(),
+            ))
+            .await?;
+        let array = self.client.parse_lookup_all(res)?;
+        Ok(array
+            .into_iter()
+            .map(move |e| Element {
+                client: self.client.clone(),
+                element: e,
+            })
+            .collect())
     }
 }
 
