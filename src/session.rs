@@ -3,8 +3,6 @@ use crate::error::ErrorStatus;
 use crate::wd::{self, WebDriverCompatibleCommand};
 use crate::{error, Client};
 use base64::Engine;
-use futures_util::future::{self, Either};
-use futures_util::{FutureExt, TryFutureExt};
 use http_body_util::combinators::BoxBody;
 use http_body_util::BodyExt;
 use hyper_util::client::legacy::connect;
@@ -683,11 +681,7 @@ where
             capabilities: session_config,
         };
 
-        match client
-            .issue(WebDriverCommand::NewSession(spec))
-            .map(Self::map_handshake_response)
-            .await
-        {
+        match Self::map_handshake_response(client.issue(WebDriverCommand::NewSession(spec)).await) {
             Ok(new_session_response) => {
                 client.new_session_response =
                     Some(wd::NewSessionResponse::from_wd(new_session_response));
@@ -710,150 +704,132 @@ where
         &self,
         cmd: Box<impl WebDriverCompatibleCommand + Send + 'static + ?Sized>,
     ) -> impl Future<Output = Result<Json, error::CmdError>> {
-        // TODO: make this an async fn
-        // will take some doing as returned future must be independent of self
-        let url = match cmd.endpoint(&self.wdb, self.session.as_deref()) {
-            Ok(url) => url,
-            Err(e) => return Either::Right(future::err(error::CmdError::from(e))),
-        };
+        let input = cmd
+            .endpoint(&self.wdb, self.session.as_deref())
+            .map(|url| (url, self.ua.clone(), self.client.clone()));
 
-        let (method, mut body) = cmd.method_and_body(&url);
+        async move {
+            let (url, ua, client) = input?;
 
-        // issue the command to the webdriver server
-        let mut req = hyper::Request::builder();
-        req = req.method(method).uri(url.as_str());
-        if let Some(ref s) = self.ua {
-            req = req.header(hyper::header::USER_AGENT, s.to_owned());
-        }
-        // because https://github.com/hyperium/hyper/pull/727
-        if !url.username().is_empty() || url.password().is_some() {
-            req = req.header(
-                hyper::header::AUTHORIZATION,
-                format!(
-                    "Basic {}",
-                    base64::engine::general_purpose::STANDARD.encode(&format!(
-                        "{}:{}",
-                        url.username(),
-                        url.password().unwrap_or("")
-                    ))
-                ),
-            );
-        }
+            let (method, mut body) = cmd.method_and_body(&url);
 
-        let json_mime: mime::Mime = "application/json; charset=utf-8"
-            .parse::<mime::Mime>()
-            .unwrap_or(mime::APPLICATION_JSON);
+            // issue the command to the webdriver server
+            let mut req = hyper::Request::builder();
+            req = req.method(method).uri(url.as_str());
+            if let Some(ref s) = ua {
+                req = req.header(hyper::header::USER_AGENT, s);
+            }
+            // because https://github.com/hyperium/hyper/pull/727
+            if !url.username().is_empty() || url.password().is_some() {
+                req = req.header(
+                    hyper::header::AUTHORIZATION,
+                    format!(
+                        "Basic {}",
+                        base64::engine::general_purpose::STANDARD.encode(&format!(
+                            "{}:{}",
+                            url.username(),
+                            url.password().unwrap_or("")
+                        ))
+                    ),
+                );
+            }
 
-        let req = if let Some(body) = body.take() {
-            req = req.header(hyper::header::CONTENT_TYPE, json_mime.as_ref());
-            req = req.header(hyper::header::CONTENT_LENGTH, body.len());
-            self.client.request(req.body(BoxBody::new(body)).unwrap())
-        } else {
-            self.client.request(
+            let json_mime: mime::Mime = "application/json; charset=utf-8"
+                .parse::<mime::Mime>()
+                .unwrap_or(mime::APPLICATION_JSON);
+
+            let body = if let Some(body) = body.take() {
+                req = req.header(hyper::header::CONTENT_TYPE, json_mime.as_ref());
+                req = req.header(hyper::header::CONTENT_LENGTH, body.len());
+                req.body(BoxBody::new(body)).unwrap()
+            } else {
                 req.body(BoxBody::new(http_body_util::Empty::new()))
-                    .unwrap(),
-            )
-        };
+                    .unwrap()
+            };
 
-        let f = req
-            .map_err(error::CmdError::from)
-            .and_then(move |res| {
-                // keep track of result status (.body() consumes self -- ugh)
-                let status = res.status();
+            let res = client.request(body).await?;
+            // keep track of result status (.body() consumes self -- ugh)
+            let status = res.status();
 
-                // check that the server sent us json
-                let ctype = res
-                    .headers()
-                    .get(hyper::header::CONTENT_TYPE)
-                    .and_then(|ctype| ctype.to_str().ok()?.parse::<mime::Mime>().ok());
+            // check that the server sent us json
+            let ctype = res
+                .headers()
+                .get(hyper::header::CONTENT_TYPE)
+                .and_then(|ctype| ctype.to_str().ok()?.parse::<mime::Mime>().ok());
 
-                // What did the server send us?
-                res.into_body()
-                    .collect()
-                    .map_ok(|body| body.to_bytes())
-                    .map_ok(move |body| (body, ctype, status))
-                    .map_err(|e| -> error::CmdError { e.into() })
-            })
-            .map(|r| {
-                let (body, ctype, status) = r?;
+            // What did the server send us?
+            let body = res.into_body().collect().await?.to_bytes();
 
-                // Too bad we can't stream into a String :(
-                let body =
-                    String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
+            // Too bad we can't stream into a String :(
+            let body = String::from_utf8(body.to_vec()).expect("non utf-8 response from webdriver");
 
-                if let Some(ctype) = ctype {
-                    if ctype.type_() == mime::APPLICATION_JSON.type_()
-                        && ctype.subtype() == mime::APPLICATION_JSON.subtype()
-                    {
-                        Ok((body, status))
-                    } else {
-                        // nope, something else...
-                        Err(error::CmdError::NotJson(body))
-                    }
-                } else {
-                    // WebDriver host sent us something weird...
-                    Err(error::CmdError::NotJson(body))
-                }
-            })
-            .map(move |r| {
-                let (body, status) = r?;
-                let is_success = status.is_success();
-
-                // https://www.w3.org/TR/webdriver/#dfn-send-a-response
-                // NOTE: the standard specifies that even errors use the "Send a Response" steps
-                let body = match serde_json::from_str(&*body)? {
-                    Json::Object(mut v) => v
-                        .remove("value")
-                        .ok_or(error::CmdError::NotW3C(Json::Object(v))),
-                    v => Err(error::CmdError::NotW3C(v)),
-                }?;
-
-                if is_success {
-                    return Ok(body);
-                }
-
-                // https://www.w3.org/TR/webdriver/#dfn-send-an-error
-                // https://www.w3.org/TR/webdriver/#handling-errors
-                let mut body = match body {
-                    Json::Object(o) => o,
-                    j => return Err(error::CmdError::NotW3C(j)),
-                };
-
-                // phantomjs injects a *huge* field with the entire screen contents -- remove that
-                body.remove("screen");
-
-                if !body.contains_key("error")
-                    || !body.contains_key("message")
-                    || !body["error"].is_string()
-                    || !body["message"].is_string()
+            if let Some(ctype) = ctype {
+                if ctype.type_() != mime::APPLICATION_JSON.type_()
+                    || ctype.subtype() != mime::APPLICATION_JSON.subtype()
                 {
-                    return Err(error::CmdError::NotW3C(Json::Object(body)));
+                    // nope, something else...
+                    return Err(error::CmdError::NotJson(body));
                 }
+            } else {
+                // WebDriver host sent us something weird...
+                return Err(error::CmdError::NotJson(body));
+            }
 
-                let Some(es) = body["error"].as_str() else {
-                    return Err(error::CmdError::NotW3C(Json::Object(body)));
-                };
-                let es = es.parse()?;
+            let is_success = status.is_success();
 
-                let message = match body.remove("message") {
-                    Some(Json::String(x)) => x,
-                    _ => String::new(),
-                };
+            // https://www.w3.org/TR/webdriver/#dfn-send-a-response
+            // NOTE: the standard specifies that even errors use the "Send a Response" steps
+            let body = match serde_json::from_str(&body)? {
+                Json::Object(mut v) => v
+                    .remove("value")
+                    .ok_or(error::CmdError::NotW3C(Json::Object(v))),
+                v => Err(error::CmdError::NotW3C(v)),
+            }?;
 
-                let mut wd_error = error::WebDriver::new(es, message);
+            if is_success {
+                return Ok(body);
+            }
 
-                // Add the stacktrace if there is one.
-                if let Some(Json::String(x)) = body.remove("stacktrace") {
-                    wd_error = wd_error.with_stacktrace(x);
-                }
+            // https://www.w3.org/TR/webdriver/#dfn-send-an-error
+            // https://www.w3.org/TR/webdriver/#handling-errors
+            let mut body = match body {
+                Json::Object(o) => o,
+                j => return Err(error::CmdError::NotW3C(j)),
+            };
 
-                // Some commands may annotate errors with extra data.
-                if let Some(x) = body.remove("data") {
-                    wd_error = wd_error.with_data(x);
-                }
-                Err(error::CmdError::from_webdriver_error(wd_error))
-            });
+            // phantomjs injects a *huge* field with the entire screen contents -- remove that
+            body.remove("screen");
 
-        Either::Left(f)
+            if !body.contains_key("error")
+                || !body.contains_key("message")
+                || !body["error"].is_string()
+                || !body["message"].is_string()
+            {
+                return Err(error::CmdError::NotW3C(Json::Object(body)));
+            }
+
+            let Some(es) = body["error"].as_str() else {
+                return Err(error::CmdError::NotW3C(Json::Object(body)));
+            };
+            let es = es.parse()?;
+
+            let message = match body.remove("message") {
+                Some(Json::String(x)) => x,
+                _ => String::new(),
+            };
+
+            let mut wd_error = error::WebDriver::new(es, message);
+
+            // Add the stacktrace if there is one.
+            if let Some(Json::String(x)) = body.remove("stacktrace") {
+                wd_error = wd_error.with_stacktrace(x);
+            }
+
+            // Some commands may annotate errors with extra data.
+            if let Some(x) = body.remove("data") {
+                wd_error = wd_error.with_data(x);
+            }
+            Err(error::CmdError::from_webdriver_error(wd_error))
+        }
     }
 }
