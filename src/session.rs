@@ -87,6 +87,12 @@ impl WebDriverCompatibleCommand for Wcmd {
             WebDriverCommand::FindElementElements(ref p, _) => {
                 base.join(&format!("element/{}/elements", p.0))
             }
+            WebDriverCommand::FindShadowRootElement(ref shadow, _) => {
+                base.join(&format!("shadow/{}/element", shadow.0))
+            }
+            WebDriverCommand::FindShadowRootElements(ref shadow, _) => {
+                base.join(&format!("shadow/{}/elements", shadow.0))
+            }
             WebDriverCommand::GetActiveElement => base.join("element/active"),
             WebDriverCommand::IsDisplayed(ref we) => {
                 base.join(&format!("element/{}/displayed", we.0))
@@ -140,9 +146,12 @@ impl WebDriverCompatibleCommand for Wcmd {
             WebDriverCommand::TakeElementScreenshot(ref we) => {
                 base.join(&format!("element/{}/screenshot", we.0))
             }
+            WebDriverCommand::GetShadowRoot(ref we) => {
+                base.join(&format!("element/{}/shadow", we.0))
+            }
             WebDriverCommand::Print(..) => base.join("print"),
             WebDriverCommand::Status => unreachable!(),
-            _ => unimplemented!(),
+            _ => unimplemented!("{:?}", self),
         }
     }
 
@@ -192,7 +201,9 @@ impl WebDriverCompatibleCommand for Wcmd {
             WebDriverCommand::FindElement(ref loc)
             | WebDriverCommand::FindElements(ref loc)
             | WebDriverCommand::FindElementElement(_, ref loc)
-            | WebDriverCommand::FindElementElements(_, ref loc) => {
+            | WebDriverCommand::FindElementElements(_, ref loc)
+            | WebDriverCommand::FindShadowRootElement(_, ref loc)
+            | WebDriverCommand::FindShadowRootElements(_, ref loc) => {
                 body = Some(serde_json::to_string(loc).unwrap());
                 method = Method::POST;
             }
