@@ -33,6 +33,7 @@ async fn handle_cookies_test(c: Client) -> Result<(), error::CmdError> {
 
     // Verify same_site None corner-case is correctly parsed
     cookie.set_same_site(None);
+    cookie.set_secure(true);
     c.add_cookie(cookie.clone()).await?;
     assert_eq!(
         c.get_named_cookie(cookie.name()).await?.same_site(),
