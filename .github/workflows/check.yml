@@ -120,7 +120,7 @@ jobs:
     # https://docs.github.com/en/actions/learn-github-actions/contexts#context-availability
     strategy:
       matrix:
-        msrv: ["1.88.0"] # time
+        msrv: ["1.88.0"] # webdriver 0.54 (let chains)
     name: ubuntu / ${{ matrix.msrv }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # tag=v7.0.1
