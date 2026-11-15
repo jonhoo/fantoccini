@@ -165,6 +165,7 @@ dependencies = [
 name = "fantoccini"
 version = "0.22.2"
 dependencies = [
+ "aws-lc-rs",
  "base64 0.23.1",
  "cookie 0.18.2",
  "futures-util",

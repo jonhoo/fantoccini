@@ -51,6 +51,7 @@ serial_test = "4.0"
 [target.'cfg(any())'.dependencies]
 openssl = { version = "0.10.80", optional = true } # through native-tls, <.35 no longer builds
 openssl-macros = { version = "0.1.1", optional = true }
+aws-lc-rs = { version = "1.7.0", default-features = false, optional = true } # through rustls, <1.7 needs CMake < 4 to build
 
 [package.metadata.docs.rs]
 all-features = true
