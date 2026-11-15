@@ -327,8 +327,6 @@ impl Default for PrintMargins {
 
 #[cfg(test)]
 mod tests {
-    use std::f64::{INFINITY, NAN};
-
     use crate::{
         error::PrintConfigurationError,
         wd::{PrintConfiguration, PrintMargins, PrintSize},
@@ -360,7 +358,7 @@ mod tests {
     fn non_finite_print_configuration_dimensions() {
         let nan_margins = PrintConfiguration::builder()
             .margins(PrintMargins {
-                top: NAN,
+                top: f64::NAN,
                 bottom: 0.0,
                 left: 1.0,
                 right: 5.4,
@@ -369,14 +367,14 @@ mod tests {
 
         let nan_size = PrintConfiguration::builder()
             .size(PrintSize {
-                width: NAN,
+                width: f64::NAN,
                 height: 1.0,
             })
             .build();
 
         let infinite_margins = PrintConfiguration::builder()
             .margins(PrintMargins {
-                top: INFINITY,
+                top: f64::INFINITY,
                 bottom: 0.0,
                 left: 1.0,
                 right: 5.4,
@@ -385,7 +383,7 @@ mod tests {
 
         let infinite_size = PrintConfiguration::builder()
             .size(PrintSize {
-                width: INFINITY,
+                width: f64::INFINITY,
                 height: 1.0,
             })
             .build();
